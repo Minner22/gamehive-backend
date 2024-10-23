@@ -1,0 +1,153 @@
+databaseChangeLog:
+  - changeSet:
+        id: 0
+        author: Minner22
+        changes:
+          - createTable:
+              tableName: user_details
+              columns:
+                - column:
+                    name: id
+                    type: BIGINT
+                    autoIncrement: true
+                    constraints:
+                      primaryKey: true
+                - column:
+                    name: created_at
+                    type: TIMESTAMP
+                    defaultValueComputed: CURRENT_TIMESTAMP
+                    constraints:
+                      nullable: false
+                - column:
+                    name: updated_at
+                    type: TIMESTAMP
+                - column:
+                    name: first_name
+                    type: VARCHAR(255)
+                - column:
+                    name: last_name
+                    type: VARCHAR(255)
+                - column:
+                    name: address
+                    type: VARCHAR(255)
+                - column:
+                    name: phone_number
+                    type: VARCHAR(15)
+                - column:
+                    name: date_of_birth
+                    type: DATE
+                - column:
+                    name: profile_picture_url
+                    type: VARCHAR(255)
+  - changeSet:
+      id: 1
+      author: Minner22
+      changes:
+        - createTable:
+            tableName: application_users
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+              - column:
+                  name: username
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: password
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: user_details_id
+                  type: BIGINT
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: application_users
+            baseColumnNames: user_details_id
+            constraintName: fk_user_user_details
+            referencedTableName: user_details
+            referencedColumnNames: id
+  - changeSet:
+      id: 2
+      author: Minner22
+      changes:
+        - createTable:
+            tableName: user_role
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+  - changeSet:
+      id: 3
+      author: Minner22
+      changes:
+        - createTable:
+            tableName: user_roles
+            columns:
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: user_roles
+            baseColumnNames: user_id
+            constraintName: fk_user_roles_user
+            referencedTableName: application_users
+            referencedColumnNames: id
+        - addForeignKeyConstraint:
+            baseTableName: user_roles
+            baseColumnNames: role_id
+            constraintName: fk_user_roles_role
+            referencedTableName: user_role
+            referencedColumnNames: id
