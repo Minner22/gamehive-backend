@@ -3,12 +3,13 @@ spring:
         name: GameHive
     datasource:
         url: jdbc:h2:mem:test;MODE=PostgreSQL
+
     jpa:
         hibernate:
             ddl-auto: validate
         show-sql: true
     liquibase:
-        change-log: classpath:db/changelog/db.changelog-master.yaml
+        change-log: classpath:db/changelog/db.changelog-master.xml
     security:
         user:
             name: admin
@@ -16,3 +17,7 @@ spring:
     threads:
         virtual:
             enabled: true
+    h2:
+        console:
+            enabled: true
+            path: /h2-console

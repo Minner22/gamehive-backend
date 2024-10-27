@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20241011_000" author="admin">
+        <sqlFile path="db/changelog/tables/0001_user_details.sql" />
+    </changeSet>
+    <changeSet id="20241011_001" author="admin">
+        <sqlFile path="db/changelog/tables/0001_application_users.sql" />
+    </changeSet>
+    <changeSet id="20241011_002" author="admin">
+        <sqlFile path="db/changelog/tables/0001_user_role.sql" />
+    </changeSet>
+    <changeSet id="20241011_003" author="admin">
+        <sqlFile path="db/changelog/tables/0001_user_roles.sql" />
+    </changeSet>
+    <include file="../testdata/testdata.sql" relativeToChangelogFile="true"/>
+</databaseChangeLog>
