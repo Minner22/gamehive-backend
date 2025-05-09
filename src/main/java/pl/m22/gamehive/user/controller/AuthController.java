@@ -13,7 +13,7 @@ import pl.m22.gamehive.user.exception.RoleNotFoundException;
 import pl.m22.gamehive.user.service.UserService;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 @AllArgsConstructor
 public class AuthController {
 
