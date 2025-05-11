@@ -3,7 +3,6 @@ package pl.m22.gamehive.user.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 import pl.m22.gamehive.common.AbstractEntity;
@@ -19,7 +18,7 @@ import java.util.Set;
 @AllArgsConstructor
 @ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true)
-public class User extends AbstractEntity {
+public class AppUser extends AbstractEntity {
 
     @Column(nullable = false, unique = true)
     @NotBlank
