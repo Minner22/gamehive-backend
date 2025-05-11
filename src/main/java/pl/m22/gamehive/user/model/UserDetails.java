@@ -1,7 +1,6 @@
 package pl.m22.gamehive.user.model;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -27,6 +26,4 @@ public class UserDetails extends AbstractEntity {
     private LocalDate dateOfBirth;
     @URL
     private String profilePictureUrl;
-    @OneToOne(mappedBy = "userDetails")
-    private User user;
 }
