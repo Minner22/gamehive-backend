@@ -7,8 +7,8 @@ import jakarta.validation.constraints.Size;
 import lombok.*;
 import pl.m22.gamehive.common.AbstractEntity;
 
-import java.util.Collection;
 import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "application_users")
@@ -39,7 +39,7 @@ public class AppUser extends AbstractEntity {
             joinColumns = @JoinColumn(name = "user_id", referencedColumnName = "id"),
             inverseJoinColumns = @JoinColumn(name = "role_id", referencedColumnName = "id")
     )
-    private Collection<UserRole> roles = new HashSet<>();
+    private Set<UserRole> roles = new HashSet<>();
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_details_id", referencedColumnName = "id")
