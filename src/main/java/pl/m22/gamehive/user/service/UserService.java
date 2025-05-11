@@ -8,7 +8,7 @@ import pl.m22.gamehive.user.dto.UserCredentialsDto;
 import pl.m22.gamehive.user.dto.UserRegistrationDto;
 import pl.m22.gamehive.user.exception.RoleNotFoundException;
 import pl.m22.gamehive.user.mapper.UserMapper;
-import pl.m22.gamehive.user.model.User;
+import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.UserDetails;
 import pl.m22.gamehive.user.model.UserRole;
 import pl.m22.gamehive.user.repository.UserRepository;
@@ -21,7 +21,7 @@ import java.util.Optional;
 @AllArgsConstructor
 public class UserService {
 
-    private final static String USER_ROLE = "USER";
+    private static final String USER_ROLE = "USER";
     private final UserRepository userRepository;
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
@@ -33,7 +33,7 @@ public class UserService {
 
     public List<String> findAllUserEmails() {
         return userRepository.findAllUsersByRoles_Name(USER_ROLE).stream()
-                .map(User::getEmail)
+                .map(AppUser::getEmail)
                 .toList();
     }
 
@@ -44,18 +44,18 @@ public class UserService {
 
     @Transactional
     public void register(UserRegistrationDto registrationDto) {
-        User user = UserMapper.INSTANCE.toUser(registrationDto);
+        AppUser appUser = UserMapper.INSTANCE.toUser(registrationDto);
         Optional<UserRole> userRole = userRoleRepository.findByName(USER_ROLE);
         String passwordHash = passwordEncoder.encode(registrationDto.password());
-        user.setPassword(passwordHash);
+        appUser.setPassword(passwordHash);
         userRole.ifPresentOrElse(
-                role -> user.getRoles().add(role),
+                role -> appUser.getRoles().add(role),
                 () -> {
                     throw new RoleNotFoundException(USER_ROLE);
                 }
         );
-        user.setUserDetails(new UserDetails());
-        userRepository.save(user);
+        appUser.setUserDetails(new UserDetails());
+        userRepository.save(appUser);
     }
 
     public boolean emailExists(String email) {

@@ -2,10 +2,10 @@
 INSERT INTO user_role (name, description)
 VALUES
     ('ADMIN', 'Administrator of the system'),
-    ('USER', 'Regular user of the system'),
+    ('USER', 'Regular appUser of the system'),
     ('MODERATOR', 'Moderator with special permissions');
 
--- user details
+-- appUser details
 INSERT INTO user_details (first_name, last_name, address, phone_number, date_of_birth, profile_picture_url)
 VALUES
     ('John', 'Doe', '123 Main St', '123456789', '1990-05-15', 'https://example.com/johndoe.jpg'),
