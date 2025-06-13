@@ -1,4 +1,4 @@
-package pl.m22.gamehive.user.exception;
+package pl.m22.gamehive.common.exception;
 
 public class RoleNotFoundException extends RuntimeException {
     public RoleNotFoundException(String roleName) {

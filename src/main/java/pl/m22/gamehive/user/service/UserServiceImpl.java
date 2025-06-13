@@ -4,9 +4,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.m22.gamehive.common.exception.EmailAlreadyExistsException;
+import pl.m22.gamehive.common.exception.UsernameAlreadyExistsException;
 import pl.m22.gamehive.user.dto.UserCredentialsDto;
+import pl.m22.gamehive.user.dto.UserLoginDto;
 import pl.m22.gamehive.user.dto.UserRegistrationDto;
-import pl.m22.gamehive.user.exception.RoleNotFoundException;
+import pl.m22.gamehive.common.exception.RoleNotFoundException;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.UserDetails;
@@ -48,18 +51,29 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @Override
     public void register(UserRegistrationDto registrationDto) {
+        if (userRepository.existsByEmail(registrationDto.email())) {
+            throw new EmailAlreadyExistsException(registrationDto.email());
+        }
+
+        if (userRepository.existsByUsername(registrationDto.username())) {
+            throw new UsernameAlreadyExistsException(registrationDto.username());
+        }
+
         AppUser appUser = UserMapper.INSTANCE.toUser(registrationDto);
-        Optional<UserRole> userRole = userRoleRepository.findByName(USER_ROLE);
-        String passwordHash = passwordEncoder.encode(registrationDto.password());
-        appUser.setPassword(passwordHash);
-        userRole.ifPresentOrElse(
-                role -> appUser.getRoles().add(role),
-                () -> {
-                    throw new RoleNotFoundException(USER_ROLE);
-                }
-        );
+        appUser.setPassword(passwordEncoder.encode(registrationDto.password()));
         appUser.setUserDetails(new UserDetails());
+
+        UserRole role = userRoleRepository.findByName(USER_ROLE)
+                .orElseThrow(() -> new RoleNotFoundException(USER_ROLE));
+
+        appUser.getRoles().add(role);
+
         userRepository.save(appUser);
+    }
+
+    @Override
+    public void login(UserLoginDto loginDto) {
+
     }
 
     @Override
@@ -70,5 +84,10 @@ public class UserServiceImpl implements UserService {
     @Override
     public boolean usernameExists(String username) {
         return userRepository.findByUsername(username).isPresent();
+    }
+
+    @Override
+    public List<AppUser> findAllUsers() {
+        return userRepository.findAll();
     }
 }
