@@ -2,16 +2,13 @@ package pl.m22.gamehive.user.mapper;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Named;
-import org.mapstruct.factory.Mappers;
 import pl.m22.gamehive.user.model.UserRole;
 
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Mapper
+@Mapper(componentModel = "spring")
 public interface UserRoleMapper {
-
-    UserRoleMapper INSTANCE = Mappers.getMapper(UserRoleMapper.class);
 
     @Named("mapToRoleName")
     default String toRoleName(UserRole role) {

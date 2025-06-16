@@ -14,8 +14,8 @@ VALUES
 -- users
 INSERT INTO application_users (username, password, email, user_details_id, enabled)
 VALUES
-    ('john_doe', 'password123', 'john.doe@example.com', 1, true),
-    ('jane_smith', 'password456', 'jane.smith@example.com', 2, true);
+    ('john_doe', '{bcrypt}$2a$10$DoYAljAFrC9hTtN9zWcChu/1vxOrZiUmpU/ShCmYsHGubNwn8I/Cq', 'john.doe@example.com', 1, true),
+    ('jane_smith', '{bcrypt}$2a$10$wnJKcfT8rFhyhno51MBqHeZS.ZYKXUavokV3EAQkq/WTd5E17V9fe', 'jane.smith@example.com', 2, true);
 
 INSERT INTO user_roles (user_id, role_id)
 VALUES

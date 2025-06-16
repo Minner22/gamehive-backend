@@ -26,7 +26,7 @@ public class AppUser extends AbstractEntity {
 
     @Column(nullable = false)
     @NotBlank
-    @Size(min = 5)
+    @Size(min = 8)
     private String password;
 
     @Column(nullable = false, unique = true)
