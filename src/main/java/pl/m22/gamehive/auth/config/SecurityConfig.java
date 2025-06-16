@@ -19,8 +19,10 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
         )
-                .csrf(AbstractHttpConfigurer::disable)
-                .headers(AbstractHttpConfigurer::disable);
+                .csrf(AbstractHttpConfigurer::disable) // CSRF disabled: stateless REST API with token-based authentication (JWT)
+                .headers(headers -> headers
+                        .frameOptions(frame -> frame.disable())); // H2 console requires this to be disabled
+                //.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         return http.build();
     }
 
