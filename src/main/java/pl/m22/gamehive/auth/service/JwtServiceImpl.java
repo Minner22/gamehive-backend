@@ -27,18 +27,10 @@ public class JwtServiceImpl implements JwtService {
 
     @Override
     public String generateActivationToken(String subjectEmail) {
-        JWSHeader header = new JWSHeader(jwsAlgorithm);
         JWTClaimsSet claimSet = createActivationPayload(subjectEmail);
-        SignedJWT signedJWT = new SignedJWT(header, claimSet);
-        try {
-            JWSSigner jwsSigner = new MACSigner(activationSecret);
-            signedJWT.sign(jwsSigner);
-            return signedJWT.serialize();
-        } catch (KeyLengthException e) {
-            throw new JwtPrivateKeyLengthException("Failed to create signer for JWT: " + e.getMessage());
-        } catch (JOSEException e) {
-            throw new RuntimeJOSEException("Failed to create JWT: " + e.getMessage());
-        }
+        SignedJWT activationJWT = generateToken(claimSet, activationSecret);
+        return activationJWT.serialize();
+
     }
 
     private JWTClaimsSet createActivationPayload(String subjectEmail) {
@@ -55,5 +47,19 @@ public class JwtServiceImpl implements JwtService {
     public JWTClaimsSet validateActivationToken(String token) {
         // Implementation for validating activation token
         return null; // Replace with actual validation logic
+    }
+
+    private SignedJWT generateToken(JWTClaimsSet claimSet, String secret) {
+        JWSHeader header = new JWSHeader(jwsAlgorithm);
+        SignedJWT signedJWT = new SignedJWT(header, claimSet);
+        try {
+            JWSSigner jwsSigner = new MACSigner(secret);
+            signedJWT.sign(jwsSigner);
+            return signedJWT;
+        } catch (KeyLengthException e) {
+            throw new JwtPrivateKeyLengthException("Failed to create signer for JWT: " + e.getMessage());
+        } catch (JOSEException e) {
+            throw new RuntimeJOSEException("Failed to create JWT: " + e.getMessage());
+        }
     }
 }
