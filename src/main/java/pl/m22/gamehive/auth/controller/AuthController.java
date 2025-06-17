@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.auth.service.AuthService;
+import pl.m22.gamehive.auth.service.JwtService;
 
 import java.time.Duration;
 import java.util.Map;
@@ -22,12 +23,14 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final JwtService jwtService;
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegistrationDto registrationDto) {
 
         authService.register(registrationDto);
-        return ResponseEntity.ok("User registration successful. Please check your email to confirm your account.");
+        String activationToken = jwtService.generateActivationToken(registrationDto.email());
+        return ResponseEntity.ok("User registration successful. Please check your email to confirm your account. " + activationToken);
     }
 
     @PostMapping("/login")
