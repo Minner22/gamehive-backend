@@ -6,8 +6,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.LoginDto;
+import pl.m22.gamehive.auth.dto.LoginResponseDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
+import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.service.AuthService;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.common.email.service.MailService;
@@ -28,14 +31,14 @@ public class AuthController {
     public ResponseEntity<String> register(@Valid @RequestBody RegistrationDto registrationDto) {
 
         authService.register(registrationDto);
-        String activationToken = jwtService.generateActivationToken(registrationDto.email());
+        String activationToken = jwtService.generateToken(registrationDto.email(), JwtTokenType.ACTIVATION);
         mailService.sendActivationEmail(registrationDto.email(), activationToken);
         return ResponseEntity.ok("User registration successful. Please check your email to confirm your account.");
     }
 
     @GetMapping("/activate")
     public ResponseEntity<String> activateAccount(@RequestParam("token") String token) {
-        String email = jwtService.validateActivationToken(token);
+        String email = jwtService.validateToken(token, JwtTokenType.ACTIVATION);
         authService.activateUser(email);
         return ResponseEntity.ok("Account has been successfully activated.");
     }
@@ -43,10 +46,11 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginDto loginDto) {
 
-        String token = authService.login(loginDto);
-        String refresh = "mockOfRefreshToken"; //TODO: implement refresh token logic
+        CredentialsDto userCredentials = authService.login(loginDto);
+        LoginResponseDto loginResponse = jwtService.login(userCredentials);
 
-        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refresh)
+
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", loginResponse.refreshToken())
                 .httpOnly(true)
                 //.secure(true)
                 .path("/api/v1/auth/refresh")
@@ -54,9 +58,8 @@ public class AuthController {
                 .sameSite("Strict")
                 .build();
 
-        //TODO: add JWT generation and return it in response
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
-                .body(Map.of("accessToken", token));
+                .body(Map.of("accessToken", loginResponse.accessToken()));
     }
 }

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.common.exception.*;
@@ -49,7 +50,7 @@ public class AuthServiceImpl implements AuthService{
     }
 
     @Override
-    public String login(LoginDto loginDto) {
+    public CredentialsDto login(LoginDto loginDto) {
 
         AppUser appUser = userRepository.findByEmail(loginDto.usernameOrEmail())
                 .orElseGet(() -> userRepository.findByUsername(loginDto.usernameOrEmail())
@@ -59,7 +60,11 @@ public class AuthServiceImpl implements AuthService{
             throw new InvalidPasswordException();
         }
 
-        return "Mock of the jwt token";
+        if (!appUser.isEnabled()) {
+            throw new UserNotActivatedException(appUser.getEmail());
+        }
+
+        return userMapper.toCredentialsDto(appUser);
     }
 
     @Transactional
