@@ -29,3 +29,6 @@ spring:
             data-locations: classpath:db/data.sql
     config:
         import: optional:file:./secret.properties
+jwt:
+    activation:
+      validityInSeconds: 86400

@@ -5,8 +5,8 @@ import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import pl.m22.gamehive.common.config.ActivationTokenProperties;
 import pl.m22.gamehive.common.exception.JwtPrivateKeyLengthException;
 import pl.m22.gamehive.common.exception.RuntimeJOSEException;
 
@@ -17,24 +17,19 @@ import java.util.Date;
 @RequiredArgsConstructor
 public class JwtServiceImpl implements JwtService {
 
-    @Value("${jwt.activation.secret}")
-    private String activationSecret;
-
-    @Value("${jwt.activation.validityInSeconds}")
-    private String activationTokenValidityInSeconds;
-
     private final JWSAlgorithm jwsAlgorithm = JWSAlgorithm.HS256;
+    private final ActivationTokenProperties activationProps;
 
     @Override
     public String generateActivationToken(String subjectEmail) {
         JWTClaimsSet claimSet = createActivationPayload(subjectEmail);
-        SignedJWT activationJWT = generateToken(claimSet, activationSecret);
+        SignedJWT activationJWT = generateToken(claimSet, activationProps.getSecret());
         return activationJWT.serialize();
 
     }
 
     private JWTClaimsSet createActivationPayload(String subjectEmail) {
-        Instant expirationDate = Instant.now().plusSeconds(Integer.valueOf(activationTokenValidityInSeconds));
+        Instant expirationDate = Instant.now().plusSeconds(activationProps.getValidityInSeconds());
         return new JWTClaimsSet.Builder()
                 .subject(subjectEmail)
                 .expirationTime(Date.from(expirationDate))
