@@ -61,4 +61,19 @@ public class AuthServiceImpl implements AuthService{
 
         return "Mock of the jwt token";
     }
+
+    @Transactional
+    @Override
+    public void activateUser(String email) {
+        AppUser appUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EmailNotFoundException(email));
+
+        if (appUser.isEnabled()) {
+            throw new UserAlreadyActivatedException(email);
+        }
+
+        appUser.setEnabled(true);
+
+        userRepository.save(appUser);
+    }
 }

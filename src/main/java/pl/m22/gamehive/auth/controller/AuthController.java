@@ -5,14 +5,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.auth.service.AuthService;
-import pl.m22.gamehive.auth.service.JwtService;
+import pl.m22.gamehive.auth.jwt.service.JwtService;
 
 import java.time.Duration;
 import java.util.Map;
@@ -31,6 +28,13 @@ public class AuthController {
         authService.register(registrationDto);
         String activationToken = jwtService.generateActivationToken(registrationDto.email());
         return ResponseEntity.ok("User registration successful. Please check your email to confirm your account. " + activationToken);
+    }
+
+    @GetMapping("/activate")
+    public ResponseEntity<String> activateAccount(@RequestParam("token") String token) {
+        String email = jwtService.validateActivationToken(token);
+        authService.activateUser(email);
+        return ResponseEntity.ok("Account has been successfully activated.");
     }
 
     @PostMapping("/login")

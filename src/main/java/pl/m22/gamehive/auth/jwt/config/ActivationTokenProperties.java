@@ -1,4 +1,4 @@
-package pl.m22.gamehive.common.config;
+package pl.m22.gamehive.auth.jwt.config;
 
 import lombok.Getter;
 import lombok.Setter;

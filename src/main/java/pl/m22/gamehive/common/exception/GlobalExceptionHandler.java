@@ -28,7 +28,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(UsernameOrEmailNotFoundException.class)
-    public ResponseEntity<String> handleUsernameOrEmainNotFound(UsernameOrEmailNotFoundException ex) {
+    public ResponseEntity<String> handleUsernameOrEmailNotFound(UsernameOrEmailNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ex.getMessage());
     }
 
@@ -41,9 +41,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
 
-        ex.getBindingResult().getFieldErrors().forEach(error -> {
-            errors.put(error.getField(), error.getDefaultMessage());
-        });
+        ex.getBindingResult().getFieldErrors()
+                .forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
     }
@@ -54,8 +53,43 @@ public class GlobalExceptionHandler {
                 .body(ex.getMessage());
     }
 
+    @ExceptionHandler(InvalidJwtSignature.class)
+    public ResponseEntity<String> handleInvalidJwtSignature(InvalidJwtSignature ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidJwtTypeException.class)
+    public ResponseEntity<String> handleInvalidJwtType(InvalidJwtTypeException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(ExpiredActivationTokenException.class)
+    public ResponseEntity<String>  handleExpiredActivationToken(ExpiredActivationTokenException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ex.getMessage());
+    }
+
     @ExceptionHandler(RuntimeJOSEException.class)
     public ResponseEntity<String> handleRuntimeJOSE(RuntimeJOSEException ex) {
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(EmailNotFoundException.class)
+    public ResponseEntity<String> handleEmailNotFound(EmailNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(UserAlreadyActivatedException.class)
+    public ResponseEntity<String> handleUserAlreadyActivated(UserAlreadyActivatedException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(RuntimeParseException.class)
+    public ResponseEntity<String> handleRuntimeParse(RuntimeParseException ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ex.getMessage());
     }
@@ -63,6 +97,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> handleUnexpected(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("An unexpected error occured: " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+                .body("An unexpected error occurred: " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
     }
 }
