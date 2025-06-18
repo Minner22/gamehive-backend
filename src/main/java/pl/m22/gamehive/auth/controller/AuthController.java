@@ -10,6 +10,7 @@ import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.auth.service.AuthService;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.common.email.service.MailService;
 
 import java.time.Duration;
 import java.util.Map;
@@ -21,13 +22,15 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtService jwtService;
+    private final MailService mailService;
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegistrationDto registrationDto) {
 
         authService.register(registrationDto);
         String activationToken = jwtService.generateActivationToken(registrationDto.email());
-        return ResponseEntity.ok("User registration successful. Please check your email to confirm your account. " + activationToken);
+        mailService.sendActivationEmail(registrationDto.email(), activationToken);
+        return ResponseEntity.ok("User registration successful. Please check your email to confirm your account.");
     }
 
     @GetMapping("/activate")
