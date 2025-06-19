@@ -32,7 +32,7 @@ public class JwtServiceImpl implements JwtService {
     private static final String CLAIM_ROLES = "roles";
 
     @Override
-    public String validateToken(String token, JwtTokenType tokenType) {
+    public boolean isTokenValid(String token, JwtTokenType tokenType) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
             if (!signedJWT.getHeader().getAlgorithm().equals(jwsAlgorithm)) {
@@ -52,7 +52,7 @@ public class JwtServiceImpl implements JwtService {
                 throw new InvalidJwtTypeException(type);
             }
 
-            return claims.getSubject();
+            return true;
         } catch (ParseException e) {
             throw new RuntimeParseException("Failed to parse JWT: " + e.getMessage());
         } catch (JOSEException e) {

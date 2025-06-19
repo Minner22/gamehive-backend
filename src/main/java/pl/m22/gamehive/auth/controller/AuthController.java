@@ -43,7 +43,8 @@ public class AuthController {
 
     @GetMapping("/activate")
     public ResponseEntity<String> activateAccount(@RequestParam("token") String token) {
-        String email = jwtService.validateToken(token, JwtTokenType.ACTIVATION);
+        jwtService.isTokenValid(token, JwtTokenType.ACTIVATION);
+        String email = jwtService.extractEmailFromToken(token);
         authService.activateUser(email);
         return ResponseEntity.ok("Account has been successfully activated.");
     }
@@ -57,7 +58,8 @@ public class AuthController {
 
     @GetMapping("/refresh")
     public ResponseEntity<?> refreshAccessToken(@CookieValue("refreshToken") String refreshToken) {
-        String email = jwtService.validateToken(refreshToken, JwtTokenType.REFRESH);
+        jwtService.isTokenValid(refreshToken, JwtTokenType.REFRESH);
+        String email = jwtService.extractEmailFromToken(refreshToken);
         CredentialsDto userCredentials = userMapper.toCredentialsDto(
                 userService.findUserByEmail(email)
                         .orElseThrow(() -> new EmailNotFoundException(email)));

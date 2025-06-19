@@ -7,13 +7,13 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
-import pl.m22.gamehive.common.exception.EmailNotFoundException;
-import pl.m22.gamehive.user.model.AppUser;
-import pl.m22.gamehive.user.service.UserService;
+import pl.m22.gamehive.user.service.AppUserDetailsService;
 
 import java.io.IOException;
 
@@ -22,7 +22,7 @@ import java.io.IOException;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final UserService userService;
+    private final AppUserDetailsService appUserDetailsService;
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -35,8 +35,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         final String jwt = authHeader.substring(7);
         final String email = jwtService.extractEmailFromToken(jwt);
 
-        jwtService.validateToken(jwt, JwtTokenType.ACCESS);
+        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = appUserDetailsService.loadUserByUsername(email);
 
-        //TODO: implement adapter for appUser to use SecurityContextHolder
+            if (jwtService.isTokenValid(jwt, JwtTokenType.ACCESS)) {
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.getAuthorities());
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+        }
+
+        filterChain.doFilter(request, response);
     }
 }
