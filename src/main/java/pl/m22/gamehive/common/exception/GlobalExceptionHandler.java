@@ -65,9 +65,15 @@ public class GlobalExceptionHandler {
                 .body(ex.getMessage());
     }
 
-    @ExceptionHandler(ExpiredActivationTokenException.class)
-    public ResponseEntity<String>  handleExpiredActivationToken(ExpiredActivationTokenException ex) {
+    @ExceptionHandler(ExpiredJwtTokenException.class)
+    public ResponseEntity<String>  handleExpiredJwtToken(ExpiredJwtTokenException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidJwtSubjectException.class)
+    public ResponseEntity<String> handleInvalidJwtSubject(InvalidJwtSubjectException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ex.getMessage());
     }
 

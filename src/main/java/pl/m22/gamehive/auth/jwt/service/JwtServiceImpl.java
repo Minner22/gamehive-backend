@@ -28,21 +28,26 @@ public class JwtServiceImpl implements JwtService {
     private final ActivationTokenProperties activationProps;
     private final AccessTokenProperties accessProps;
     private final RefreshTokenProperties refreshProps;
+    private static final String CLAIM_TYPE = "type";
+    private static final String CLAIM_ROLES = "roles";
 
     @Override
     public String validateToken(String token, JwtTokenType tokenType) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
+            if (!signedJWT.getHeader().getAlgorithm().equals(jwsAlgorithm)) {
+                throw new InvalidJwtAlgorithmException(signedJWT.getHeader().getAlgorithm().getName());
+            }
             if (!signedJWT.verify(new MACVerifier(getSecretForType(tokenType)))) {
                 throw new InvalidJwtSignature();
             }
 
             JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
-            if (claims.getExpirationTime().before(new Date())) {
-                throw new ExpiredActivationTokenException();
+            if (claims.getExpirationTime() == null || claims.getExpirationTime().before(new Date())) {
+                throw new ExpiredJwtTokenException();
             }
 
-            String type = claims.getStringClaim("type");
+            String type = claims.getStringClaim(CLAIM_TYPE);
             if (!tokenType.name().equals(type)) {
                 throw new InvalidJwtTypeException(type);
             }
@@ -58,14 +63,14 @@ public class JwtServiceImpl implements JwtService {
     @Override
     public LoginResponseDto login(CredentialsDto credentials) {
         String accessToken = generateToken(credentials.email(), JwtTokenType.ACCESS, credentials.roles());
-        String refreshToken = generateToken(credentials.email(), JwtTokenType.REFRESH, credentials.roles());
+        String refreshToken = generateToken(credentials.email(), JwtTokenType.REFRESH);
 
         return new LoginResponseDto(accessToken, refreshToken);
     }
 
     @Override
     public String generateToken(String subjectEmail, JwtTokenType tokenType) {
-        JWTClaimsSet claimsSet = createPayload(subjectEmail, tokenType, Set.of("USER"));
+        JWTClaimsSet claimsSet = createPayload(subjectEmail, tokenType);
         SignedJWT signedJwt = generateSignedJwt(claimsSet, tokenType);
         return signedJwt.serialize();
     }
@@ -75,6 +80,20 @@ public class JwtServiceImpl implements JwtService {
         JWTClaimsSet claimsSet = createPayload(subjectEmail, tokenType, roles);
         SignedJWT signedJwt = generateSignedJwt(claimsSet, tokenType);
         return signedJwt.serialize();
+    }
+
+    @Override
+    public String extractEmailFromToken(String token) {
+        try {
+            SignedJWT signedJWT = SignedJWT.parse(token);
+            JWTClaimsSet jwtClaimsSet = signedJWT.getJWTClaimsSet();
+            if (jwtClaimsSet.getSubject() == null || jwtClaimsSet.getSubject().isEmpty()) {
+                throw new InvalidJwtSubjectException();
+            }
+            return jwtClaimsSet.getSubject();
+        } catch (ParseException e) {
+            throw new RuntimeParseException("Failed to parse JWT: " + e.getMessage());
+        }
     }
 
     private SignedJWT generateSignedJwt(JWTClaimsSet claimSet, JwtTokenType tokenType) {
@@ -93,14 +112,26 @@ public class JwtServiceImpl implements JwtService {
         }
     }
 
-    private JWTClaimsSet createPayload(String subjectEmail, JwtTokenType tokenType, Set<String> roles) {
-        Instant expirationDate = Instant.now().plusSeconds(getValidityForType(tokenType));
+    private JWTClaimsSet createPayload(String subjectEmail, JwtTokenType tokenType) {
+        Instant now = Instant.now();
+        Instant expirationDate = now.plusSeconds(getValidityForType(tokenType));
         return new JWTClaimsSet.Builder()
                 .subject(subjectEmail)
                 .expirationTime(Date.from(expirationDate))
-                .claim("type", tokenType)
-                .claim("roles", roles)
-                .issueTime(Date.from(Instant.now()))
+                .claim(CLAIM_TYPE, tokenType)
+                .issueTime(Date.from(now))
+                .build();
+    }
+
+    private JWTClaimsSet createPayload(String subjectEmail, JwtTokenType tokenType, Set<String> roles) {
+        Instant now = Instant.now();
+        Instant expirationDate = now.plusSeconds(getValidityForType(tokenType));
+        return new JWTClaimsSet.Builder()
+                .subject(subjectEmail)
+                .expirationTime(Date.from(expirationDate))
+                .claim(CLAIM_TYPE, tokenType)
+                .claim(CLAIM_ROLES, roles)
+                .issueTime(Date.from(now))
                 .build();
     }
 

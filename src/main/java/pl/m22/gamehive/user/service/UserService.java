@@ -16,5 +16,6 @@ public interface UserService {
     boolean emailExists(String email);
     boolean usernameExists(String username);
     List<AppUser> findAllUsers();
+    Optional<AppUser> findUserByEmail(String email);
 
 }

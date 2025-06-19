@@ -42,8 +42,8 @@ public class AppUser extends AbstractEntity {
     private Set<UserRole> roles = new HashSet<>();
 
     @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "user_details_id", referencedColumnName = "id")
-    private UserDetails userDetails;
+    @JoinColumn(name = "user_profile_id", referencedColumnName = "id")
+    private UserProfile userProfile;
 
     @Column(nullable = false)
     private boolean enabled = false;

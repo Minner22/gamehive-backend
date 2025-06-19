@@ -12,12 +12,12 @@ import pl.m22.gamehive.common.AbstractEntity;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "user_details")
+@Table(name = "user_profiles")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserDetails extends AbstractEntity {
+public class UserProfile extends AbstractEntity {
 
     private String firstName;
     private String lastName;

@@ -14,6 +14,9 @@ import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.service.AuthService;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.common.email.service.MailService;
+import pl.m22.gamehive.common.exception.EmailNotFoundException;
+import pl.m22.gamehive.user.mapper.UserMapper;
+import pl.m22.gamehive.user.service.UserService;
 
 import java.time.Duration;
 import java.util.Map;
@@ -26,6 +29,8 @@ public class AuthController {
     private final AuthService authService;
     private final JwtService jwtService;
     private final MailService mailService;
+    private final UserMapper userMapper;
+    private final UserService userService;
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegistrationDto registrationDto) {
@@ -47,8 +52,20 @@ public class AuthController {
     public ResponseEntity<?> login(@Valid @RequestBody LoginDto loginDto) {
 
         CredentialsDto userCredentials = authService.login(loginDto);
-        LoginResponseDto loginResponse = jwtService.login(userCredentials);
+        return generateTokens(userCredentials);
+    }
 
+    @GetMapping("/refresh")
+    public ResponseEntity<?> refreshAccessToken(@CookieValue("refreshToken") String refreshToken) {
+        String email = jwtService.validateToken(refreshToken, JwtTokenType.REFRESH);
+        CredentialsDto userCredentials = userMapper.toCredentialsDto(
+                userService.findUserByEmail(email)
+                        .orElseThrow(() -> new EmailNotFoundException(email)));
+        return generateTokens(userCredentials);
+    }
+
+    private ResponseEntity<?> generateTokens(CredentialsDto userCredentials) {
+        LoginResponseDto loginResponse = jwtService.login(userCredentials);
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", loginResponse.refreshToken())
                 .httpOnly(true)

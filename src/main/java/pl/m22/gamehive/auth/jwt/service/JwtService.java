@@ -12,4 +12,5 @@ public interface JwtService {
     String generateToken(String subjectEmail, JwtTokenType tokenType, Set<String> roles);
     String validateToken(String token, JwtTokenType tokenType);
     LoginResponseDto login(CredentialsDto credentials);
+    String extractEmailFromToken(String token);
 }
