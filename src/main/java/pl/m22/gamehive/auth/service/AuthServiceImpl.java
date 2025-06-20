@@ -4,12 +4,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.common.exception.*;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.model.AppUser;
-import pl.m22.gamehive.user.model.UserDetails;
+import pl.m22.gamehive.user.model.UserProfile;
 import pl.m22.gamehive.user.model.UserRole;
 import pl.m22.gamehive.user.repository.UserRepository;
 import pl.m22.gamehive.user.repository.UserRoleRepository;
@@ -36,9 +37,9 @@ public class AuthServiceImpl implements AuthService{
         }
 
         AppUser appUser = userMapper.toUser(registrationDto);
-        appUser.setEnabled(false); //TODO: implement email confirmation
+        appUser.setEnabled(false);
         appUser.setPassword(passwordEncoder.encode(registrationDto.password()));
-        appUser.setUserDetails(new UserDetails());
+        appUser.setUserProfile(new UserProfile());
 
         UserRole role = userRoleRepository.findByName(USER_ROLE)
                 .orElseThrow(() -> new RoleNotFoundException(USER_ROLE));
@@ -49,7 +50,7 @@ public class AuthServiceImpl implements AuthService{
     }
 
     @Override
-    public String login(LoginDto loginDto) {
+    public CredentialsDto login(LoginDto loginDto) {
 
         AppUser appUser = userRepository.findByEmail(loginDto.usernameOrEmail())
                 .orElseGet(() -> userRepository.findByUsername(loginDto.usernameOrEmail())
@@ -59,7 +60,11 @@ public class AuthServiceImpl implements AuthService{
             throw new InvalidPasswordException();
         }
 
-        return "Mock of the jwt token";
+        if (!appUser.isEnabled()) {
+            throw new UserNotActivatedException(appUser.getEmail());
+        }
+
+        return userMapper.toCredentialsDto(appUser);
     }
 
     @Transactional

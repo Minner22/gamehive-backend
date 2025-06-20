@@ -44,6 +44,7 @@ jwt:
         validityInSeconds: 86400
     refresh:
         validityInSeconds: 604800
+        maxActiveTokensPerUser: 5
     access:
         validityInSeconds: 900
 

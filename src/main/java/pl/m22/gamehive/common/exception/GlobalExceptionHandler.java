@@ -65,9 +65,27 @@ public class GlobalExceptionHandler {
                 .body(ex.getMessage());
     }
 
-    @ExceptionHandler(ExpiredActivationTokenException.class)
-    public ResponseEntity<String>  handleExpiredActivationToken(ExpiredActivationTokenException ex) {
+    @ExceptionHandler(ExpiredJwtTokenException.class)
+    public ResponseEntity<String>  handleExpiredJwtToken(ExpiredJwtTokenException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidJwtSubjectException.class)
+    public ResponseEntity<String> handleInvalidJwtSubject(InvalidJwtSubjectException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidJwtRolesException.class)
+    public ResponseEntity<String> handleInvalidJwtRoles(InvalidJwtRolesException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidJwtJtiException.class)
+    public ResponseEntity<String> handleInvalidJwtJti(InvalidJwtJtiException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ex.getMessage());
     }
 
@@ -76,6 +94,11 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(UserNotActivatedException.class)
+    public ResponseEntity<String> handleUserNotActivated(UserNotActivatedException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ex.getMessage());
     }
 
     @ExceptionHandler(EmailNotFoundException.class)
