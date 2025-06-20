@@ -12,4 +12,5 @@ import org.springframework.stereotype.Component;
 public class RefreshTokenProperties {
     private String secret;
     private int validityInSeconds;
+    private int maxActiveTokensPerUser;
 }

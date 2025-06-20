@@ -8,7 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.LoginDto;
-import pl.m22.gamehive.auth.dto.LoginResponseDto;
+import pl.m22.gamehive.auth.dto.TokenPairDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.service.AuthService;
@@ -36,7 +36,7 @@ public class AuthController {
     public ResponseEntity<String> register(@Valid @RequestBody RegistrationDto registrationDto) {
 
         authService.register(registrationDto);
-        String activationToken = jwtService.generateToken(registrationDto.email(), JwtTokenType.ACTIVATION);
+        String activationToken = jwtService.generateToken(registrationDto.email(), JwtTokenType.ACTIVATION, null);
         mailService.sendActivationEmail(registrationDto.email(), activationToken);
         return ResponseEntity.ok("User registration successful. Please check your email to confirm your account.");
     }
@@ -67,7 +67,7 @@ public class AuthController {
     }
 
     private ResponseEntity<?> generateTokens(CredentialsDto userCredentials) {
-        LoginResponseDto loginResponse = jwtService.login(userCredentials);
+        TokenPairDto loginResponse = jwtService.generateTokenPair(userCredentials);
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", loginResponse.refreshToken())
                 .httpOnly(true)
@@ -76,7 +76,8 @@ public class AuthController {
                 .maxAge(Duration.ofDays(7))
                 .sameSite("Strict")
                 .build();
-
+        System.out.println("Access: " + loginResponse.accessToken());
+        System.out.println("Refresh: " + loginResponse.refreshToken());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                 .body(Map.of("accessToken", loginResponse.accessToken()));

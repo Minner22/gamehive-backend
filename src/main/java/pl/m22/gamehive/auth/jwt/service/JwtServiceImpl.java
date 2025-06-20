@@ -7,18 +7,24 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
-import pl.m22.gamehive.auth.dto.LoginResponseDto;
+import pl.m22.gamehive.auth.dto.TokenPairDto;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.config.AccessTokenProperties;
 import pl.m22.gamehive.auth.jwt.config.ActivationTokenProperties;
 import pl.m22.gamehive.auth.jwt.config.RefreshTokenProperties;
+import pl.m22.gamehive.auth.jwt.model.UserRefreshToken;
+import pl.m22.gamehive.auth.jwt.repository.UserRefreshTokenRepository;
 import pl.m22.gamehive.common.exception.*;
+import pl.m22.gamehive.user.model.AppUser;
+import pl.m22.gamehive.user.repository.UserRepository;
 
 import java.text.ParseException;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +34,8 @@ public class JwtServiceImpl implements JwtService {
     private final ActivationTokenProperties activationProps;
     private final AccessTokenProperties accessProps;
     private final RefreshTokenProperties refreshProps;
+    private final UserRefreshTokenRepository userRefreshTokenRepository;
+    private final UserRepository userRepository;
     private static final String CLAIM_TYPE = "type";
     private static final String CLAIM_ROLES = "roles";
 
@@ -52,6 +60,16 @@ public class JwtServiceImpl implements JwtService {
                 throw new InvalidJwtTypeException(type);
             }
 
+            if (tokenType == JwtTokenType.REFRESH) {
+                String jti = claims.getJWTID();
+                if (jti == null || jti.isEmpty()) {
+                    throw new InvalidJwtJtiException("Refresh token must contain a valid JTI");
+                }
+                if (!userRefreshTokenRepository.existsByJtiAndRevokedFalse(jti)) {
+                    throw new InvalidJwtJtiException("Refresh token with JTI " + jti + " does not exist or is revoked");
+                }
+            }
+
             return true;
         } catch (ParseException e) {
             throw new RuntimeParseException("Failed to parse JWT: " + e.getMessage());
@@ -60,25 +78,26 @@ public class JwtServiceImpl implements JwtService {
         }
     }
 
+    @Transactional
     @Override
-    public LoginResponseDto login(CredentialsDto credentials) {
+    public TokenPairDto generateTokenPair(CredentialsDto credentials) {
         String accessToken = generateToken(credentials.email(), JwtTokenType.ACCESS, credentials.roles());
-        String refreshToken = generateToken(credentials.email(), JwtTokenType.REFRESH);
+        String refreshToken = generateToken(credentials.email(), JwtTokenType.REFRESH, null);
 
-        return new LoginResponseDto(accessToken, refreshToken);
+        return new TokenPairDto(accessToken, refreshToken);
     }
 
-    @Override
-    public String generateToken(String subjectEmail, JwtTokenType tokenType) {
-        JWTClaimsSet claimsSet = createPayload(subjectEmail, tokenType);
-        SignedJWT signedJwt = generateSignedJwt(claimsSet, tokenType);
-        return signedJwt.serialize();
-    }
-
+    @Transactional
     @Override
     public String generateToken(String subjectEmail, JwtTokenType tokenType, Set<String> roles) {
         JWTClaimsSet claimsSet = createPayload(subjectEmail, tokenType, roles);
         SignedJWT signedJwt = generateSignedJwt(claimsSet, tokenType);
+
+        if (tokenType == JwtTokenType.REFRESH) {
+
+            saveRefreshToken(claimsSet);
+        }
+
         return signedJwt.serialize();
     }
 
@@ -112,27 +131,57 @@ public class JwtServiceImpl implements JwtService {
         }
     }
 
-    private JWTClaimsSet createPayload(String subjectEmail, JwtTokenType tokenType) {
-        Instant now = Instant.now();
-        Instant expirationDate = now.plusSeconds(getValidityForType(tokenType));
-        return new JWTClaimsSet.Builder()
-                .subject(subjectEmail)
-                .expirationTime(Date.from(expirationDate))
-                .claim(CLAIM_TYPE, tokenType)
-                .issueTime(Date.from(now))
-                .build();
-    }
-
     private JWTClaimsSet createPayload(String subjectEmail, JwtTokenType tokenType, Set<String> roles) {
         Instant now = Instant.now();
         Instant expirationDate = now.plusSeconds(getValidityForType(tokenType));
-        return new JWTClaimsSet.Builder()
+
+        JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder()
                 .subject(subjectEmail)
-                .expirationTime(Date.from(expirationDate))
-                .claim(CLAIM_TYPE, tokenType)
-                .claim(CLAIM_ROLES, roles)
                 .issueTime(Date.from(now))
-                .build();
+                .expirationTime(Date.from(expirationDate))
+                .claim(CLAIM_TYPE, tokenType);
+
+        if (roles != null && !roles.isEmpty()) {
+            builder.claim(CLAIM_ROLES, roles);
+        }
+        else if (tokenType == JwtTokenType.ACCESS) {
+            throw new InvalidJwtRolesException("Access token must contain roles");
+        }
+
+        if (tokenType == JwtTokenType.REFRESH) {
+            builder.jwtID(UUID.randomUUID().toString());
+        }
+
+        return builder.build();
+    }
+
+
+    private void saveRefreshToken(JWTClaimsSet claimsSet) {
+        String jti = claimsSet.getJWTID();
+        String email = claimsSet.getSubject();
+        Instant expirationTime = claimsSet.getExpirationTime().toInstant();
+
+        AppUser user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EmailNotFoundException("User with email " + email + " not found"));
+
+        long activeTokensCount = userRefreshTokenRepository.countByAppUserEmailAndRevokedFalse(email);
+
+        if (activeTokensCount >= refreshProps.getMaxActiveTokensPerUser()) {
+            UserRefreshToken oldestToken = userRefreshTokenRepository
+                    .findByAppUserEmailAndRevokedFalseOrderByCreatedAtAsc(email)
+                    .stream()
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("No token to revoke found for user: " + email));
+            oldestToken.setRevoked(true);
+            userRefreshTokenRepository.save(oldestToken);
+        }
+
+        UserRefreshToken userRefreshToken = new UserRefreshToken();
+        userRefreshToken.setJti(jti);
+        userRefreshToken.setAppUser(user);
+        userRefreshToken.setExpiresAt(expirationTime);
+
+        userRefreshTokenRepository.save(userRefreshToken);
     }
 
     private String getSecretForType(JwtTokenType tokenType) {

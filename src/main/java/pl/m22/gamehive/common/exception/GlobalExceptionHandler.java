@@ -77,6 +77,18 @@ public class GlobalExceptionHandler {
                 .body(ex.getMessage());
     }
 
+    @ExceptionHandler(InvalidJwtRolesException.class)
+    public ResponseEntity<String> handleInvalidJwtRoles(InvalidJwtRolesException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidJwtJtiException.class)
+    public ResponseEntity<String> handleInvalidJwtJti(InvalidJwtJtiException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ex.getMessage());
+    }
+
     @ExceptionHandler(RuntimeJOSEException.class)
     public ResponseEntity<String> handleRuntimeJOSE(RuntimeJOSEException ex) {
 
