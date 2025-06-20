@@ -1,9 +1,9 @@
 -- roles
 INSERT INTO user_role (name, description)
 VALUES
-    ('ADMIN', 'Administrator of the system'),
-    ('USER', 'Regular appUser of the system'),
-    ('MODERATOR', 'Moderator with special permissions');
+    ('ROLE_ADMIN', 'Administrator of the system'),
+    ('ROLE_USER', 'Regular appUser of the system'),
+    ('ROLE_MODERATOR', 'Moderator with special permissions');
 
 -- appUser details
 INSERT INTO user_profiles (first_name, last_name, address, phone_number, date_of_birth, profile_picture_url)
