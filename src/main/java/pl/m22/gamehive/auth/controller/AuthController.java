@@ -66,6 +66,16 @@ public class AuthController {
         return generateTokens(userCredentials);
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestHeader("Authorization") String accessTokenHeader) {
+        String accessToken = accessTokenHeader.substring(7);
+        jwtService.isTokenValid(accessToken, JwtTokenType.ACCESS);
+        String subjectEmail = jwtService.extractEmailFromToken(accessToken);
+        jwtService.revokeUsersTokens(subjectEmail);
+
+        return ResponseEntity.ok().build();
+    }
+
     private ResponseEntity<?> generateTokens(CredentialsDto userCredentials) {
         TokenPairDto loginResponse = jwtService.generateTokenPair(userCredentials);
 
