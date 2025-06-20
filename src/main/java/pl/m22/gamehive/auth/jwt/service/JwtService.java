@@ -11,4 +11,6 @@ public interface JwtService {
     boolean isTokenValid(String token, JwtTokenType tokenType);
     TokenPairDto generateTokenPair(CredentialsDto credentials);
     String extractEmailFromToken(String token);
+
+    void revokeUsersTokens(String email);
 }

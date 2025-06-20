@@ -83,6 +83,7 @@ public class GlobalExceptionHandler {
                 .body(ex.getMessage());
     }
 
+
     @ExceptionHandler(InvalidJwtJtiException.class)
     public ResponseEntity<String> handleInvalidJwtJti(InvalidJwtJtiException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

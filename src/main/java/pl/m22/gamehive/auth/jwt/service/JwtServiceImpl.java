@@ -115,6 +115,20 @@ public class JwtServiceImpl implements JwtService {
         }
     }
 
+    @Transactional
+    @Override
+    public void revokeUsersTokens(String email) {
+        if (email == null || email.isEmpty()) {
+            throw new EmailNotFoundException("Email cannot be null or empty");
+        }
+
+        userRefreshTokenRepository.findByAppUserEmailAndRevokedFalseOrderByCreatedAtAsc(email)
+                .forEach(token -> {
+                    token.setRevoked(true);
+                    userRefreshTokenRepository.save(token);
+                });
+    }
+
     private SignedJWT generateSignedJwt(JWTClaimsSet claimSet, JwtTokenType tokenType) {
         JWSHeader header = new JWSHeader.Builder(jwsAlgorithm)
                 .type(JOSEObjectType.JWT)

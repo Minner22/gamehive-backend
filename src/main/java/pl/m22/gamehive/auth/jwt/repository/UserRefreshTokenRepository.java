@@ -18,4 +18,6 @@ public interface UserRefreshTokenRepository extends JpaRepository<UserRefreshTok
     Long countByAppUserEmailAndRevokedFalse(String email);
 
     boolean existsByJtiAndRevokedFalse(String jti);
+
+
 }
