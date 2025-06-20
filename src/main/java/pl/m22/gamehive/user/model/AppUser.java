@@ -1,5 +1,6 @@
 package pl.m22.gamehive.user.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -27,6 +28,7 @@ public class AppUser extends AbstractEntity {
     @Column(nullable = false)
     @NotBlank
     @Size(min = 8)
+    @JsonIgnore
     private String password;
 
     @Column(nullable = false, unique = true)
