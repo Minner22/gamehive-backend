@@ -19,7 +19,7 @@ import pl.m22.gamehive.user.repository.UserRoleRepository;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService{
 
-    private static final String USER_ROLE = "USER";
+    private static final String USER_ROLE = "ROLE_USER";
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserRoleRepository userRoleRepository;
