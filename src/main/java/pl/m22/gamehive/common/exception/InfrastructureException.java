@@ -4,4 +4,8 @@ public class InfrastructureException extends BaseException {
     public InfrastructureException(ErrorCode errorCode, String message) {
         super(errorCode, message);
     }
+
+    public InfrastructureException(ErrorCode errorCode) {
+        super(errorCode);
+    }
 }

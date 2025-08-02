@@ -4,4 +4,7 @@ public class ApplicationException extends BaseException {
     public ApplicationException(ErrorCode errorCode, String message) {
         super(errorCode, message);
     }
+    public ApplicationException(ErrorCode errorCode) {
+        super(errorCode);
+        }
 }
