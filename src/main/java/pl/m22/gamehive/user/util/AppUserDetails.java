@@ -13,7 +13,7 @@ import java.util.Collection;
 @Getter
 public class AppUserDetails implements UserDetails {
 
-    private final AppUser appUser;
+    private final transient AppUser appUser;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

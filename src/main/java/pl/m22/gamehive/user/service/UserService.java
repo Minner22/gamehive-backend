@@ -1,8 +1,6 @@
 package pl.m22.gamehive.user.service;
 
 import pl.m22.gamehive.auth.dto.CredentialsDto;
-import pl.m22.gamehive.auth.dto.LoginDto;
-import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.user.model.AppUser;
 
 import java.util.List;

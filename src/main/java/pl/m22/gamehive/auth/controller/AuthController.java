@@ -39,10 +39,9 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegistrationDto registrationDto) {
 
-        authService.register(registrationDto);
+        String activationToken = authService.registerAndGenerateActivationToken(registrationDto);
         log.info("User registered: {}", LoggingUtils.obfuscateEmail(registrationDto.email()));
 
-        String activationToken = jwtService.generateToken(registrationDto.email(), JwtTokenType.ACTIVATION, null);
         mailService.sendActivationEmail(registrationDto.email(), activationToken);
         log.info("Activation email sent to: {}", LoggingUtils.obfuscateEmail(registrationDto.email()));
 
@@ -59,7 +58,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginDto loginDto) {
+    public ResponseEntity<Map<String, String>> login(@Valid @RequestBody LoginDto loginDto) {
 
         CredentialsDto userCredentials = authService.login(loginDto);
         log.info("User logged in: {}", LoggingUtils.obfuscateEmail(userCredentials.email()));
@@ -67,7 +66,7 @@ public class AuthController {
     }
 
     @GetMapping("/refresh")
-    public ResponseEntity<?> refreshAccessToken(@CookieValue("refreshToken") String refreshToken) {
+    public ResponseEntity<Map<String, String>> refreshAccessToken(@CookieValue("refreshToken") String refreshToken) {
         jwtService.isTokenValid(refreshToken, JwtTokenType.REFRESH);
         String email = jwtService.extractEmailFromToken(refreshToken);
         CredentialsDto userCredentials = userMapper.toCredentialsDto(
@@ -78,7 +77,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestHeader("Authorization") String accessTokenHeader) {
+    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String accessTokenHeader) {
         String accessToken = accessTokenHeader.substring(7);
         jwtService.isTokenValid(accessToken, JwtTokenType.ACCESS);
         String subjectEmail = jwtService.extractEmailFromToken(accessToken);
@@ -87,7 +86,7 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
-    private ResponseEntity<?> generateTokens(CredentialsDto userCredentials) {
+    private ResponseEntity<Map<String, String>> generateTokens(CredentialsDto userCredentials) {
         TokenPairDto loginResponse = jwtService.generateTokenPair(userCredentials);
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", loginResponse.refreshToken())

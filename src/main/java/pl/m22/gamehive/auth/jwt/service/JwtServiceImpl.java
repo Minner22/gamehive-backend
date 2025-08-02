@@ -30,7 +30,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class JwtServiceImpl implements JwtService {
 
-    private final JWSAlgorithm jwsAlgorithm = JWSAlgorithm.HS256;
+    private static final JWSAlgorithm jwsAlgorithm = JWSAlgorithm.HS256;
     private final ActivationTokenProperties activationProps;
     private final AccessTokenProperties accessProps;
     private final RefreshTokenProperties refreshProps;
@@ -97,7 +97,6 @@ public class JwtServiceImpl implements JwtService {
         return new TokenPairDto(accessToken, refreshToken);
     }
 
-    @Transactional
     @Override
     public String generateToken(String subjectEmail, JwtTokenType tokenType, Set<String> roles) {
         JWTClaimsSet claimsSet = createPayload(subjectEmail, tokenType, roles);
