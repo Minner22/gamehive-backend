@@ -123,4 +123,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("An unexpected error occurred: " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
     }
+
+    @ExceptionHandler(BaseException.class)
+    public ResponseEntity<ApiError> handleBaseException(BaseException ex) {
+        ApiError apiError = new ApiError(ex.getErrorCode().name(), ex.getMessage());
+        HttpStatus status = mapToHttpStatus(ex.getErrorCode());
+        return ResponseEntity.status(status).body(apiError);
+    }
+
+    private HttpStatus mapToHttpStatus(ErrorCode errorCode) {
+        return switch (errorCode) {
+            case USER_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case EMAIL_ALREADY_EXISTS -> HttpStatus.BAD_REQUEST;
+            default -> HttpStatus.INTERNAL_SERVER_ERROR; // Default fallback
+        };
+    }
 }
