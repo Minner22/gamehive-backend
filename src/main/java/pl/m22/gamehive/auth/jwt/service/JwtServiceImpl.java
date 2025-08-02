@@ -44,37 +44,47 @@ public class JwtServiceImpl implements JwtService {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
             if (!signedJWT.getHeader().getAlgorithm().equals(jwsAlgorithm)) {
-                throw new InvalidJwtAlgorithmException(signedJWT.getHeader().getAlgorithm().getName());
+                throw new ApplicationException(ErrorCode.JWT_INVALID_ALGORITHM,
+                        "Invalid JWT algorithm: " + signedJWT.getHeader().getAlgorithm().getName());
             }
             if (!signedJWT.verify(new MACVerifier(getSecretForType(tokenType)))) {
-                throw new InvalidJwtSignature();
+                throw new ApplicationException(ErrorCode.JWT_INVALID_SIGNATURE);
             }
 
             JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
             if (claims.getExpirationTime() == null || claims.getExpirationTime().before(new Date())) {
-                throw new ExpiredJwtTokenException();
+                throw new ApplicationException(ErrorCode.JWT_EXPIRED);
             }
 
             String type = claims.getStringClaim(CLAIM_TYPE);
             if (!tokenType.name().equals(type)) {
-                throw new InvalidJwtTypeException(type);
+                throw new ApplicationException(
+                        ErrorCode.JWT_INVALID_TYPE,
+                        "Expected token type " + tokenType + " but got " + type
+                );
             }
 
             if (tokenType == JwtTokenType.REFRESH) {
                 String jti = claims.getJWTID();
                 if (jti == null || jti.isEmpty()) {
-                    throw new InvalidJwtJtiException("Refresh token must contain a valid JTI");
+                    throw new ApplicationException(ErrorCode.JWT_INVALID_JTI);
                 }
                 if (!userRefreshTokenRepository.existsByJtiAndRevokedFalse(jti)) {
-                    throw new InvalidJwtJtiException("Refresh token with JTI " + jti + " does not exist or is revoked");
+                    throw new ApplicationException(ErrorCode.JWT_INVALID_JTI);
                 }
             }
 
             return true;
         } catch (ParseException e) {
-            throw new RuntimeParseException("Failed to parse JWT: " + e.getMessage());
+            throw new ApplicationException(
+                    ErrorCode.JWT_PARSE_ERROR,
+                    "Failed to parse JWT: " + e.getMessage()
+            );
         } catch (JOSEException e) {
-            throw new RuntimeJOSEException("Failed to validate JWT: " + e.getMessage());
+            throw new InfrastructureException(
+                    ErrorCode.JWT_SIGNING_ERROR,
+                    "Failed to sign JWT: " + e.getMessage()
+            );
         }
     }
 
@@ -107,11 +117,14 @@ public class JwtServiceImpl implements JwtService {
             SignedJWT signedJWT = SignedJWT.parse(token);
             JWTClaimsSet jwtClaimsSet = signedJWT.getJWTClaimsSet();
             if (jwtClaimsSet.getSubject() == null || jwtClaimsSet.getSubject().isEmpty()) {
-                throw new InvalidJwtSubjectException();
+                throw new ApplicationException(ErrorCode.JWT_INVALID_SUBJECT);
             }
             return jwtClaimsSet.getSubject();
         } catch (ParseException e) {
-            throw new RuntimeParseException("Failed to parse JWT: " + e.getMessage());
+            throw new ApplicationException(
+                    ErrorCode.JWT_PARSE_ERROR,
+                    "Failed to parse JWT: " + e.getMessage()
+            );
         }
     }
 
@@ -119,7 +132,7 @@ public class JwtServiceImpl implements JwtService {
     @Override
     public void revokeUsersTokens(String email) {
         if (email == null || email.isEmpty()) {
-            throw new EmailNotFoundException("Email cannot be null or empty");
+            throw new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email cannot be null or empty");
         }
 
         userRefreshTokenRepository.findByAppUserEmailAndRevokedFalseOrderByCreatedAtAsc(email)
@@ -139,9 +152,15 @@ public class JwtServiceImpl implements JwtService {
             signedJWT.sign(jwsSigner);
             return signedJWT;
         } catch (KeyLengthException e) {
-            throw new JwtPrivateKeyLengthException("Failed to create signer for JWT: " + e.getMessage());
+            throw new InfrastructureException(
+                    ErrorCode.JWT_KEY_ERROR,
+                    "Invalid key length for JWT signing: " + e.getMessage()
+            );
         } catch (JOSEException e) {
-            throw new RuntimeJOSEException("Failed to create JWT: " + e.getMessage());
+            throw new InfrastructureException(
+                    ErrorCode.JWT_SIGNING_ERROR,
+                    "Failed to sign JWT: " + e.getMessage()
+            );
         }
     }
 
@@ -159,7 +178,7 @@ public class JwtServiceImpl implements JwtService {
             builder.claim(CLAIM_ROLES, roles);
         }
         else if (tokenType == JwtTokenType.ACCESS) {
-            throw new InvalidJwtRolesException("Access token must contain roles");
+            throw new ApplicationException(ErrorCode.JWT_INVALID_ROLES);
         }
 
         if (tokenType == JwtTokenType.REFRESH) {
@@ -176,7 +195,7 @@ public class JwtServiceImpl implements JwtService {
         Instant expirationTime = claimsSet.getExpirationTime().toInstant();
 
         AppUser user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new EmailNotFoundException("User with email " + email + " not found"));
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email));
 
         long activeTokensCount = userRefreshTokenRepository.countByAppUserEmailAndRevokedFalse(email);
 
@@ -203,7 +222,10 @@ public class JwtServiceImpl implements JwtService {
             case ACTIVATION -> activationProps.getSecret();
             case ACCESS -> accessProps.getSecret();
             case REFRESH -> refreshProps.getSecret();
-            default -> throw new InvalidJwtTypeException(tokenType.name());
+            default -> throw new ApplicationException(
+                    ErrorCode.JWT_INVALID_TYPE,
+                    "Invalid JWT type: " + tokenType.name()
+            );
         };
     }
 
@@ -212,7 +234,10 @@ public class JwtServiceImpl implements JwtService {
             case ACTIVATION -> activationProps.getValidityInSeconds();
             case ACCESS -> accessProps.getValidityInSeconds();
             case REFRESH -> refreshProps.getValidityInSeconds();
-            default -> throw new InvalidJwtTypeException(tokenType.name());
+            default -> throw new ApplicationException(
+                    ErrorCode.JWT_INVALID_TYPE,
+                    "Invalid JWT type: " + tokenType.name()
+            );
         };
     }
 }

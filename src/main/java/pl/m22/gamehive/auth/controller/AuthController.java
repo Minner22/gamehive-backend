@@ -14,7 +14,8 @@ import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.service.AuthService;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.common.email.service.MailService;
-import pl.m22.gamehive.common.exception.EmailNotFoundException;
+import pl.m22.gamehive.common.exception.ApplicationException;
+import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.service.UserService;
 
@@ -62,7 +63,7 @@ public class AuthController {
         String email = jwtService.extractEmailFromToken(refreshToken);
         CredentialsDto userCredentials = userMapper.toCredentialsDto(
                 userService.findUserByEmail(email)
-                        .orElseThrow(() -> new EmailNotFoundException(email)));
+                        .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email)));
         return generateTokens(userCredentials);
     }
 

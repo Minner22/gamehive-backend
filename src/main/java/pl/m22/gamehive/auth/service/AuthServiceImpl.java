@@ -29,11 +29,11 @@ public class AuthServiceImpl implements AuthService{
     @Override
     public void register(RegistrationDto registrationDto) {
         if (userRepository.existsByEmail(registrationDto.email())) {
-            throw new EmailAlreadyExistsException(registrationDto.email());
+            throw new ApplicationException(ErrorCode.EMAIL_ALREADY_EXISTS, "Email already exists: " + registrationDto.email());
         }
 
         if (userRepository.existsByUsername(registrationDto.username())) {
-            throw new UsernameAlreadyExistsException(registrationDto.username());
+            throw new ApplicationException(ErrorCode.USERNAME_ALREADY_EXISTS, "Username already exists: " + registrationDto.username());
         }
 
         AppUser appUser = userMapper.toUser(registrationDto);
@@ -42,7 +42,7 @@ public class AuthServiceImpl implements AuthService{
         appUser.setUserProfile(new UserProfile());
 
         UserRole role = userRoleRepository.findByName(USER_ROLE)
-                .orElseThrow(() -> new RoleNotFoundException(USER_ROLE));
+                .orElseThrow(() -> new ApplicationException(ErrorCode.ROLE_NOT_FOUND, "Role not found: " + USER_ROLE));
 
         appUser.getRoles().add(role);
 
@@ -54,14 +54,14 @@ public class AuthServiceImpl implements AuthService{
 
         AppUser appUser = userRepository.findByEmail(loginDto.usernameOrEmail())
                 .orElseGet(() -> userRepository.findByUsername(loginDto.usernameOrEmail())
-                        .orElseThrow(() -> new UsernameOrEmailNotFoundException(loginDto.usernameOrEmail())));
+                        .orElseThrow(() -> new ApplicationException(ErrorCode.IDENTIFIER_NOT_FOUND, "Username or email not found: " + loginDto.usernameOrEmail())));
 
         if (!passwordEncoder.matches(loginDto.password(), appUser.getPassword())) {
-            throw new InvalidPasswordException();
+            throw new ApplicationException(ErrorCode.INVALID_PASSWORD);
         }
 
         if (!appUser.isEnabled()) {
-            throw new UserNotActivatedException(appUser.getEmail());
+            throw new ApplicationException(ErrorCode.USER_NOT_ACTIVATED, "User not activated: " + appUser.getEmail());
         }
 
         return userMapper.toCredentialsDto(appUser);
@@ -71,10 +71,10 @@ public class AuthServiceImpl implements AuthService{
     @Override
     public void activateUser(String email) {
         AppUser appUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new EmailNotFoundException(email));
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email));
 
         if (appUser.isEnabled()) {
-            throw new UserAlreadyActivatedException(email);
+            throw new ApplicationException(ErrorCode.USER_ALREADY_ACTIVATED, "User with email " + email + " is already activated.");
         }
 
         appUser.setEnabled(true);
