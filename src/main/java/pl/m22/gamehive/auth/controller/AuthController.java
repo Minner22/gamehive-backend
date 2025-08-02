@@ -2,6 +2,7 @@ package pl.m22.gamehive.auth.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -16,12 +17,14 @@ import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.common.email.service.MailService;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.logging.LoggingUtils;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.service.UserService;
 
 import java.time.Duration;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -37,8 +40,12 @@ public class AuthController {
     public ResponseEntity<String> register(@Valid @RequestBody RegistrationDto registrationDto) {
 
         authService.register(registrationDto);
+        log.info("User registered: {}", LoggingUtils.obfuscateEmail(registrationDto.email()));
+
         String activationToken = jwtService.generateToken(registrationDto.email(), JwtTokenType.ACTIVATION, null);
         mailService.sendActivationEmail(registrationDto.email(), activationToken);
+        log.info("Activation email sent to: {}", LoggingUtils.obfuscateEmail(registrationDto.email()));
+
         return ResponseEntity.ok("User registration successful. Please check your email to confirm your account.");
     }
 
@@ -47,6 +54,7 @@ public class AuthController {
         jwtService.isTokenValid(token, JwtTokenType.ACTIVATION);
         String email = jwtService.extractEmailFromToken(token);
         authService.activateUser(email);
+        log.info("User account activated: {}", LoggingUtils.obfuscateEmail(email));
         return ResponseEntity.ok("Account has been successfully activated.");
     }
 
@@ -54,6 +62,7 @@ public class AuthController {
     public ResponseEntity<?> login(@Valid @RequestBody LoginDto loginDto) {
 
         CredentialsDto userCredentials = authService.login(loginDto);
+        log.info("User logged in: {}", LoggingUtils.obfuscateEmail(userCredentials.email()));
         return generateTokens(userCredentials);
     }
 
@@ -64,6 +73,7 @@ public class AuthController {
         CredentialsDto userCredentials = userMapper.toCredentialsDto(
                 userService.findUserByEmail(email)
                         .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email)));
+        log.info("User refreshed access token: {}", LoggingUtils.obfuscateEmail(userCredentials.email()));
         return generateTokens(userCredentials);
     }
 
@@ -73,7 +83,7 @@ public class AuthController {
         jwtService.isTokenValid(accessToken, JwtTokenType.ACCESS);
         String subjectEmail = jwtService.extractEmailFromToken(accessToken);
         jwtService.revokeUsersTokens(subjectEmail);
-
+        log.info("User logged out: {}", LoggingUtils.obfuscateEmail(subjectEmail));
         return ResponseEntity.ok().build();
     }
 
@@ -87,8 +97,6 @@ public class AuthController {
                 .maxAge(Duration.ofDays(7))
                 .sameSite("Strict")
                 .build();
-        System.out.println("Access: " + loginResponse.accessToken());
-        System.out.println("Refresh: " + loginResponse.refreshToken());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                 .body(Map.of("accessToken", loginResponse.accessToken()));
