@@ -1,0 +1,26 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    defer-datasource-initialization: true  # dane po utworzeniu schematu
+  sql:
+    init:
+      mode: always                         # w testach H2 i tak zadziała, ale jawnie jest czytelniej
+      schema-locations: [ ]                  # WYŁĄCZ uruchamianie schema*.sql
+      data-locations: classpath:data.sql    # tylko dane
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+
+# override secrets for tests (so you don't need secret.properties)
+jwt:
+  activation:
+    secret: "test-activation-secret-abcdefghijklmnopqrstuvwxyz1234"
+    validityInSeconds: 2
+  refresh:
+    secret: "test-refresh-secret-abcdefghijklmnopqrstuvwxyz123456"
+    validityInSeconds: 1209600
+    maxActiveTokensPerUser: 5
+  access:
+    secret: "test-access-secret-abcdefghijklmnopqrstuvwxyz1234567"
+    validityInSeconds: 2
