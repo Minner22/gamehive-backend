@@ -29,6 +29,7 @@ public enum ErrorCode {
     JWT_INVALID_JTI(HttpStatus.UNAUTHORIZED, "Invalid or revoked JWT JTI"),
     JWT_PARSE_ERROR(HttpStatus.BAD_REQUEST, "Failed to parse JWT"),
 
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "Access denied"),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Validation failed"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
 

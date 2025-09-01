@@ -33,6 +33,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus()).body(apiError);
     }
 
+    @ExceptionHandler(org.springframework.security.authorization.AuthorizationDeniedException.class)
+    public ResponseEntity<ApiError> handleAuthorizationDenied(org.springframework.security.authorization.AuthorizationDeniedException ex) {
+        log.warn("Access denied (method security): {}", ex.getMessage());
+
+        ApiError apiError = new ApiError(
+                ErrorCode.ACCESS_DENIED.name(),
+                ErrorCode.ACCESS_DENIED.getDefaultMessage()
+        );
+
+        return ResponseEntity.status(ErrorCode.ACCESS_DENIED.getHttpStatus())
+                .body(apiError);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleOtherExceptions(Exception ex) {
 
