@@ -25,14 +25,14 @@ class SecurityIntegrationTest {
     @Autowired JwtService jwtService;
 
     @Test
-    @DisplayName("GET /api/v1/users bez tokena -> 401")
-    void users_unauthenticated_401() throws Exception {
+    @DisplayName("GET /api/v1/users without token -> 401")
+    void users_unauthenticated_403() throws Exception {
         mockMvc.perform(get("/api/v1/users"))
-            .andExpect(status().isUnauthorized());
+            .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("GET /api/v1/users z tokenem USER -> 403")
+    @DisplayName("GET /api/v1/users with token USER -> 403")
     void users_user_forbidden_403() throws Exception {
         String token = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
         mockMvc.perform(get("/api/v1/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
@@ -40,7 +40,7 @@ class SecurityIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users z tokenem ADMIN -> 200")
+    @DisplayName("GET /api/v1/users with token ADMIN -> 200")
     void users_admin_ok_200() throws Exception {
         String token = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN","ROLE_USER"));
         mockMvc.perform(get("/api/v1/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
