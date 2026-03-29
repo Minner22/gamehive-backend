@@ -40,7 +40,7 @@ public class JwtServiceImpl implements JwtService {
     private static final String CLAIM_ROLES = "roles";
 
     @Override
-    public boolean isTokenValid(String token, JwtTokenType tokenType) {
+    public void validateToken(String token, JwtTokenType tokenType) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
             if (!signedJWT.getHeader().getAlgorithm().equals(jwsAlgorithm)) {
@@ -73,8 +73,7 @@ public class JwtServiceImpl implements JwtService {
                     throw new ApplicationException(ErrorCode.JWT_INVALID_JTI);
                 }
             }
-
-            return true;
+            
         } catch (ParseException e) {
             throw new ApplicationException(
                     ErrorCode.JWT_PARSE_ERROR,
@@ -171,7 +170,7 @@ public class JwtServiceImpl implements JwtService {
                 .subject(subjectEmail)
                 .issueTime(Date.from(now))
                 .expirationTime(Date.from(expirationDate))
-                .claim(CLAIM_TYPE, tokenType);
+                .claim(CLAIM_TYPE, tokenType.name());
 
         if (roles != null && !roles.isEmpty()) {
             builder.claim(CLAIM_ROLES, roles);

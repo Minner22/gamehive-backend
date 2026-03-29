@@ -50,7 +50,7 @@ public class AuthController {
 
     @GetMapping("/activate")
     public ResponseEntity<String> activateAccount(@RequestParam("token") String token) {
-        jwtService.isTokenValid(token, JwtTokenType.ACTIVATION);
+        jwtService.validateToken(token, JwtTokenType.ACTIVATION);
         String email = jwtService.extractEmailFromToken(token);
         authService.activateUser(email);
         log.info("User account activated: {}", LoggingUtils.obfuscateEmail(email));
@@ -67,7 +67,7 @@ public class AuthController {
 
     @GetMapping("/refresh")
     public ResponseEntity<Map<String, String>> refreshAccessToken(@CookieValue("refreshToken") String refreshToken) {
-        jwtService.isTokenValid(refreshToken, JwtTokenType.REFRESH);
+        jwtService.validateToken(refreshToken, JwtTokenType.REFRESH);
         String email = jwtService.extractEmailFromToken(refreshToken);
         CredentialsDto userCredentials = userMapper.toCredentialsDto(
                 userService.findUserByEmail(email)
@@ -79,11 +79,22 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@RequestHeader("Authorization") String accessTokenHeader) {
         String accessToken = accessTokenHeader.substring(7);
-        jwtService.isTokenValid(accessToken, JwtTokenType.ACCESS);
+        jwtService.validateToken(accessToken, JwtTokenType.ACCESS);
         String subjectEmail = jwtService.extractEmailFromToken(accessToken);
         jwtService.revokeUsersTokens(subjectEmail);
+
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                //.secure(true)
+                .path("/api/v1/auth/refresh")
+                .maxAge(0)
+                .sameSite("Strict")
+                .build();
+
         log.info("User logged out: {}", LoggingUtils.obfuscateEmail(subjectEmail));
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .build();
     }
 
     private ResponseEntity<Map<String, String>> generateTokens(CredentialsDto userCredentials) {

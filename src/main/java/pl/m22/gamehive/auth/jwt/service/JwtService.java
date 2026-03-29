@@ -8,7 +8,7 @@ import java.util.Set;
 
 public interface JwtService {
     String generateToken(String subjectEmail, JwtTokenType tokenType, Set<String> roles);
-    boolean isTokenValid(String token, JwtTokenType tokenType);
+    void validateToken(String token, JwtTokenType tokenType);
     TokenPairDto generateTokenPair(CredentialsDto credentials);
     String extractEmailFromToken(String token);
 
