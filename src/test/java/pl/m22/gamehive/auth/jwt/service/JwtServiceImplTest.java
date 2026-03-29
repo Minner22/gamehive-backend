@@ -8,7 +8,6 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -37,6 +36,7 @@ class JwtServiceImplTest {
     @Autowired UserRepository userRepository;
 
     private static final String ACCESS_SECRET = "test-access-secret-abcdefghijklmnopqrstuvwxyz1234567";
+    private static final String ACTIVATION_SECRET = "test-activation-secret-abcdefghijklmnopqrstuvwxyz1234";
 
     private CredentialsDto johnCreds() {
         Optional<AppUser> userOpt = userRepository.findByEmail("john.doe@example.com");
@@ -50,14 +50,14 @@ class JwtServiceImplTest {
     @DisplayName("generateToken/access -> token się weryfikuje poprawnie")
     void generate_and_validate_access_token_ok() {
         String token = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN","ROLE_USER"));
-        Assertions.assertTrue(jwtService.isTokenValid(token, JwtTokenType.ACCESS));
+        jwtService.validateToken(token, JwtTokenType.ACCESS);
     }
 
     @Test
     @DisplayName("generateTokenPair/refresh -> JTI zapisany, a token refresh przechodzi weryfikację")
     void refresh_token_persisted_and_valid() {
         TokenPairDto pair = jwtService.generateTokenPair(johnCreds());
-        Assertions.assertTrue(jwtService.isTokenValid(pair.refreshToken(), JwtTokenType.REFRESH));
+        jwtService.validateToken(pair.refreshToken(), JwtTokenType.REFRESH);
     }
 
     @Test
@@ -67,7 +67,7 @@ class JwtServiceImplTest {
         String refresh = pair.refreshToken();
         jwtService.revokeUsersTokens("john.doe@example.com");
         ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> jwtService.isTokenValid(refresh, JwtTokenType.REFRESH));
+                () -> jwtService.validateToken(refresh, JwtTokenType.REFRESH));
         assertEquals(ErrorCode.JWT_INVALID_JTI, ex.getErrorCode());
     }
 
@@ -78,7 +78,7 @@ class JwtServiceImplTest {
         // psujemy podpis – najprościej: dokładamy śmieci na końcu, parsuje się, ale weryfikacja podpisu padnie
         String broken = token + "AA";
         ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> jwtService.isTokenValid(broken, JwtTokenType.ACCESS));
+                () -> jwtService.validateToken(broken, JwtTokenType.ACCESS));
         assertEquals(ErrorCode.JWT_INVALID_SIGNATURE, ex.getErrorCode());
     }
 
@@ -103,8 +103,33 @@ class JwtServiceImplTest {
 
         // 3) walidacja powinna polec na typie
         ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> jwtService.isTokenValid(token, JwtTokenType.ACCESS));
+                () -> jwtService.validateToken(token, JwtTokenType.ACCESS));
         assertEquals(ErrorCode.JWT_INVALID_TYPE, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("wygasły activation token -> JWT_EXPIRED")
+    void expired_activation_token() {
+        Instant now = Instant.now();
+
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .subject("john.doe@example.com")
+                .issueTime(Date.from(now.minusSeconds(10)))
+                .expirationTime(Date.from(now.minusSeconds(1)))
+                .claim("type", "ACTIVATION")
+                .build();
+
+        SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
+        try {
+            jwt.sign(new MACSigner(ACTIVATION_SECRET.getBytes(StandardCharsets.UTF_8)));
+        } catch (JOSEException e) {
+            throw new RuntimeException(e);
+        }
+
+        String token = jwt.serialize();
+        ApplicationException ex = assertThrows(ApplicationException.class,
+                () -> jwtService.validateToken(token, JwtTokenType.ACTIVATION));
+        assertEquals(ErrorCode.JWT_EXPIRED, ex.getErrorCode());
     }
 
     @Test
@@ -129,7 +154,7 @@ class JwtServiceImplTest {
 
         String token = jwt.serialize();
         ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> jwtService.isTokenValid(token, JwtTokenType.ACCESS));
+                () -> jwtService.validateToken(token, JwtTokenType.ACCESS));
         assertEquals(ErrorCode.JWT_EXPIRED, ex.getErrorCode());
     }
 }

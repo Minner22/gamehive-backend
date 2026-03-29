@@ -9,7 +9,9 @@ import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
-import pl.m22.gamehive.common.exception.*;
+import pl.m22.gamehive.common.email.service.MailService;
+import pl.m22.gamehive.common.exception.ApplicationException;
+import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.UserProfile;
@@ -27,12 +29,14 @@ public class AuthServiceImpl implements AuthService{
     private final UserRoleRepository userRoleRepository;
     private final UserMapper userMapper;
     private final JwtService jwtService;
+    private final MailService mailService;
 
     @Transactional
     @Override
-    public String registerAndGenerateActivationToken(RegistrationDto registrationDto) {
+    public void register(RegistrationDto registrationDto) {
         AppUser appUser = registerUser(registrationDto);
-        return generateActivationToken(appUser);
+        String activationToken = generateActivationToken(appUser);
+        mailService.sendActivationEmail(appUser.getEmail(), activationToken);
     }
 
     @Override

@@ -16,7 +16,9 @@ import pl.m22.gamehive.auth.jwt.config.ActivationTokenProperties;
 import pl.m22.gamehive.auth.jwt.config.RefreshTokenProperties;
 import pl.m22.gamehive.auth.jwt.model.UserRefreshToken;
 import pl.m22.gamehive.auth.jwt.repository.UserRefreshTokenRepository;
-import pl.m22.gamehive.common.exception.*;
+import pl.m22.gamehive.common.exception.ApplicationException;
+import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.exception.InfrastructureException;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.repository.UserRepository;
 
@@ -40,7 +42,7 @@ public class JwtServiceImpl implements JwtService {
     private static final String CLAIM_ROLES = "roles";
 
     @Override
-    public boolean isTokenValid(String token, JwtTokenType tokenType) {
+    public void validateToken(String token, JwtTokenType tokenType) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
             if (!signedJWT.getHeader().getAlgorithm().equals(jwsAlgorithm)) {
@@ -73,8 +75,7 @@ public class JwtServiceImpl implements JwtService {
                     throw new ApplicationException(ErrorCode.JWT_INVALID_JTI);
                 }
             }
-
-            return true;
+            
         } catch (ParseException e) {
             throw new ApplicationException(
                     ErrorCode.JWT_PARSE_ERROR,
@@ -134,11 +135,7 @@ public class JwtServiceImpl implements JwtService {
             throw new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email cannot be null or empty");
         }
 
-        userRefreshTokenRepository.findByAppUserEmailAndRevokedFalseOrderByCreatedAtAsc(email)
-                .forEach(token -> {
-                    token.setRevoked(true);
-                    userRefreshTokenRepository.save(token);
-                });
+        userRefreshTokenRepository.revokeAllByUserEmail(email);
     }
 
     private SignedJWT generateSignedJwt(JWTClaimsSet claimSet, JwtTokenType tokenType) {
@@ -171,7 +168,7 @@ public class JwtServiceImpl implements JwtService {
                 .subject(subjectEmail)
                 .issueTime(Date.from(now))
                 .expirationTime(Date.from(expirationDate))
-                .claim(CLAIM_TYPE, tokenType);
+                .claim(CLAIM_TYPE, tokenType.name());
 
         if (roles != null && !roles.isEmpty()) {
             builder.claim(CLAIM_ROLES, roles);
@@ -191,6 +188,12 @@ public class JwtServiceImpl implements JwtService {
     private void saveRefreshToken(JWTClaimsSet claimsSet) {
         String jti = claimsSet.getJWTID();
         String email = claimsSet.getSubject();
+        if (email == null || email.isEmpty()) {
+            throw new ApplicationException(ErrorCode.JWT_INVALID_SUBJECT);
+        }
+        if (claimsSet.getExpirationTime() == null) {
+            throw new ApplicationException(ErrorCode.JWT_EXPIRED);
+        }
         Instant expirationTime = claimsSet.getExpirationTime().toInstant();
 
         AppUser user = userRepository.findByEmail(email)
@@ -203,7 +206,7 @@ public class JwtServiceImpl implements JwtService {
                     .findByAppUserEmailAndRevokedFalseOrderByCreatedAtAsc(email)
                     .stream()
                     .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("No token to revoke found for user: " + email));
+                    .orElseThrow(() -> new ApplicationException(ErrorCode.JWT_INVALID_JTI, "No token to revoke found for user: " + email));
             oldestToken.setRevoked(true);
             userRefreshTokenRepository.save(oldestToken);
         }

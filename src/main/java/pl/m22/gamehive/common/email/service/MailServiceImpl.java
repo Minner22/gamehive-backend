@@ -1,11 +1,16 @@
 package pl.m22.gamehive.common.email.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import pl.m22.gamehive.common.email.config.MailProperties;
+import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.exception.InfrastructureException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MailServiceImpl implements MailService {
@@ -31,6 +36,11 @@ public class MailServiceImpl implements MailService {
         mailMessage.setSubject("Account Activation");
         mailMessage.setText(emailContent);
 
-        mailSender.send(mailMessage);
+        try {
+            mailSender.send(mailMessage);
+        } catch (MailException e) {
+            log.error("Failed to send activation email to {}: {}", email, e.getMessage());
+            throw new InfrastructureException(ErrorCode.EMAIL_SEND_FAILED);
+        }
     }
 }
