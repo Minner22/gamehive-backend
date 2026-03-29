@@ -31,6 +31,8 @@ public enum ErrorCode {
 
     EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to send email"),
 
+    REDIS_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Token service temporarily unavailable"),
+
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "Access denied"),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Validation failed"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");

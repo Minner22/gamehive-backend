@@ -7,20 +7,15 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.TokenPairDto;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.config.AccessTokenProperties;
 import pl.m22.gamehive.auth.jwt.config.ActivationTokenProperties;
 import pl.m22.gamehive.auth.jwt.config.RefreshTokenProperties;
-import pl.m22.gamehive.auth.jwt.model.UserRefreshToken;
-import pl.m22.gamehive.auth.jwt.repository.UserRefreshTokenRepository;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
-import pl.m22.gamehive.user.model.AppUser;
-import pl.m22.gamehive.user.repository.UserRepository;
 
 import java.text.ParseException;
 import java.time.Instant;
@@ -36,8 +31,7 @@ public class JwtServiceImpl implements JwtService {
     private final ActivationTokenProperties activationProps;
     private final AccessTokenProperties accessProps;
     private final RefreshTokenProperties refreshProps;
-    private final UserRefreshTokenRepository userRefreshTokenRepository;
-    private final UserRepository userRepository;
+    private final RedisRefreshTokenStore redisRefreshTokenStore;
     private static final String CLAIM_TYPE = "type";
     private static final String CLAIM_ROLES = "roles";
 
@@ -71,11 +65,11 @@ public class JwtServiceImpl implements JwtService {
                 if (jti == null || jti.isEmpty()) {
                     throw new ApplicationException(ErrorCode.JWT_INVALID_JTI);
                 }
-                if (!userRefreshTokenRepository.existsByJtiAndRevokedFalse(jti)) {
+                if (!redisRefreshTokenStore.existsByJti(jti)) {
                     throw new ApplicationException(ErrorCode.JWT_INVALID_JTI);
                 }
             }
-            
+
         } catch (ParseException e) {
             throw new ApplicationException(
                     ErrorCode.JWT_PARSE_ERROR,
@@ -89,7 +83,6 @@ public class JwtServiceImpl implements JwtService {
         }
     }
 
-    @Transactional
     @Override
     public TokenPairDto generateTokenPair(CredentialsDto credentials) {
         String accessToken = generateToken(credentials.email(), JwtTokenType.ACCESS, credentials.roles());
@@ -104,7 +97,6 @@ public class JwtServiceImpl implements JwtService {
         SignedJWT signedJwt = generateSignedJwt(claimsSet, tokenType);
 
         if (tokenType == JwtTokenType.REFRESH) {
-
             saveRefreshToken(claimsSet);
         }
 
@@ -128,14 +120,26 @@ public class JwtServiceImpl implements JwtService {
         }
     }
 
-    @Transactional
+    @Override
+    public String extractJtiFromToken(String token) {
+        try {
+            SignedJWT signedJWT = SignedJWT.parse(token);
+            return signedJWT.getJWTClaimsSet().getJWTID();
+        } catch (ParseException e) {
+            throw new ApplicationException(
+                    ErrorCode.JWT_PARSE_ERROR,
+                    "Failed to parse JWT: " + e.getMessage()
+            );
+        }
+    }
+
     @Override
     public void revokeUsersTokens(String email) {
         if (email == null || email.isEmpty()) {
             throw new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email cannot be null or empty");
         }
 
-        userRefreshTokenRepository.revokeAllByUserEmail(email);
+        redisRefreshTokenStore.revokeAllByUserEmail(email);
     }
 
     private SignedJWT generateSignedJwt(JWTClaimsSet claimSet, JwtTokenType tokenType) {
@@ -177,13 +181,12 @@ public class JwtServiceImpl implements JwtService {
             throw new ApplicationException(ErrorCode.JWT_INVALID_ROLES);
         }
 
-        if (tokenType == JwtTokenType.REFRESH) {
+        if (tokenType == JwtTokenType.REFRESH || tokenType == JwtTokenType.ACCESS) {
             builder.jwtID(UUID.randomUUID().toString());
         }
 
         return builder.build();
     }
-
 
     private void saveRefreshToken(JWTClaimsSet claimsSet) {
         String jti = claimsSet.getJWTID();
@@ -196,27 +199,7 @@ public class JwtServiceImpl implements JwtService {
         }
         Instant expirationTime = claimsSet.getExpirationTime().toInstant();
 
-        AppUser user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email));
-
-        long activeTokensCount = userRefreshTokenRepository.countByAppUserEmailAndRevokedFalse(email);
-
-        if (activeTokensCount >= refreshProps.getMaxActiveTokensPerUser()) {
-            UserRefreshToken oldestToken = userRefreshTokenRepository
-                    .findByAppUserEmailAndRevokedFalseOrderByCreatedAtAsc(email)
-                    .stream()
-                    .findFirst()
-                    .orElseThrow(() -> new ApplicationException(ErrorCode.JWT_INVALID_JTI, "No token to revoke found for user: " + email));
-            oldestToken.setRevoked(true);
-            userRefreshTokenRepository.save(oldestToken);
-        }
-
-        UserRefreshToken userRefreshToken = new UserRefreshToken();
-        userRefreshToken.setJti(jti);
-        userRefreshToken.setAppUser(user);
-        userRefreshToken.setExpiresAt(expirationTime);
-
-        userRefreshTokenRepository.save(userRefreshToken);
+        redisRefreshTokenStore.saveRefreshToken(jti, email, expirationTime);
     }
 
     private String getSecretForType(JwtTokenType tokenType) {

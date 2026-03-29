@@ -13,6 +13,7 @@ import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.auth.dto.TokenPairDto;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
 import pl.m22.gamehive.auth.service.AuthService;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
@@ -32,6 +33,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtService jwtService;
+    private final TokenBlacklistService tokenBlacklistService;
     private final UserMapper userMapper;
     private final UserService userService;
 
@@ -76,6 +78,7 @@ public class AuthController {
     public ResponseEntity<Void> logout(@RequestHeader("Authorization") String accessTokenHeader) {
         String accessToken = Objects.nonNull(accessTokenHeader) && accessTokenHeader.startsWith("Bearer ") ? accessTokenHeader.substring(7) : accessTokenHeader;
         jwtService.validateToken(accessToken, JwtTokenType.ACCESS);
+        tokenBlacklistService.blacklistAccessToken(accessToken);
         String subjectEmail = jwtService.extractEmailFromToken(accessToken);
         jwtService.revokeUsersTokens(subjectEmail);
 
