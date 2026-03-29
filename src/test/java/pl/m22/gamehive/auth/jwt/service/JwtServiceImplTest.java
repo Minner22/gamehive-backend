@@ -36,6 +36,7 @@ class JwtServiceImplTest {
     @Autowired UserRepository userRepository;
 
     private static final String ACCESS_SECRET = "test-access-secret-abcdefghijklmnopqrstuvwxyz1234567";
+    private static final String ACTIVATION_SECRET = "test-activation-secret-abcdefghijklmnopqrstuvwxyz1234";
 
     private CredentialsDto johnCreds() {
         Optional<AppUser> userOpt = userRepository.findByEmail("john.doe@example.com");
@@ -104,6 +105,31 @@ class JwtServiceImplTest {
         ApplicationException ex = assertThrows(ApplicationException.class,
                 () -> jwtService.validateToken(token, JwtTokenType.ACCESS));
         assertEquals(ErrorCode.JWT_INVALID_TYPE, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("wygasły activation token -> JWT_EXPIRED")
+    void expired_activation_token() {
+        Instant now = Instant.now();
+
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .subject("john.doe@example.com")
+                .issueTime(Date.from(now.minusSeconds(10)))
+                .expirationTime(Date.from(now.minusSeconds(1)))
+                .claim("type", "ACTIVATION")
+                .build();
+
+        SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
+        try {
+            jwt.sign(new MACSigner(ACTIVATION_SECRET.getBytes(StandardCharsets.UTF_8)));
+        } catch (JOSEException e) {
+            throw new RuntimeException(e);
+        }
+
+        String token = jwt.serialize();
+        ApplicationException ex = assertThrows(ApplicationException.class,
+                () -> jwtService.validateToken(token, JwtTokenType.ACTIVATION));
+        assertEquals(ErrorCode.JWT_EXPIRED, ex.getErrorCode());
     }
 
     @Test

@@ -7,7 +7,7 @@ import pl.m22.gamehive.user.model.AppUser;
 
 public interface AuthService {
 
-    String registerAndGenerateActivationToken(RegistrationDto registrationDto);
+    void register(RegistrationDto registrationDto);
 
     String generateActivationToken(AppUser appUser);
 

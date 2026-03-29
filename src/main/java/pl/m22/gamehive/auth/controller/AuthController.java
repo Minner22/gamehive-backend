@@ -9,12 +9,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.LoginDto;
-import pl.m22.gamehive.auth.dto.TokenPairDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
+import pl.m22.gamehive.auth.dto.TokenPairDto;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
-import pl.m22.gamehive.auth.service.AuthService;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
-import pl.m22.gamehive.common.email.service.MailService;
+import pl.m22.gamehive.auth.service.AuthService;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.logging.LoggingUtils;
@@ -23,6 +22,7 @@ import pl.m22.gamehive.user.service.UserService;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.Objects;
 
 @Slf4j
 @RestController
@@ -32,18 +32,14 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtService jwtService;
-    private final MailService mailService;
     private final UserMapper userMapper;
     private final UserService userService;
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegistrationDto registrationDto) {
 
-        String activationToken = authService.registerAndGenerateActivationToken(registrationDto);
-        log.info("User registered: {}", LoggingUtils.obfuscateEmail(registrationDto.email()));
-
-        mailService.sendActivationEmail(registrationDto.email(), activationToken);
-        log.info("Activation email sent to: {}", LoggingUtils.obfuscateEmail(registrationDto.email()));
+        authService.register(registrationDto);
+        log.info("User registered and activation email sent to: {}", LoggingUtils.obfuscateEmail(registrationDto.email()));
 
         return ResponseEntity.ok("User registration successful. Please check your email to confirm your account.");
     }
@@ -78,14 +74,14 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@RequestHeader("Authorization") String accessTokenHeader) {
-        String accessToken = accessTokenHeader.substring(7);
+        String accessToken = Objects.nonNull(accessTokenHeader) && accessTokenHeader.startsWith("Bearer ") ? accessTokenHeader.substring(7) : accessTokenHeader;
         jwtService.validateToken(accessToken, JwtTokenType.ACCESS);
         String subjectEmail = jwtService.extractEmailFromToken(accessToken);
         jwtService.revokeUsersTokens(subjectEmail);
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
-                //.secure(true)
+                .secure(true)
                 .path("/api/v1/auth/refresh")
                 .maxAge(0)
                 .sameSite("Strict")
@@ -102,7 +98,7 @@ public class AuthController {
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", loginResponse.refreshToken())
                 .httpOnly(true)
-                //.secure(true)
+                .secure(true)
                 .path("/api/v1/auth/refresh")
                 .maxAge(Duration.ofDays(7))
                 .sameSite("Strict")

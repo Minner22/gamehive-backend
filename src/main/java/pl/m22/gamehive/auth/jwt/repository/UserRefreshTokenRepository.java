@@ -1,15 +1,13 @@
 package pl.m22.gamehive.auth.jwt.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import pl.m22.gamehive.auth.jwt.model.UserRefreshToken;
 
 import java.util.List;
 
 public interface UserRefreshTokenRepository extends JpaRepository<UserRefreshToken, Long> {
-
-
-    boolean existsByJti(String jti);
-
 
     List<UserRefreshToken> findByAppUserEmailAndRevokedFalseOrderByCreatedAtAsc(String email);
 
@@ -17,5 +15,8 @@ public interface UserRefreshTokenRepository extends JpaRepository<UserRefreshTok
 
     boolean existsByJtiAndRevokedFalse(String jti);
 
+    @Modifying
+    @Query("UPDATE UserRefreshToken t SET t.revoked = true WHERE t.appUser.email = :email AND t.revoked = false")
+    void revokeAllByUserEmail(String email);
 
 }
