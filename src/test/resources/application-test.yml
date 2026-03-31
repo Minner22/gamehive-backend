@@ -15,6 +15,7 @@ spring:
     redis:
       host: localhost
       port: 16379
+      password: ""
 
 # override secrets for tests (so you don't need secret.properties)
 jwt:

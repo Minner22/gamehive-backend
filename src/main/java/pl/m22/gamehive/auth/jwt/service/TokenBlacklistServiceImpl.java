@@ -53,7 +53,7 @@ public class TokenBlacklistServiceImpl implements TokenBlacklistService {
             return false;
         }
         try {
-            return Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_PREFIX + jti));
+            return redisTemplate.hasKey(BLACKLIST_PREFIX + jti);
         } catch (RedisConnectionFailureException e) {
             log.warn("Redis unavailable for blacklist check, failing open", e);
             return false;
