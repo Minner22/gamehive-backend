@@ -1,5 +1,5 @@
 -- === user_profiles ===
-CREATE TABLE user_profiles (
+CREATE TABLE IF NOT EXISTS user_profiles (
                               id BIGSERIAL PRIMARY KEY,
                               created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
                               updated_at TIMESTAMP WITH TIME ZONE,
@@ -12,7 +12,7 @@ CREATE TABLE user_profiles (
 );
 
 -- === application_users ===
-CREATE TABLE application_users (
+CREATE TABLE IF NOT EXISTS application_users (
                                    id BIGSERIAL PRIMARY KEY,
                                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
                                    updated_at TIMESTAMP WITH TIME ZONE,
@@ -26,7 +26,7 @@ CREATE TABLE application_users (
 );
 
 -- === user_role ===
-CREATE TABLE user_role (
+CREATE TABLE IF NOT EXISTS user_role (
                            id BIGSERIAL PRIMARY KEY,
                            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
                            updated_at TIMESTAMP WITH TIME ZONE,
@@ -35,22 +35,10 @@ CREATE TABLE user_role (
 );
 
 -- === user_roles (relacja N:M użytkownik – role) ===
-CREATE TABLE user_roles (
+CREATE TABLE IF NOT EXISTS user_roles (
                             user_id BIGINT NOT NULL,
                             role_id BIGINT NOT NULL,
                             PRIMARY KEY (user_id, role_id),
                             CONSTRAINT fk_user_roles_user FOREIGN KEY (user_id) REFERENCES application_users(id) ON DELETE CASCADE,
                             CONSTRAINT fk_user_roles_role FOREIGN KEY (role_id) REFERENCES user_role(id) ON DELETE CASCADE
-);
-
--- === user_refresh_tokens ===
-CREATE TABLE user_refresh_tokens (
-                            id BIGSERIAL PRIMARY KEY,
-                            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-                            updated_at TIMESTAMP WITH TIME ZONE,
-                            user_id BIGINT NOT NULL,
-                            jti VARCHAR(255) NOT NULL UNIQUE,
-                            expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-                            revoked BOOLEAN NOT NULL DEFAULT FALSE,
-                            CONSTRAINT fk_user_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES application_users(id) ON DELETE CASCADE
 );

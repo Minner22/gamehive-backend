@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
 import pl.m22.gamehive.user.service.AppUserDetailsService;
 
 import java.io.IOException;
@@ -25,6 +26,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final AppUserDetailsService appUserDetailsService;
+    private final TokenBlacklistService tokenBlacklistService;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -38,6 +41,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         try {
             jwtService.validateToken(jwt, JwtTokenType.ACCESS);
+
+            String jti = jwtService.extractJtiFromToken(jwt);
+            if (jti != null && tokenBlacklistService.isBlacklisted(jti)) {
+                log.debug("Access token blacklisted for request [{}]", request.getRequestURI());
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             final String email = jwtService.extractEmailFromToken(jwt);
 
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
