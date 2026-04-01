@@ -1,0 +1,28 @@
+spring:
+    jpa:
+        hibernate:
+            ddl-auto: none
+        show-sql: true
+    sql:
+        init:
+            mode: always
+            schema-locations: classpath:db/schema.sql
+            data-locations: classpath:db/data.sql
+    mail:
+        activationAddress: http://localhost:8080/api/v1/auth/activate
+    data:
+        redis:
+            host: localhost
+            port: 6379
+            username: default
+            password: ${REDIS_PASSWORD}
+            timeout: 2000ms
+            lettuce:
+                pool:
+                    max-active: 8
+                    max-idle: 8
+                    min-idle: 2
+    docker:
+        compose:
+            lifecycle-management: start-and-stop
+            file: docker-compose.yml
