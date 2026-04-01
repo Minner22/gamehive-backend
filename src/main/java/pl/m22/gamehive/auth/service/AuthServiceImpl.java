@@ -74,16 +74,16 @@ public class AuthServiceImpl implements AuthService{
     @Override
     public CredentialsDto login(LoginDto loginDto) {
 
-        AppUser appUser = userRepository.findByEmail(loginDto.usernameOrEmail())
-                .orElseGet(() -> userRepository.findByUsername(loginDto.usernameOrEmail())
-                        .orElseThrow(() -> new ApplicationException(ErrorCode.IDENTIFIER_NOT_FOUND, "Username or email not found: " + loginDto.usernameOrEmail())));
-
-        if (!passwordEncoder.matches(loginDto.password(), appUser.getPassword())) {
-            throw new ApplicationException(ErrorCode.INVALID_PASSWORD);
-        }
+        String identifier = loginDto.usernameOrEmail();
+        AppUser appUser = userRepository.findByEmailOrUsername(identifier, identifier)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.IDENTIFIER_NOT_FOUND, "Username or email not found: " + identifier));
 
         if (!appUser.isEnabled()) {
             throw new ApplicationException(ErrorCode.USER_NOT_ACTIVATED, "User not activated: " + appUser.getEmail());
+        }
+
+        if (!passwordEncoder.matches(loginDto.password(), appUser.getPassword())) {
+            throw new ApplicationException(ErrorCode.INVALID_PASSWORD);
         }
 
         return userMapper.toCredentialsDto(appUser);
