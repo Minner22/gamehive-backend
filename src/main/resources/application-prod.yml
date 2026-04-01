@@ -1,5 +1,36 @@
 spring:
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
+    datasource:
+        url: ${DB_URL}
+        username: ${DB_USER}
+        password: ${DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+    jpa:
+        hibernate:
+            ddl-auto: validate
+        show-sql: false
+        properties:
+            hibernate:
+                dialect: org.hibernate.dialect.PostgreSQLDialect
+    h2:
+        console:
+            enabled: false
+    sql:
+        init:
+            mode: never
+    mail:
+        activationAddress: ${ACTIVATION_ADDRESS}
+    data:
+        redis:
+            host: ${REDIS_HOST}
+            port: ${REDIS_PORT:6379}
+            username: default
+            password: ${REDIS_PASSWORD}
+            timeout: 2000ms
+            lettuce:
+                pool:
+                    max-active: 8
+                    max-idle: 8
+                    min-idle: 2
+    docker:
+        compose:
+            enabled: false
