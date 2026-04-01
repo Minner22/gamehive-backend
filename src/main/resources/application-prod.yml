@@ -14,9 +14,8 @@ spring:
     h2:
         console:
             enabled: false
-    sql:
-        init:
-            mode: never
+    flyway:
+        locations: classpath:db/migration
     mail:
         activationAddress: ${ACTIVATION_ADDRESS}
     data:
