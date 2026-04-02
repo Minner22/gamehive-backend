@@ -7,10 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import pl.m22.gamehive.auth.dto.CredentialsDto;
-import pl.m22.gamehive.auth.dto.LoginDto;
-import pl.m22.gamehive.auth.dto.RegistrationDto;
-import pl.m22.gamehive.auth.dto.TokenPairDto;
+import pl.m22.gamehive.auth.dto.*;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
@@ -57,7 +54,9 @@ public class AuthController {
 
         String email = jwtService.extractEmailFromToken(token);
         authService.activateUser(email);
+
         tokenBlacklistService.blacklistToken(token);
+
         log.info("User account activated: {}", LoggingUtils.obfuscateEmail(email));
 
         return ResponseEntity.ok("Account has been successfully activated.");
@@ -94,6 +93,7 @@ public class AuthController {
 
         jwtService.validateToken(accessToken, JwtTokenType.ACCESS);
         tokenBlacklistService.blacklistToken(accessToken);
+
         String subjectEmail = jwtService.extractEmailFromToken(accessToken);
         jwtService.revokeUsersTokens(subjectEmail);
 
@@ -111,7 +111,37 @@ public class AuthController {
                 .build();
     }
 
+    @PostMapping("/password-reset/request")
+    public ResponseEntity<Void> requestPasswordReset(@Valid @RequestBody PasswordResetRequestDto requestDto) {
+
+        authService.requestPasswordReset(requestDto.email());
+        log.info("Password reset requested for email: {}", LoggingUtils.obfuscateEmail(requestDto.email()));
+
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/passwoer-reset/confirm")
+    public ResponseEntity<Void> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmDto confirmDto) {
+
+        String token = confirmDto.token();
+        jwtService.validateToken(token, JwtTokenType.PASSWORD_RESET);
+
+        if (tokenBlacklistService.isBlacklisted(jwtService.extractJtiFromToken(token))) {
+            throw new ApplicationException(ErrorCode.JWT_BLACKLISTED, "Activation token has already been used or is invalid.");
+        }
+
+        String email = jwtService.extractEmailFromToken(token);
+
+        authService.confirmPasswordReset(email, confirmDto.newPassword());
+
+        tokenBlacklistService.blacklistToken(token);
+        log.info("Password reset confirmed for email: {}", LoggingUtils.obfuscateEmail(email));
+
+        return ResponseEntity.ok().build();
+    }
+
     private ResponseEntity<Map<String, String>> generateTokens(CredentialsDto userCredentials) {
+
         TokenPairDto loginResponse = jwtService.generateTokenPair(userCredentials);
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", loginResponse.refreshToken())
