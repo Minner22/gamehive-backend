@@ -20,53 +20,29 @@ public class MailServiceImpl implements MailService {
 
     @Override
     public void sendActivationEmail(String email, String activationToken) {
-
-        String activationLink = mailProperties.getActivationAddress() +
-                "?token=" +
-                activationToken;
-
-        String emailContent = "Hello,\n\n" +
-                "Please activate your account by clicking the link below:\n" +
-                activationLink +
-                "\n\nThank you!";
-
-
-        SimpleMailMessage mailMessage = new SimpleMailMessage();
-        mailMessage.setFrom(mailProperties.getUsername());
-        mailMessage.setTo(email);
-        mailMessage.setSubject("Account Activation");
-        mailMessage.setText(emailContent);
-
-        try {
-            mailSender.send(mailMessage);
-        } catch (MailException e) {
-            log.error("Failed to send activation email to {}: {}", email, e.getMessage());
-            throw new InfrastructureException(ErrorCode.EMAIL_SEND_FAILED);
-        }
+        String link = mailProperties.getActivationAddress() + "?token=" + activationToken;
+        String body = "Hello,\n\nPlease activate your account by clicking the link below:\n" + link + "\n\nThank you!";
+        sendEmail(email, "Account Activation", body);
     }
 
     @Override
     public void sendPasswordResetEmail(String email, String resetToken) {
-        String activationLink = mailProperties.getPasswordResetAddress() +
-                "?token=" +
-                resetToken;
+        String link = mailProperties.getPasswordResetAddress() + "?token=" + resetToken;
+        String body = "Hello,\n\nPlease reset your password by clicking the link below:\n" + link + "\n\nThank you!";
+        sendEmail(email, "Password reset", body);
+    }
 
-        String emailContent = "Hello,\n\n" +
-                "Please reset your password by clicking the link below:\n" +
-                activationLink +
-                "\n\nThank you!";
-
-
+    private void sendEmail(String to, String subject, String text) {
         SimpleMailMessage mailMessage = new SimpleMailMessage();
         mailMessage.setFrom(mailProperties.getUsername());
-        mailMessage.setTo(email);
-        mailMessage.setSubject("Password reset");
-        mailMessage.setText(emailContent);
+        mailMessage.setTo(to);
+        mailMessage.setSubject(subject);
+        mailMessage.setText(text);
 
         try {
             mailSender.send(mailMessage);
         } catch (MailException e) {
-            log.error("Failed to send password reset email to {}: {}", email, e.getMessage());
+            log.error("Failed to send email to {}: {}", to, e.getMessage());
             throw new InfrastructureException(ErrorCode.EMAIL_SEND_FAILED);
         }
     }
