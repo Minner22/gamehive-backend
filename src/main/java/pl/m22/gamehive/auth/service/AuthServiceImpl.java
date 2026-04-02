@@ -103,4 +103,10 @@ public class AuthServiceImpl implements AuthService{
 
         userRepository.save(appUser);
     }
+
+    @Override
+    public void requestPasswordReset(String email) {
+
+        String token = jwtService.generateToken(email, JwtTokenType.PASSWORD_RESET, null);
+    }
 }
