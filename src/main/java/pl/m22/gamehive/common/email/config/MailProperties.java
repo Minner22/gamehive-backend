@@ -15,4 +15,5 @@ public class MailProperties {
     private int port;
     private String username;
     private String activationAddress;
+    private String passwordResetAddress;
 }

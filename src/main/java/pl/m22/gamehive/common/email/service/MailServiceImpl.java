@@ -17,6 +17,7 @@ public class MailServiceImpl implements MailService {
 
     private final MailProperties mailProperties;
     private final JavaMailSender mailSender;
+
     @Override
     public void sendActivationEmail(String email, String activationToken) {
 
@@ -40,6 +41,32 @@ public class MailServiceImpl implements MailService {
             mailSender.send(mailMessage);
         } catch (MailException e) {
             log.error("Failed to send activation email to {}: {}", email, e.getMessage());
+            throw new InfrastructureException(ErrorCode.EMAIL_SEND_FAILED);
+        }
+    }
+
+    @Override
+    public void sendPasswordResetEmail(String email, String resetToken) {
+        String activationLink = mailProperties.getPasswordResetAddress() +
+                "?token=" +
+                resetToken;
+
+        String emailContent = "Hello,\n\n" +
+                "Please reset your password by clicking the link below:\n" +
+                activationLink +
+                "\n\nThank you!";
+
+
+        SimpleMailMessage mailMessage = new SimpleMailMessage();
+        mailMessage.setFrom(mailProperties.getUsername());
+        mailMessage.setTo(email);
+        mailMessage.setSubject("Password reset");
+        mailMessage.setText(emailContent);
+
+        try {
+            mailSender.send(mailMessage);
+        } catch (MailException e) {
+            log.error("Failed to send password reset email to {}: {}", email, e.getMessage());
             throw new InfrastructureException(ErrorCode.EMAIL_SEND_FAILED);
         }
     }
