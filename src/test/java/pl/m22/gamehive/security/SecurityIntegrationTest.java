@@ -51,7 +51,7 @@ class SecurityIntegrationTest {
     @DisplayName("GET /api/v1/users with blacklisted ADMIN token -> 403")
     void users_blacklisted_token_403() throws Exception {
         String token = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN", "ROLE_USER"));
-        tokenBlacklistService.blacklistAccessToken(token);
+        tokenBlacklistService.blacklistToken(token);
         mockMvc.perform(get("/api/v1/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
             .andExpect(status().isForbidden());
     }

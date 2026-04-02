@@ -174,17 +174,14 @@ public class JwtServiceImpl implements JwtService {
                 .subject(subjectEmail)
                 .issueTime(Date.from(now))
                 .expirationTime(Date.from(expirationDate))
-                .claim(CLAIM_TYPE, tokenType.name());
+                .claim(CLAIM_TYPE, tokenType.name())
+                .jwtID(UUID.randomUUID().toString());
 
         if (roles != null && !roles.isEmpty()) {
             builder.claim(CLAIM_ROLES, roles);
         }
         else if (tokenType == JwtTokenType.ACCESS) {
             throw new ApplicationException(ErrorCode.JWT_INVALID_ROLES);
-        }
-
-        if (tokenType == JwtTokenType.REFRESH || tokenType == JwtTokenType.ACCESS) {
-            builder.jwtID(UUID.randomUUID().toString());
         }
 
         return builder.build();

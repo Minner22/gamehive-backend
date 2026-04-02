@@ -19,6 +19,7 @@ public enum ErrorCode {
     USER_ALREADY_ACTIVATED(HttpStatus.CONFLICT, "User is already activated"),
 
     JWT_KEY_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Invalid JWT signing key"),
+    JWT_BLACKLISTED(HttpStatus.UNAUTHORIZED, "JWT token already used"),
     JWT_SIGNING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to sign or verify JWT"),
     JWT_INVALID_ROLES(HttpStatus.UNAUTHORIZED, "JWT token does not contain valid roles"),
     JWT_INVALID_ALGORITHM(HttpStatus.UNAUTHORIZED, "Invalid JWT algorithm"),

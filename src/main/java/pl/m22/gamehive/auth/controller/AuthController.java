@@ -48,10 +48,18 @@ public class AuthController {
 
     @GetMapping("/activate")
     public ResponseEntity<String> activateAccount(@RequestParam("token") String token) {
+
         jwtService.validateToken(token, JwtTokenType.ACTIVATION);
+
+        if (tokenBlacklistService.isBlacklisted(jwtService.extractJtiFromToken(token))) {
+            throw new ApplicationException(ErrorCode.JWT_BLACKLISTED, "Activation token has already been used or is invalid.");
+        }
+
         String email = jwtService.extractEmailFromToken(token);
         authService.activateUser(email);
+        tokenBlacklistService.blacklistToken(token);
         log.info("User account activated: {}", LoggingUtils.obfuscateEmail(email));
+
         return ResponseEntity.ok("Account has been successfully activated.");
     }
 
@@ -60,25 +68,32 @@ public class AuthController {
 
         CredentialsDto userCredentials = authService.login(loginDto);
         log.info("User logged in: {}", LoggingUtils.obfuscateEmail(userCredentials.email()));
+
         return generateTokens(userCredentials);
     }
 
     @GetMapping("/refresh")
     public ResponseEntity<Map<String, String>> refreshAccessToken(@CookieValue("refreshToken") String refreshToken) {
+
         jwtService.validateToken(refreshToken, JwtTokenType.REFRESH);
+
         String email = jwtService.extractEmailFromToken(refreshToken);
         CredentialsDto userCredentials = userMapper.toCredentialsDto(
                 userService.findUserByEmail(email)
                         .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email)));
+
         log.info("User refreshed access token: {}", LoggingUtils.obfuscateEmail(userCredentials.email()));
+
         return generateTokens(userCredentials);
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@RequestHeader("Authorization") String accessTokenHeader) {
+
         String accessToken = Objects.nonNull(accessTokenHeader) && accessTokenHeader.startsWith("Bearer ") ? accessTokenHeader.substring(7) : accessTokenHeader;
+
         jwtService.validateToken(accessToken, JwtTokenType.ACCESS);
-        tokenBlacklistService.blacklistAccessToken(accessToken);
+        tokenBlacklistService.blacklistToken(accessToken);
         String subjectEmail = jwtService.extractEmailFromToken(accessToken);
         jwtService.revokeUsersTokens(subjectEmail);
 

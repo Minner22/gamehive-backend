@@ -17,5 +17,7 @@ public interface AuthService {
 
     void requestPasswordReset(String email);
 
+    void confirmPasswordReset(String token, String newPassword);
+
     AppUser registerUser(RegistrationDto registrationDto);
 }
