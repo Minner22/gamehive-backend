@@ -28,12 +28,12 @@ class TokenBlacklistServiceImplTest {
     }
 
     @Test
-    @DisplayName("blacklistAccessToken + isBlacklisted -> true")
+    @DisplayName("blacklistToken + isBlacklisted -> true")
     void blacklist_and_check() {
         String token = jwtService.generateToken("test@test.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
         String jti = jwtService.extractJtiFromToken(token);
 
-        tokenBlacklistService.blacklistAccessToken(token);
+        tokenBlacklistService.blacklistToken(token);
 
         assertTrue(tokenBlacklistService.isBlacklisted(jti));
     }

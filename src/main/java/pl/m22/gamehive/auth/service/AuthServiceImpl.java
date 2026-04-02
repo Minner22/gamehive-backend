@@ -19,6 +19,8 @@ import pl.m22.gamehive.user.model.UserRole;
 import pl.m22.gamehive.user.repository.UserRepository;
 import pl.m22.gamehive.user.repository.UserRoleRepository;
 
+import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService{
@@ -101,6 +103,26 @@ public class AuthServiceImpl implements AuthService{
 
         appUser.setEnabled(true);
 
+        userRepository.save(appUser);
+    }
+
+    @Override
+    public void requestPasswordReset(String email) {
+
+        Optional<AppUser> appUser = userRepository.findByEmail(email);
+
+        if (appUser.isPresent()) {
+            String token = jwtService.generateToken(email, JwtTokenType.PASSWORD_RESET, null);
+            mailService.sendPasswordResetEmail(email, token);
+        }
+    }
+
+    @Override
+    public void confirmPasswordReset(String email, String newPassword) {
+        AppUser appUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email));
+
+        appUser.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(appUser);
     }
 }

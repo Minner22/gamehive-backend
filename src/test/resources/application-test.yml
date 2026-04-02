@@ -31,3 +31,6 @@ jwt:
   access:
     secret: "test-access-secret-abcdefghijklmnopqrstuvwxyz1234567"
     validityInSeconds: 2
+  passwordreset:
+    secret: "test-passwordreset-secret-abcdefghijklmnopqrstuvwxyz"
+    validityInSeconds: 900

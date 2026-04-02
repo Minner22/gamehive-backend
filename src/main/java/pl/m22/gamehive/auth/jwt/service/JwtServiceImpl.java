@@ -12,6 +12,7 @@ import pl.m22.gamehive.auth.dto.TokenPairDto;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.config.AccessTokenProperties;
 import pl.m22.gamehive.auth.jwt.config.ActivationTokenProperties;
+import pl.m22.gamehive.auth.jwt.config.PasswordResetTokenProperties;
 import pl.m22.gamehive.auth.jwt.config.RefreshTokenProperties;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
@@ -31,6 +32,7 @@ public class JwtServiceImpl implements JwtService {
     private final ActivationTokenProperties activationProps;
     private final AccessTokenProperties accessProps;
     private final RefreshTokenProperties refreshProps;
+    private final PasswordResetTokenProperties passwordResetProps;
     private final RedisRefreshTokenStore redisRefreshTokenStore;
     private static final String CLAIM_TYPE = "type";
     private static final String CLAIM_ROLES = "roles";
@@ -172,17 +174,14 @@ public class JwtServiceImpl implements JwtService {
                 .subject(subjectEmail)
                 .issueTime(Date.from(now))
                 .expirationTime(Date.from(expirationDate))
-                .claim(CLAIM_TYPE, tokenType.name());
+                .claim(CLAIM_TYPE, tokenType.name())
+                .jwtID(UUID.randomUUID().toString());
 
         if (roles != null && !roles.isEmpty()) {
             builder.claim(CLAIM_ROLES, roles);
         }
         else if (tokenType == JwtTokenType.ACCESS) {
             throw new ApplicationException(ErrorCode.JWT_INVALID_ROLES);
-        }
-
-        if (tokenType == JwtTokenType.REFRESH || tokenType == JwtTokenType.ACCESS) {
-            builder.jwtID(UUID.randomUUID().toString());
         }
 
         return builder.build();
@@ -207,6 +206,7 @@ public class JwtServiceImpl implements JwtService {
             case ACTIVATION -> activationProps.getSecret();
             case ACCESS -> accessProps.getSecret();
             case REFRESH -> refreshProps.getSecret();
+            case PASSWORD_RESET -> passwordResetProps.getSecret();
             default -> throw new ApplicationException(
                     ErrorCode.JWT_INVALID_TYPE,
                     "Invalid JWT type: " + tokenType.name()
@@ -219,6 +219,7 @@ public class JwtServiceImpl implements JwtService {
             case ACTIVATION -> activationProps.getValidityInSeconds();
             case ACCESS -> accessProps.getValidityInSeconds();
             case REFRESH -> refreshProps.getValidityInSeconds();
+            case PASSWORD_RESET -> passwordResetProps.getValidityInSeconds();
             default -> throw new ApplicationException(
                     ErrorCode.JWT_INVALID_TYPE,
                     "Invalid JWT type: " + tokenType.name()

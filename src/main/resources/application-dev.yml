@@ -7,6 +7,9 @@ spring:
         locations: classpath:db/migration
     mail:
         activationAddress: http://localhost:8080/api/v1/auth/activate
+        # TODO: change to frontend URL (e.g. http://localhost:3000/reset-password) once frontend is ready.
+        # The link lands on a page with a "new password" form, which then POSTs to POST /api/v1/auth/password-reset/confirm.
+        passwordResetAddress: http://localhost:8080/api/v1/auth/password-reset/confirm
     data:
         redis:
             host: localhost

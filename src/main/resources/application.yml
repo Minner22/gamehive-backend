@@ -28,3 +28,5 @@ jwt:
         maxActiveTokensPerUser: 5
     access:
         validityInSeconds: 900
+    passwordreset:
+        validityInSeconds: 900

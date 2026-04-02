@@ -12,6 +12,12 @@ public interface AuthService {
     String generateActivationToken(AppUser appUser);
 
     CredentialsDto login(LoginDto loginDto);
+
     void activateUser(String email);
+
+    void requestPasswordReset(String email);
+
+    void confirmPasswordReset(String token, String newPassword);
+
     AppUser registerUser(RegistrationDto registrationDto);
 }

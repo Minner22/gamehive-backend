@@ -18,6 +18,7 @@ spring:
         locations: classpath:db/migration
     mail:
         activationAddress: ${ACTIVATION_ADDRESS}
+        passwordResetAddress: ${PASSWORD_RESET_ADDRESS}
     data:
         redis:
             host: ${REDIS_HOST}

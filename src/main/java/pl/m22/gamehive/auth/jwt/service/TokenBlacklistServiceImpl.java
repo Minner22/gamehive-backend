@@ -22,12 +22,12 @@ public class TokenBlacklistServiceImpl implements TokenBlacklistService {
     private final RedisTemplate<String, String> redisTemplate;
 
     @Override
-    public void blacklistAccessToken(String token) {
+    public void blacklistToken(String token) {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
             String jti = signedJWT.getJWTClaimsSet().getJWTID();
             if (jti == null) {
-                log.warn("Access token has no JTI, cannot blacklist");
+                log.warn("Token has no JTI, cannot blacklist");
                 return;
             }
 
