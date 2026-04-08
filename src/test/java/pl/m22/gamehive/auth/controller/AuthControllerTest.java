@@ -6,14 +6,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
@@ -39,7 +39,7 @@ class AuthControllerTest {
     @Autowired JwtService jwtService;
     @Autowired UserService userService;
     @Autowired TokenBlacklistService tokenBlacklistService;
-    @MockBean JavaMailSender mailSender;
+    @MockitoBean JavaMailSender mailSender;
 
     @AfterEach
     void cleanup() {

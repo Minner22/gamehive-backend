@@ -3,8 +3,8 @@ package pl.m22.gamehive.auth.config;
 import io.lettuce.core.ClientOptions;
 import io.lettuce.core.protocol.ProtocolVersion;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.data.redis.LettuceClientConfigurationBuilderCustomizer;
-import org.springframework.boot.autoconfigure.data.redis.RedisConnectionDetails;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisConnectionDetails;
+import org.springframework.boot.data.redis.autoconfigure.LettuceClientConfigurationBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -17,12 +17,12 @@ public class RedisConfig {
 
     @Bean
     @Primary
-    public RedisConnectionDetails redisConnectionDetails(
+    public DataRedisConnectionDetails redisConnectionDetails(
             @Value("${spring.data.redis.host:localhost}") String host,
             @Value("${spring.data.redis.port:6379}") int port,
             @Value("${spring.data.redis.password:}") String password) {
 
-        return new RedisConnectionDetails() {
+        return new DataRedisConnectionDetails() {
             @Override
             public String getPassword() {
                 return password.isEmpty() ? null : password;
