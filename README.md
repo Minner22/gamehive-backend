@@ -1,6 +1,6 @@
 # GameHive
 
-##MVP:
+## MVP:
 1. Rejestracja użytkowników ✅
 2. Logowanie użytkowników ✅
 3. zarządzanie użytkownikami ⏺️
