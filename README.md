@@ -1,5 +1,15 @@
 # GameHive
 
+##MVP:
+1. Rejestracja użytkowników ✅
+2. Logowanie użytkowników ✅
+3. zarządzanie użytkownikami ⏺️
+4. dodawanie gier ❌
+5. zarządzanie grami❌
+6. dodawanie grup ❌
+7. dołączanie do grup ❌
+8. zarządzanie grupami ❌
+
 ## TODO:
 
 1. ***Użytkownicy i autoryzacja***
