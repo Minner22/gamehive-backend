@@ -26,15 +26,6 @@ class UserServiceImplTest {
     @Autowired UserService userService;
 
     @Test
-    @DisplayName("findAllUsers() -> zawiera seed userów")
-    void findAllUsers_contains_seed_users() {
-        List<AppUser> users = userService.findAllUsers();
-        assertFalse(users.isEmpty());
-        assertTrue(users.stream().anyMatch(u -> "john.doe@example.com".equals(u.getEmail())));
-        assertTrue(users.stream().anyMatch(u -> "jane.smith@example.com".equals(u.getEmail())));
-    }
-
-    @Test
     @DisplayName("findUserByEmail() -> znaleziony")
     void findUserByEmail_found() {
         AppUser user = userService.findUserByEmail("john.doe@example.com");
