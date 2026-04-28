@@ -60,8 +60,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public Optional<AppUser> findUserByEmail(String email) {
-        return userRepository.findByEmail(email);
+    public AppUser findUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new DomainException(ErrorCode.USER_NOT_FOUND));
     }
 
     @Override

@@ -78,8 +78,7 @@ public class AuthController {
 
         String email = jwtService.extractEmailFromToken(refreshToken);
         CredentialsDto userCredentials = userMapper.toCredentialsDto(
-                userService.findUserByEmail(email)
-                        .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email)));
+                userService.findUserByEmail(email));
 
         log.info("User refreshed access token: {}", LoggingUtils.obfuscateEmail(userCredentials.email()));
 

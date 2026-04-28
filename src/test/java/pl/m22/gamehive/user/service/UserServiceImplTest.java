@@ -16,7 +16,6 @@ import pl.m22.gamehive.user.model.UserProfile;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -38,15 +37,16 @@ class UserServiceImplTest {
     @Test
     @DisplayName("findUserByEmail() -> znaleziony")
     void findUserByEmail_found() {
-        Optional<AppUser> user = userService.findUserByEmail("john.doe@example.com");
-        assertTrue(user.isPresent());
-        assertEquals("john_doe", user.get().getUsername());
+        AppUser user = userService.findUserByEmail("john.doe@example.com");
+        assertEquals("john_doe", user.getUsername());
     }
 
     @Test
-    @DisplayName("findUserByEmail() -> nieznaleziony")
+    @DisplayName("findUserByEmail() -> nieznaleziony -> DomainException USER_NOT_FOUND")
     void findUserByEmail_not_found() {
-        assertFalse(userService.findUserByEmail("nobody@test.com").isPresent());
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.findUserByEmail("nobody@test.com"));
+        assertEquals(ErrorCode.USER_NOT_FOUND, ex.getErrorCode());
     }
 
     @Test
@@ -173,7 +173,7 @@ class UserServiceImplTest {
     @Transactional
     @DisplayName("updateCurrentUserProfile() -> tworzy nowy profil gdy brak")
     void updateCurrentUserProfile_creates_profile_when_null() {
-        AppUser user = userService.findUserByEmail("john.doe@example.com").orElseThrow();
+        AppUser user = userService.findUserByEmail("john.doe@example.com");
         user.setUserProfile(null);
 
         UserProfileUpdateDto dto = new UserProfileUpdateDto(
