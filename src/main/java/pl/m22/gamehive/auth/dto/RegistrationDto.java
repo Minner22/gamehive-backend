@@ -10,6 +10,6 @@ public record RegistrationDto(
         @Email(message = "Email should be valid")
         String email,
         @NotBlank(message = "Password is mandatory")
-        @Size(min = 5, message = "Password must be at least 5 characters long")
+        @Size(min = 8, message = "Password must be at least 8 characters long")
         String password) {
 }
