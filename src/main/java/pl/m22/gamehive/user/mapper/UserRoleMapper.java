@@ -2,31 +2,37 @@ package pl.m22.gamehive.user.mapper;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Named;
+import org.springframework.beans.factory.annotation.Autowired;
+import pl.m22.gamehive.common.exception.DomainException;
+import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.model.UserRole;
+import pl.m22.gamehive.user.repository.UserRoleRepository;
 
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Mapper(componentModel = "spring")
-public interface UserRoleMapper {
+public abstract class UserRoleMapper {
 
-    @Named("mapToRoleName")
-    default String toRoleName(UserRole role) {
-        return role.getName();
-    }
-
-    UserRole toUserRole(String roleName);
+    @Autowired
+    protected UserRoleRepository userRoleRepository;
 
     @Named("mapToRoleNames")
-    default Set<String> mapToRoleNames(Set<UserRole> roles) {
+    public Set<String> mapToRoleNames(Set<UserRole> roles) {
         return roles.stream()
                 .map(UserRole::getName)
                 .collect(Collectors.toSet());
     }
+
     @Named("mapToUserRoles")
-    default Set<UserRole> mapToUserRoles(Set<String> roleNames) {
+    public Set<UserRole> mapToUserRoles(Set<String> roleNames) {
         return roleNames.stream()
                 .map(this::toUserRole)
                 .collect(Collectors.toSet());
+    }
+
+    public UserRole toUserRole(String roleName) {
+        return userRoleRepository.findByName(roleName)
+                .orElseThrow(() -> new DomainException(ErrorCode.ROLE_NOT_FOUND));
     }
 }
