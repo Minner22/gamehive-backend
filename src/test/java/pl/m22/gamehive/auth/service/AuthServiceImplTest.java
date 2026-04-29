@@ -53,16 +53,20 @@ class AuthServiceImplTest {
     @Test
     @DisplayName("register() duplikat email -> EMAIL_ALREADY_EXISTS")
     void register_duplicate_email() {
+        RegistrationDto dto = new RegistrationDto("other", "john.doe@example.com", "password123");
+
         ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> authService.register(new RegistrationDto("other", "john.doe@example.com", "password123")));
+                () -> authService.register(dto));
         assertEquals(ErrorCode.EMAIL_ALREADY_EXISTS, ex.getErrorCode());
     }
 
     @Test
     @DisplayName("register() duplikat username -> USERNAME_ALREADY_EXISTS")
     void register_duplicate_username() {
+        RegistrationDto dto = new RegistrationDto("john_doe", "other@test.com", "password123");
+
         ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> authService.register(new RegistrationDto("john_doe", "other@test.com", "password123")));
+                () -> authService.register(dto));
         assertEquals(ErrorCode.USERNAME_ALREADY_EXISTS, ex.getErrorCode());
     }
 }

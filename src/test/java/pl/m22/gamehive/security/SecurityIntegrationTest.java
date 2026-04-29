@@ -30,33 +30,33 @@ class SecurityIntegrationTest {
     @MockitoBean JavaMailSender mailSender;
 
     @Test
-    @DisplayName("GET /api/v1/users/me without token -> 403")
-    void users_unauthenticated_403() throws Exception {
+    @DisplayName("GET /api/v1/users/me without token -> 401")
+    void users_unauthenticated_401() throws Exception {
         mockMvc.perform(get("/api/v1/users/me"))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/me with invalid Authorization header (no Bearer prefix) -> 403")
-    void users_invalid_header_no_bearer_403() throws Exception {
+    @DisplayName("GET /api/v1/users/me with invalid Authorization header (no Bearer prefix) -> 401")
+    void users_invalid_header_no_bearer_401() throws Exception {
         mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "InvalidToken"))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/me with empty Bearer token -> 403")
-    void users_empty_bearer_403() throws Exception {
+    @DisplayName("GET /api/v1/users/me with empty Bearer token -> 401")
+    void users_empty_bearer_401() throws Exception {
         mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer "))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/me with blacklisted token -> 403")
-    void users_blacklisted_token_403() throws Exception {
+    @DisplayName("GET /api/v1/users/me with blacklisted token -> 401")
+    void users_blacklisted_token_401() throws Exception {
         String token = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN", "ROLE_USER"));
         tokenBlacklistService.blacklistToken(token);
         mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -68,10 +68,10 @@ class SecurityIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/me with ACTIVATION token type -> 403")
-    void users_me_wrong_token_type_403() throws Exception {
+    @DisplayName("GET /api/v1/users/me with ACTIVATION token type -> 401")
+    void users_me_wrong_token_type_401() throws Exception {
         String token = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACTIVATION, null);
         mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
     }
 }

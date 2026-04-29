@@ -18,7 +18,7 @@ public class EmbeddedRedisConfig {
 
     @PostConstruct
     public void startRedis() throws IOException {
-        if (isPortAvailable(REDIS_PORT)) {
+        if (isPortAvailable()) {
             redisServer = new RedisServer(REDIS_PORT);
             redisServer.start();
         }
@@ -31,11 +31,11 @@ public class EmbeddedRedisConfig {
         }
     }
 
-    private boolean isPortAvailable(int port) {
-        try (ServerSocket socket = new ServerSocket(port)) {
+    private boolean isPortAvailable() {
+        try (ServerSocket socket = new ServerSocket(REDIS_PORT)) {
             socket.setReuseAddress(true);
             return true;
-        } catch (IOException e) {
+        } catch (IOException _) {
             return false;
         }
     }
