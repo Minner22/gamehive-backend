@@ -67,10 +67,10 @@ class AdminUserControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/admin/users/ bez tokena -> 403")
-    void getAllUsers_unauthenticated_403() throws Exception {
+    @DisplayName("GET /api/v1/admin/users/ bez tokena -> 401")
+    void getAllUsers_unauthenticated_401() throws Exception {
         mockMvc.perform(get("/api/v1/admin/users/"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     // --- getUserById ---
