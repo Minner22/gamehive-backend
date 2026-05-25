@@ -6,19 +6,22 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 
+import java.util.Objects;
 import java.util.Set;
 
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.hamcrest.Matchers.hasSize;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.hamcrest.Matchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -29,6 +32,7 @@ class AdminUserControllerTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired JwtService jwtService;
+    @Autowired RedisTemplate<String, String> redisTemplate;
     @MockitoBean JavaMailSender mailSender;
 
     private String adminToken;
@@ -38,6 +42,7 @@ class AdminUserControllerTest {
     void setUp() {
         adminToken = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN", "ROLE_USER"));
         userToken = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
+        Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
     }
 
     // --- getAllUsers ---
@@ -131,5 +136,202 @@ class AdminUserControllerTest {
         mockMvc.perform(get("/api/v1/admin/users/by-email/nobody@test.com")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
+    }
+
+    // --- PUT /{id}/roles ---
+
+    @Test
+    @Transactional
+    @DisplayName("PUT /api/v1/admin/users/{id}/roles jako ADMIN -> 200 + zaktualizowane role")
+    void updateUserRoles_asAdmin_200() throws Exception {
+        mockMvc.perform(put("/api/v1/admin/users/2/roles")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roles\":[\"ROLE_MODERATOR\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(2))
+                .andExpect(jsonPath("$.roles", containsInAnyOrder("ROLE_MODERATOR")));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/admin/users/{id}/roles jako USER -> 403")
+    void updateUserRoles_asUser_403() throws Exception {
+        mockMvc.perform(put("/api/v1/admin/users/2/roles")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roles\":[\"ROLE_MODERATOR\"]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/admin/users/{id}/roles bez tokena -> 403")
+    void updateUserRoles_unauthenticated_403() throws Exception {
+        mockMvc.perform(put("/api/v1/admin/users/2/roles")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roles\":[\"ROLE_MODERATOR\"]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/admin/users/{id}/roles nieistniejący user -> 404")
+    void updateUserRoles_userNotFound_404() throws Exception {
+        mockMvc.perform(put("/api/v1/admin/users/999/roles")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roles\":[\"ROLE_USER\"]}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/admin/users/{id}/roles nieistniejąca rola -> 404")
+    void updateUserRoles_roleNotFound_404() throws Exception {
+        mockMvc.perform(put("/api/v1/admin/users/2/roles")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roles\":[\"ROLE_GHOST\"]}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/admin/users/{id}/roles self -> 403 (CANNOT_MODIFY_OWN_ACCOUNT)")
+    void updateUserRoles_self_403() throws Exception {
+        mockMvc.perform(put("/api/v1/admin/users/1/roles")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roles\":[\"ROLE_USER\"]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/admin/users/{id}/roles pusty zbiór ról -> 400 (validation)")
+    void updateUserRoles_emptyRoles_400() throws Exception {
+        mockMvc.perform(put("/api/v1/admin/users/2/roles")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roles\":[]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // --- PATCH /{id}/deactivate ---
+
+    @Test
+    @Transactional
+    @DisplayName("PATCH /api/v1/admin/users/{id}/deactivate jako ADMIN -> 200 + enabled=false")
+    void deactivateUser_asAdmin_200() throws Exception {
+        mockMvc.perform(patch("/api/v1/admin/users/2/deactivate")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(2))
+                .andExpect(jsonPath("$.enabled").value(false));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/admin/users/{id}/deactivate jako USER -> 403")
+    void deactivateUser_asUser_403() throws Exception {
+        mockMvc.perform(patch("/api/v1/admin/users/2/deactivate")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/admin/users/{id}/deactivate nieistniejący user -> 404")
+    void deactivateUser_userNotFound_404() throws Exception {
+        mockMvc.perform(patch("/api/v1/admin/users/999/deactivate")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/admin/users/{id}/deactivate self -> 403 (CANNOT_MODIFY_OWN_ACCOUNT)")
+    void deactivateUser_self_403() throws Exception {
+        mockMvc.perform(patch("/api/v1/admin/users/1/deactivate")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isForbidden());
+    }
+
+    // --- PATCH /{id}/activate ---
+
+    @Test
+    @Transactional
+    @DisplayName("PATCH /api/v1/admin/users/{id}/activate jako ADMIN -> 200 + enabled=true")
+    void activateUser_asAdmin_200() throws Exception {
+        mockMvc.perform(patch("/api/v1/admin/users/2/deactivate")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/v1/admin/users/2/activate")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(2))
+                .andExpect(jsonPath("$.enabled").value(true));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/admin/users/{id}/activate jako USER -> 403")
+    void activateUser_asUser_403() throws Exception {
+        mockMvc.perform(patch("/api/v1/admin/users/2/activate")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/admin/users/{id}/activate bez tokena -> 403")
+    void activateUser_unauthenticated_403() throws Exception {
+        mockMvc.perform(patch("/api/v1/admin/users/2/activate"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/admin/users/{id}/activate nieistniejący user -> 404")
+    void activateUser_userNotFound_404() throws Exception {
+        mockMvc.perform(patch("/api/v1/admin/users/999/activate")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    // --- DELETE /{id} ---
+
+    @Test
+    @Transactional
+    @DisplayName("DELETE /api/v1/admin/users/{id} jako ADMIN -> 204")
+    void deleteUser_asAdmin_204() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/users/2")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/admin/users/2")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/admin/users/{id} jako USER -> 403")
+    void deleteUser_asUser_403() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/users/2")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/admin/users/{id} bez tokena -> 403")
+    void deleteUser_unauthenticated_403() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/users/2"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/admin/users/{id} nieistniejący user -> 404")
+    void deleteUser_userNotFound_404() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/users/999")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/admin/users/{id} self -> 403 (CANNOT_MODIFY_OWN_ACCOUNT)")
+    void deleteUser_self_403() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/users/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isForbidden());
     }
 }

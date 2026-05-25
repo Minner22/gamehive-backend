@@ -104,7 +104,7 @@ public class UserServiceImpl implements UserService {
 
     @Transactional
     @Override
-    public void updateUserRoles(Long userId, Set<String> roleNames, String requesterEmail) {
+    public AppUser updateUserRoles(Long userId, Set<String> roleNames, String requesterEmail) {
         guardOwnAccount(userId, requesterEmail);
         AppUser user = findUserById(userId);
         guardLastAdminOnRoleUpdate(user, roleNames);
@@ -114,25 +114,32 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toSet());
         user.setRoles(userRoles);
         userRepository.save(user);
+
+        return user;
     }
 
     @Transactional
     @Override
-    public void deactivateUser(Long userId, String requesterEmail) {
+    public AppUser deactivateUser(Long userId, String requesterEmail) {
         guardOwnAccount(userId, requesterEmail);
         AppUser user = findUserById(userId);
         guardLastAdmin(user);
         user.setEnabled(false);
         userRepository.save(user);
         redisRefreshTokenStore.revokeAllByUserEmail(user.getEmail());
+
+        return user;
     }
 
     @Transactional
     @Override
-    public void activateUser(Long userId) {
+    public AppUser activateUser(Long userId) {
         AppUser user = findUserById(userId);
+
         user.setEnabled(true);
         userRepository.save(user);
+
+        return user;
     }
 
     @Transactional
