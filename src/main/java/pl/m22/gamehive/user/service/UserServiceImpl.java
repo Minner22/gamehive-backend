@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 public class UserServiceImpl implements UserService {
 
     private static final String USER_ROLE = "ROLE_USER";
+    private static final String ROLE_ADMIN = "ROLE_ADMIN";
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final UserRoleRepository userRoleRepository;
@@ -103,8 +104,10 @@ public class UserServiceImpl implements UserService {
 
     @Transactional
     @Override
-    public void updateUserRoles(Long userId, Set<String> roleNames) {
+    public void updateUserRoles(Long userId, Set<String> roleNames, String requesterEmail) {
+        guardOwnAccount(userId, requesterEmail);
         AppUser user = findUserById(userId);
+        guardLastAdminOnRoleUpdate(user, roleNames);
         Set<UserRole> userRoles = roleNames.stream()
                 .map(name -> userRoleRepository.findByName(name)
                         .orElseThrow(() -> new DomainException(ErrorCode.ROLE_NOT_FOUND)))
@@ -113,11 +116,12 @@ public class UserServiceImpl implements UserService {
         userRepository.save(user);
     }
 
-
     @Transactional
     @Override
-    public void deactivateUser(Long userId) {
+    public void deactivateUser(Long userId, String requesterEmail) {
+        guardOwnAccount(userId, requesterEmail);
         AppUser user = findUserById(userId);
+        guardLastAdmin(user);
         user.setEnabled(false);
         userRepository.save(user);
         redisRefreshTokenStore.revokeAllByUserEmail(user.getEmail());
@@ -133,10 +137,39 @@ public class UserServiceImpl implements UserService {
 
     @Transactional
     @Override
-    public void deleteUser(Long userId) {
+    public void deleteUser(Long userId, String requesterEmail) {
+        guardOwnAccount(userId, requesterEmail);
         AppUser user = findUserById(userId);
+        guardLastAdmin(user);
         String email = user.getEmail();
         userRepository.delete(user);
         redisRefreshTokenStore.revokeAllByUserEmail(email);
+    }
+
+    private void guardOwnAccount(Long targetUserId, String requesterEmail) {
+        AppUser requester = userRepository.findByEmail(requesterEmail)
+                .orElseThrow(() -> new DomainException(ErrorCode.USER_NOT_FOUND));
+        if (requester.getId().equals(targetUserId)) {
+            throw new DomainException(ErrorCode.CANNOT_MODIFY_OWN_ACCOUNT);
+        }
+    }
+
+    private void guardLastAdmin(AppUser targetUser) {
+        if (hasAdminRole(targetUser) && userRepository.countByRoles_Name(ROLE_ADMIN) <= 1) {
+            throw new DomainException(ErrorCode.CANNOT_REMOVE_LAST_ADMIN);
+        }
+    }
+
+    private void guardLastAdminOnRoleUpdate(AppUser targetUser, Set<String> newRoleNames) {
+        boolean wasAdmin = hasAdminRole(targetUser);
+        boolean willBeAdmin = newRoleNames.contains(ROLE_ADMIN);
+        if (wasAdmin && !willBeAdmin && userRepository.countByRoles_Name(ROLE_ADMIN) <= 1) {
+            throw new DomainException(ErrorCode.CANNOT_REMOVE_LAST_ADMIN);
+        }
+    }
+
+    private boolean hasAdminRole(AppUser user) {
+        return user.getRoles().stream()
+                .anyMatch(role -> ROLE_ADMIN.equals(role.getName()));
     }
 }

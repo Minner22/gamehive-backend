@@ -25,10 +25,10 @@ public interface UserService {
 
     Page<AppUser> findAllUsers(Pageable pageable);
 
-    void updateUserRoles(Long userId, Set<String> roleNames);
-    void deactivateUser(Long userId);
+    void updateUserRoles(Long userId, Set<String> roleNames, String requesterEmail);
+    void deactivateUser(Long userId, String requesterEmail);
     void activateUser(Long userId);
-    void deleteUser(Long userId);
+    void deleteUser(Long userId, String requesterEmail);
 
     UserProfile updateCurrentUserProfile(String email, UserProfileUpdateDto userProfileUpdateDto);
 

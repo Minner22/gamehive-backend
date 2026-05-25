@@ -230,22 +230,9 @@ class UserServiceImplTest {
 
     @Test
     @Transactional
-    @DisplayName("updateUserRoles() -> aktualizuje role usera")
+    @DisplayName("updateUserRoles() -> aktualizuje role usera (admin edytuje innego)")
     void updateUserRoles_updates() {
-        userService.updateUserRoles(1L, Set.of("ROLE_USER"));
-
-        AppUser user = userService.findUserById(1L);
-        Set<String> names = user.getRoles().stream()
-                .map(UserRole::getName)
-                .collect(Collectors.toSet());
-        assertEquals(Set.of("ROLE_USER"), names);
-    }
-
-    @Test
-    @Transactional
-    @DisplayName("updateUserRoles() -> zastępuje istniejące role nowym zestawem")
-    void updateUserRoles_replaces() {
-        userService.updateUserRoles(2L, Set.of("ROLE_MODERATOR"));
+        userService.updateUserRoles(2L, Set.of("ROLE_MODERATOR"), "john.doe@example.com");
 
         AppUser user = userService.findUserById(2L);
         Set<String> names = user.getRoles().stream()
@@ -255,10 +242,23 @@ class UserServiceImplTest {
     }
 
     @Test
+    @Transactional
+    @DisplayName("updateUserRoles() -> zastępuje istniejące role nowym zestawem")
+    void updateUserRoles_replaces() {
+        userService.updateUserRoles(2L, Set.of("ROLE_USER", "ROLE_MODERATOR"), "john.doe@example.com");
+
+        AppUser user = userService.findUserById(2L);
+        Set<String> names = user.getRoles().stream()
+                .map(UserRole::getName)
+                .collect(Collectors.toSet());
+        assertEquals(Set.of("ROLE_USER", "ROLE_MODERATOR"), names);
+    }
+
+    @Test
     @DisplayName("updateUserRoles() -> nieistniejący user -> DomainException USER_NOT_FOUND")
     void updateUserRoles_user_not_found() {
         DomainException ex = assertThrows(DomainException.class,
-                () -> userService.updateUserRoles(999L, Set.of("ROLE_USER")));
+                () -> userService.updateUserRoles(999L, Set.of("ROLE_USER"), "john.doe@example.com"));
 
         assertEquals(ErrorCode.USER_NOT_FOUND, ex.getErrorCode());
     }
@@ -267,9 +267,42 @@ class UserServiceImplTest {
     @DisplayName("updateUserRoles() -> nieistniejąca rola -> DomainException ROLE_NOT_FOUND")
     void updateUserRoles_role_not_found() {
         DomainException ex = assertThrows(DomainException.class,
-                () -> userService.updateUserRoles(1L, Set.of("ROLE_GHOST")));
+                () -> userService.updateUserRoles(2L, Set.of("ROLE_GHOST"), "john.doe@example.com"));
 
         assertEquals(ErrorCode.ROLE_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("updateUserRoles() -> self -> DomainException CANNOT_MODIFY_OWN_ACCOUNT")
+    void updateUserRoles_self_blocked() {
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.updateUserRoles(1L, Set.of("ROLE_USER"), "john.doe@example.com"));
+
+        assertEquals(ErrorCode.CANNOT_MODIFY_OWN_ACCOUNT, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("updateUserRoles() -> odbiera ROLE_ADMIN ostatniemu adminowi -> CANNOT_REMOVE_LAST_ADMIN")
+    void updateUserRoles_last_admin_demote_blocked() {
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.updateUserRoles(1L, Set.of("ROLE_USER"), "jane.smith@example.com"));
+
+        assertEquals(ErrorCode.CANNOT_REMOVE_LAST_ADMIN, ex.getErrorCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("updateUserRoles() -> demote admina gdy są inni admini -> OK")
+    void updateUserRoles_demote_admin_when_others_exist_ok() {
+        userService.updateUserRoles(2L, Set.of("ROLE_USER", "ROLE_ADMIN"), "john.doe@example.com");
+
+        userService.updateUserRoles(1L, Set.of("ROLE_USER"), "jane.smith@example.com");
+
+        AppUser john = userService.findUserById(1L);
+        Set<String> names = john.getRoles().stream()
+                .map(UserRole::getName)
+                .collect(Collectors.toSet());
+        assertEquals(Set.of("ROLE_USER"), names);
     }
 
     // --- deactivateUser ---
@@ -278,9 +311,9 @@ class UserServiceImplTest {
     @Transactional
     @DisplayName("deactivateUser() -> ustawia enabled=false")
     void deactivateUser_disables() {
-        userService.deactivateUser(1L);
+        userService.deactivateUser(2L, "john.doe@example.com");
 
-        AppUser user = userService.findUserById(1L);
+        AppUser user = userService.findUserById(2L);
         assertFalse(user.isEnabled());
     }
 
@@ -289,10 +322,10 @@ class UserServiceImplTest {
     @DisplayName("deactivateUser() -> usuwa refresh tokeny usera z Redisa")
     void deactivateUser_revokes_refresh_tokens() {
         String jti = "test-jti-deactivate";
-        redisRefreshTokenStore.saveRefreshToken(jti, "john.doe@example.com", Instant.now().plusSeconds(3600));
+        redisRefreshTokenStore.saveRefreshToken(jti, "jane.smith@example.com", Instant.now().plusSeconds(3600));
         assertTrue(redisRefreshTokenStore.existsByJti(jti));
 
-        userService.deactivateUser(1L);
+        userService.deactivateUser(2L, "john.doe@example.com");
 
         assertFalse(redisRefreshTokenStore.existsByJti(jti));
     }
@@ -301,9 +334,39 @@ class UserServiceImplTest {
     @DisplayName("deactivateUser() -> nieistniejący user -> DomainException USER_NOT_FOUND")
     void deactivateUser_user_not_found() {
         DomainException ex = assertThrows(DomainException.class,
-                () -> userService.deactivateUser(999L));
+                () -> userService.deactivateUser(999L, "john.doe@example.com"));
 
         assertEquals(ErrorCode.USER_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("deactivateUser() -> self -> DomainException CANNOT_MODIFY_OWN_ACCOUNT")
+    void deactivateUser_self_blocked() {
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.deactivateUser(1L, "john.doe@example.com"));
+
+        assertEquals(ErrorCode.CANNOT_MODIFY_OWN_ACCOUNT, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("deactivateUser() -> ostatni admin -> CANNOT_REMOVE_LAST_ADMIN")
+    void deactivateUser_last_admin_blocked() {
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.deactivateUser(1L, "jane.smith@example.com"));
+
+        assertEquals(ErrorCode.CANNOT_REMOVE_LAST_ADMIN, ex.getErrorCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("deactivateUser() -> dezaktywacja admina gdy są inni admini -> OK")
+    void deactivateUser_admin_when_others_exist_ok() {
+        userService.updateUserRoles(2L, Set.of("ROLE_USER", "ROLE_ADMIN"), "john.doe@example.com");
+
+        userService.deactivateUser(1L, "jane.smith@example.com");
+
+        AppUser john = userService.findUserById(1L);
+        assertFalse(john.isEnabled());
     }
 
     // --- activateUser ---
@@ -312,11 +375,11 @@ class UserServiceImplTest {
     @Transactional
     @DisplayName("activateUser() -> ustawia enabled=true dla zdezaktywowanego usera")
     void activateUser_enables() {
-        userService.deactivateUser(1L);
+        userService.deactivateUser(2L, "john.doe@example.com");
 
-        userService.activateUser(1L);
+        userService.activateUser(2L);
 
-        AppUser user = userService.findUserById(1L);
+        AppUser user = userService.findUserById(2L);
         assertTrue(user.isEnabled());
     }
 
@@ -335,7 +398,7 @@ class UserServiceImplTest {
     @Transactional
     @DisplayName("deleteUser() -> usuwa usera z bazy")
     void deleteUser_removes_user() {
-        userService.deleteUser(2L);
+        userService.deleteUser(2L, "john.doe@example.com");
 
         DomainException ex = assertThrows(DomainException.class,
                 () -> userService.findUserById(2L));
@@ -350,7 +413,7 @@ class UserServiceImplTest {
         redisRefreshTokenStore.saveRefreshToken(jti, "jane.smith@example.com", Instant.now().plusSeconds(3600));
         assertTrue(redisRefreshTokenStore.existsByJti(jti));
 
-        userService.deleteUser(2L);
+        userService.deleteUser(2L, "john.doe@example.com");
 
         assertFalse(redisRefreshTokenStore.existsByJti(jti));
     }
@@ -359,8 +422,26 @@ class UserServiceImplTest {
     @DisplayName("deleteUser() -> nieistniejący user -> DomainException USER_NOT_FOUND")
     void deleteUser_user_not_found() {
         DomainException ex = assertThrows(DomainException.class,
-                () -> userService.deleteUser(999L));
+                () -> userService.deleteUser(999L, "john.doe@example.com"));
 
         assertEquals(ErrorCode.USER_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("deleteUser() -> self -> DomainException CANNOT_MODIFY_OWN_ACCOUNT")
+    void deleteUser_self_blocked() {
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.deleteUser(1L, "john.doe@example.com"));
+
+        assertEquals(ErrorCode.CANNOT_MODIFY_OWN_ACCOUNT, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("deleteUser() -> ostatni admin -> CANNOT_REMOVE_LAST_ADMIN")
+    void deleteUser_last_admin_blocked() {
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.deleteUser(1L, "jane.smith@example.com"));
+
+        assertEquals(ErrorCode.CANNOT_REMOVE_LAST_ADMIN, ex.getErrorCode());
     }
 }
