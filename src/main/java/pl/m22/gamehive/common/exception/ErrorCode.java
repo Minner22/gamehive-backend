@@ -36,7 +36,10 @@ public enum ErrorCode {
 
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "Access denied"),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Validation failed"),
-    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred"),
+
+    CANNOT_MODIFY_OWN_ACCOUNT(HttpStatus.FORBIDDEN, "Cannot modify your own account"),
+    CANNOT_REMOVE_LAST_ADMIN(HttpStatus.CONFLICT, "Cannot remove last administrator"); //czy poprawny http status?
 
     private final HttpStatus httpStatus;
     private final String defaultMessage;

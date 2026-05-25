@@ -1,14 +1,14 @@
 package pl.m22.gamehive.user.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+import pl.m22.gamehive.user.dto.UpdateUserRolesDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.service.UserService;
@@ -53,5 +53,37 @@ public class AdminUserController {
         UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.findUserByEmail(email));
 
         return ResponseEntity.ok(userResponseDto);
+    }
+
+    @PutMapping("/{id}/roles")
+    public ResponseEntity<UserResponseDto> updateUserRoles(@PathVariable Long id, @Valid @RequestBody UpdateUserRolesDto dto, Authentication authentication) {
+
+        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.updateUserRoles(id, dto.roles(), authentication.getName()));
+
+        return ResponseEntity.ok(userResponseDto);
+    }
+
+    @PatchMapping("/{id}/deactivate")
+    public ResponseEntity<UserResponseDto> deactivateUser(@PathVariable Long id, Authentication authentication) {
+
+        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.deactivateUser(id, authentication.getName()));
+
+        return ResponseEntity.ok(userResponseDto);
+    }
+
+    @PatchMapping("/{id}/activate")
+    public ResponseEntity<UserResponseDto> activateUser(@PathVariable Long id) {
+
+        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.activateUser(id));
+
+        return ResponseEntity.ok(userResponseDto);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<UserResponseDto> deleteUser(@PathVariable Long id, Authentication authentication) {
+
+        userService.deleteUser(id, authentication.getName());
+
+        return ResponseEntity.noContent().build();
     }
 }
