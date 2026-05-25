@@ -164,12 +164,12 @@ class AdminUserControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /api/v1/admin/users/{id}/roles bez tokena -> 403")
-    void updateUserRoles_unauthenticated_403() throws Exception {
+    @DisplayName("PUT /api/v1/admin/users/{id}/roles bez tokena -> 401")
+    void updateUserRoles_unauthenticated_401() throws Exception {
         mockMvc.perform(put("/api/v1/admin/users/2/roles")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roles\":[\"ROLE_MODERATOR\"]}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -275,10 +275,10 @@ class AdminUserControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH /api/v1/admin/users/{id}/activate bez tokena -> 403")
-    void activateUser_unauthenticated_403() throws Exception {
+    @DisplayName("PATCH /api/v1/admin/users/{id}/activate bez tokena -> 401")
+    void activateUser_unauthenticated_401() throws Exception {
         mockMvc.perform(patch("/api/v1/admin/users/2/activate"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -313,10 +313,10 @@ class AdminUserControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /api/v1/admin/users/{id} bez tokena -> 403")
-    void deleteUser_unauthenticated_403() throws Exception {
+    @DisplayName("DELETE /api/v1/admin/users/{id} bez tokena -> 401")
+    void deleteUser_unauthenticated_401() throws Exception {
         mockMvc.perform(delete("/api/v1/admin/users/2"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

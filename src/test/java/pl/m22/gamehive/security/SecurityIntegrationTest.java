@@ -80,13 +80,13 @@ class SecurityIntegrationTest {
 
     @Test
     @Transactional
-    @DisplayName("GET /api/v1/users/me with valid token but user is disabled -> 403")
-    void users_me_disabled_user_403() throws Exception {
+    @DisplayName("GET /api/v1/users/me with valid token but user is disabled -> 401")
+    void users_me_disabled_user_401() throws Exception {
         String token = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
 
         userService.deactivateUser(2L, "john.doe@example.com");
 
         mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isUnauthorized());
     }
 }
