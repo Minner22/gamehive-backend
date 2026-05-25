@@ -53,10 +53,10 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/me bez tokena -> 403")
-    void getMe_unauthenticated_403() throws Exception {
+    @DisplayName("GET /api/v1/users/me bez tokena -> 401")
+    void getMe_unauthenticated_401() throws Exception {
         mockMvc.perform(get("/api/v1/users/me"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     // --- PATCH /me/profile ---
@@ -107,13 +107,13 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH /api/v1/users/me/profile bez tokena -> 403")
-    void updateProfile_unauthenticated_403() throws Exception {
+    @DisplayName("PATCH /api/v1/users/me/profile bez tokena -> 401")
+    void updateProfile_unauthenticated_401() throws Exception {
         mockMvc.perform(patch("/api/v1/users/me/profile")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"firstName":"Test"}
                                 """))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 }

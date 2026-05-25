@@ -1,8 +1,8 @@
 package pl.m22.gamehive.user.mapper;
 
+import lombok.RequiredArgsConstructor;
 import org.mapstruct.Mapper;
 import org.mapstruct.Named;
-import org.springframework.beans.factory.annotation.Autowired;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.model.UserRole;
@@ -12,9 +12,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Mapper(componentModel = "spring")
+@RequiredArgsConstructor
 public abstract class UserRoleMapper {
 
-    @Autowired
     protected UserRoleRepository userRoleRepository;
 
     @Named("mapToRoleNames")
