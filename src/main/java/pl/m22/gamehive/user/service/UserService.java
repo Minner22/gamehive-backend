@@ -9,6 +9,7 @@ import pl.m22.gamehive.user.model.UserProfile;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface UserService {
     Optional<CredentialsDto> findCredentialsByEmail(String email);
@@ -23,6 +24,11 @@ public interface UserService {
     AppUser findUserByUsername(String username);
 
     Page<AppUser> findAllUsers(Pageable pageable);
+
+    void updateUserRoles(Long userId, Set<String> roleNames);
+    void deactivateUser(Long userId);
+    void activateUser(Long userId);
+    void deleteUser(Long userId);
 
     UserProfile updateCurrentUserProfile(String email, UserProfileUpdateDto userProfileUpdateDto);
 

@@ -10,9 +10,11 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
+import pl.m22.gamehive.user.service.UserService;
 
 import java.util.Set;
 
@@ -27,6 +29,7 @@ class SecurityIntegrationTest {
     @Autowired MockMvc mockMvc;
     @Autowired JwtService jwtService;
     @Autowired TokenBlacklistService tokenBlacklistService;
+    @Autowired UserService userService;
     @MockitoBean JavaMailSender mailSender;
 
     @Test
@@ -71,6 +74,18 @@ class SecurityIntegrationTest {
     @DisplayName("GET /api/v1/users/me with ACTIVATION token type -> 403")
     void users_me_wrong_token_type_403() throws Exception {
         String token = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACTIVATION, null);
+        mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("GET /api/v1/users/me with valid token but user is disabled -> 403")
+    void users_me_disabled_user_403() throws Exception {
+        String token = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN", "ROLE_USER"));
+
+        userService.deactivateUser(1L);
+
         mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
             .andExpect(status().isForbidden());
     }

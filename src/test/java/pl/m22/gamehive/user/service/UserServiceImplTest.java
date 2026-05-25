@@ -1,21 +1,29 @@
 package pl.m22.gamehive.user.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import pl.m22.gamehive.auth.jwt.service.RedisRefreshTokenStore;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.UserProfile;
+import pl.m22.gamehive.user.model.UserRole;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -24,6 +32,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class UserServiceImplTest {
 
     @Autowired UserService userService;
+    @Autowired RedisRefreshTokenStore redisRefreshTokenStore;
+    @Autowired RedisTemplate<String, String> redisTemplate;
+
+    @BeforeEach
+    void cleanRedis() {
+        Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
+    }
 
     @Test
     @DisplayName("findUserByEmail() -> znaleziony")
@@ -207,6 +222,144 @@ class UserServiceImplTest {
 
         DomainException ex = assertThrows(DomainException.class,
                 () -> userService.updateCurrentUserProfile("nobody@test.com", dto));
+
+        assertEquals(ErrorCode.USER_NOT_FOUND, ex.getErrorCode());
+    }
+
+    // --- updateUserRoles ---
+
+    @Test
+    @Transactional
+    @DisplayName("updateUserRoles() -> aktualizuje role usera")
+    void updateUserRoles_updates() {
+        userService.updateUserRoles(1L, Set.of("ROLE_USER"));
+
+        AppUser user = userService.findUserById(1L);
+        Set<String> names = user.getRoles().stream()
+                .map(UserRole::getName)
+                .collect(Collectors.toSet());
+        assertEquals(Set.of("ROLE_USER"), names);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("updateUserRoles() -> zastępuje istniejące role nowym zestawem")
+    void updateUserRoles_replaces() {
+        userService.updateUserRoles(2L, Set.of("ROLE_MODERATOR"));
+
+        AppUser user = userService.findUserById(2L);
+        Set<String> names = user.getRoles().stream()
+                .map(UserRole::getName)
+                .collect(Collectors.toSet());
+        assertEquals(Set.of("ROLE_MODERATOR"), names);
+    }
+
+    @Test
+    @DisplayName("updateUserRoles() -> nieistniejący user -> DomainException USER_NOT_FOUND")
+    void updateUserRoles_user_not_found() {
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.updateUserRoles(999L, Set.of("ROLE_USER")));
+
+        assertEquals(ErrorCode.USER_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("updateUserRoles() -> nieistniejąca rola -> DomainException ROLE_NOT_FOUND")
+    void updateUserRoles_role_not_found() {
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.updateUserRoles(1L, Set.of("ROLE_GHOST")));
+
+        assertEquals(ErrorCode.ROLE_NOT_FOUND, ex.getErrorCode());
+    }
+
+    // --- deactivateUser ---
+
+    @Test
+    @Transactional
+    @DisplayName("deactivateUser() -> ustawia enabled=false")
+    void deactivateUser_disables() {
+        userService.deactivateUser(1L);
+
+        AppUser user = userService.findUserById(1L);
+        assertFalse(user.isEnabled());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("deactivateUser() -> usuwa refresh tokeny usera z Redisa")
+    void deactivateUser_revokes_refresh_tokens() {
+        String jti = "test-jti-deactivate";
+        redisRefreshTokenStore.saveRefreshToken(jti, "john.doe@example.com", Instant.now().plusSeconds(3600));
+        assertTrue(redisRefreshTokenStore.existsByJti(jti));
+
+        userService.deactivateUser(1L);
+
+        assertFalse(redisRefreshTokenStore.existsByJti(jti));
+    }
+
+    @Test
+    @DisplayName("deactivateUser() -> nieistniejący user -> DomainException USER_NOT_FOUND")
+    void deactivateUser_user_not_found() {
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.deactivateUser(999L));
+
+        assertEquals(ErrorCode.USER_NOT_FOUND, ex.getErrorCode());
+    }
+
+    // --- activateUser ---
+
+    @Test
+    @Transactional
+    @DisplayName("activateUser() -> ustawia enabled=true dla zdezaktywowanego usera")
+    void activateUser_enables() {
+        userService.deactivateUser(1L);
+
+        userService.activateUser(1L);
+
+        AppUser user = userService.findUserById(1L);
+        assertTrue(user.isEnabled());
+    }
+
+    @Test
+    @DisplayName("activateUser() -> nieistniejący user -> DomainException USER_NOT_FOUND")
+    void activateUser_user_not_found() {
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.activateUser(999L));
+
+        assertEquals(ErrorCode.USER_NOT_FOUND, ex.getErrorCode());
+    }
+
+    // --- deleteUser ---
+
+    @Test
+    @Transactional
+    @DisplayName("deleteUser() -> usuwa usera z bazy")
+    void deleteUser_removes_user() {
+        userService.deleteUser(2L);
+
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.findUserById(2L));
+        assertEquals(ErrorCode.USER_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("deleteUser() -> usuwa refresh tokeny usera z Redisa")
+    void deleteUser_revokes_refresh_tokens() {
+        String jti = "test-jti-delete";
+        redisRefreshTokenStore.saveRefreshToken(jti, "jane.smith@example.com", Instant.now().plusSeconds(3600));
+        assertTrue(redisRefreshTokenStore.existsByJti(jti));
+
+        userService.deleteUser(2L);
+
+        assertFalse(redisRefreshTokenStore.existsByJti(jti));
+    }
+
+    @Test
+    @DisplayName("deleteUser() -> nieistniejący user -> DomainException USER_NOT_FOUND")
+    void deleteUser_user_not_found() {
+        DomainException ex = assertThrows(DomainException.class,
+                () -> userService.deleteUser(999L));
 
         assertEquals(ErrorCode.USER_NOT_FOUND, ex.getErrorCode());
     }
