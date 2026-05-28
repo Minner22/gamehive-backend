@@ -9,11 +9,10 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
-import pl.m22.gamehive.common.exception.InfrastructureException;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
@@ -29,13 +28,15 @@ class MailServiceImplTest {
 
     @Test
     @DisplayName("sendActivationEmail when SMTP throws exception -> InfrastructureException EMAIL_SEND_FAILED")
-    void sendActivationEmail_smtpFailure_throwsInfrastructureException() {
+    void sendActivationEmail_smtpFailure_throwsEmailSendFailed() {
+
         doThrow(new MailSendException("SMTP unavailable"))
                 .when(mailSender).send(any(SimpleMailMessage.class));
 
-        InfrastructureException ex = assertThrows(InfrastructureException.class,
-                () -> mailService.sendActivationEmail("user@example.com", "someToken"));
+        assertThatThrownBy(() -> mailService.sendActivationEmail("user@example.com", "someToken"))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.EMAIL_SEND_FAILED);
 
-        assertEquals(ErrorCode.EMAIL_SEND_FAILED, ex.getErrorCode());
     }
 }

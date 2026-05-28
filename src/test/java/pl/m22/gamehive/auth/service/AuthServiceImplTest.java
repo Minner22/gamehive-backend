@@ -10,12 +10,13 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
-import pl.m22.gamehive.common.exception.ApplicationException;
+import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
-import pl.m22.gamehive.common.exception.InfrastructureException;
 import pl.m22.gamehive.user.repository.UserRepository;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -31,6 +32,7 @@ class AuthServiceImplTest {
     @Test
     @DisplayName("register() happy path -> użytkownik zapisany, mail wysłany")
     void register_happy_path() {
+
         RegistrationDto dto = new RegistrationDto("newuser", "newuser@test.com", "password123");
 
         authService.register(dto);
@@ -42,10 +44,14 @@ class AuthServiceImplTest {
     @Test
     @DisplayName("register() błąd SMTP -> rollback, użytkownik NIE zapisany")
     void register_email_fails_rollback() {
+
         doThrow(new MailSendException("SMTP error")).when(mailSender).send(any(SimpleMailMessage.class));
         RegistrationDto dto = new RegistrationDto("failuser", "fail@test.com", "password123");
 
-        assertThrows(InfrastructureException.class, () -> authService.register(dto));
+        assertThatThrownBy(() -> authService.register(dto))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.EMAIL_SEND_FAILED);
 
         assertFalse(userRepository.existsByEmail("fail@test.com"));
     }
@@ -53,20 +59,25 @@ class AuthServiceImplTest {
     @Test
     @DisplayName("register() duplikat email -> EMAIL_ALREADY_EXISTS")
     void register_duplicate_email() {
+
         RegistrationDto dto = new RegistrationDto("other", "john.doe@example.com", "password123");
 
-        ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> authService.register(dto));
-        assertEquals(ErrorCode.EMAIL_ALREADY_EXISTS, ex.getErrorCode());
+        assertThatThrownBy(() -> authService.register(dto))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS);
     }
 
     @Test
     @DisplayName("register() duplikat username -> USERNAME_ALREADY_EXISTS")
     void register_duplicate_username() {
+
         RegistrationDto dto = new RegistrationDto("john_doe", "other@test.com", "password123");
 
-        ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> authService.register(dto));
-        assertEquals(ErrorCode.USERNAME_ALREADY_EXISTS, ex.getErrorCode());
+        assertThatThrownBy(() -> authService.register(dto))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.USERNAME_ALREADY_EXISTS);
+
     }
 }
