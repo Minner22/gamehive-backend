@@ -1,7 +1,6 @@
 package pl.m22.gamehive.common.exception;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +15,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiValidationError> handleValidationExceptions(MethodArgumentNotValidException ex) {
+
         log.warn("Validation error occurred: {}", ex.getMessage());
 
         List<FieldValidationError> fieldErrors = ex.getBindingResult()
@@ -35,6 +35,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(org.springframework.security.authorization.AuthorizationDeniedException.class)
     public ResponseEntity<ApiError> handleAuthorizationDenied(org.springframework.security.authorization.AuthorizationDeniedException ex) {
+
         log.warn("Access denied (method security): {}", ex.getMessage());
 
         ApiError apiError = new ApiError(
@@ -52,16 +53,38 @@ public class GlobalExceptionHandler {
         log.error("An unexpected error occurred: {}", ex.getMessage(), ex);
 
         ApiError apiError = new ApiError(ErrorCode.INTERNAL_ERROR.name(), ErrorCode.INTERNAL_ERROR.getDefaultMessage());
+
         return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.getHttpStatus()).body(apiError);
     }
 
-    @ExceptionHandler(BaseException.class)
-    public ResponseEntity<ApiError> handleBaseException(BaseException ex) {
+    @ExceptionHandler(DomainException.class)
+    public ResponseEntity<ApiError> handleDomainException(DomainException ex) {
 
-        log.warn("BaseException occurred: {} ({})", ex.getMessage(), ex.getErrorCode());
+        log.info("Domain rule violation: {} ({})", ex.getMessage(), ex.getErrorCode());
+
+        return buildResponse(ex);
+    }
+
+    @ExceptionHandler(ApplicationException.class)
+    public ResponseEntity<ApiError> handleApplicationException(ApplicationException ex) {
+
+        log.warn("Application flow error: {} ({})", ex.getMessage(), ex.getErrorCode());
+
+        return buildResponse(ex);
+    }
+
+    @ExceptionHandler(InfrastructureException.class)
+    public ResponseEntity<ApiError> handleInfrastructureException(InfrastructureException ex) {
+
+        log.error("Infrastructure failure: {} ({})", ex.getMessage(), ex.getErrorCode(), ex);
+
+        return buildResponse(ex);
+    }
+
+    private ResponseEntity<ApiError> buildResponse(BaseException ex) {
 
         ApiError apiError = new ApiError(ex.getErrorCode().name(), ex.getMessage());
-        HttpStatus status = ex.getErrorCode().getHttpStatus();
-        return ResponseEntity.status(status).body(apiError);
+
+        return ResponseEntity.status(ex.getErrorCode().getHttpStatus()).body(apiError);
     }
 }
