@@ -8,38 +8,41 @@ import org.springframework.http.HttpStatus;
 @AllArgsConstructor
 public enum ErrorCode {
 
-    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
-    EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "Email not found"),
+    // ===== Domain — naruszenia reguł biznesowych (handler loguje INFO) =====
+    CANNOT_MODIFY_OWN_ACCOUNT(HttpStatus.FORBIDDEN, "Cannot modify your own account"),
+    CANNOT_REMOVE_LAST_ADMIN(HttpStatus.CONFLICT, "Cannot remove last administrator"),
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
-    USER_NOT_ACTIVATED(HttpStatus.FORBIDDEN, "User account is not activated"),
-    USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "Username already exists"),
-    ROLE_NOT_FOUND(HttpStatus.NOT_FOUND, "Role not found"),
-    IDENTIFIER_NOT_FOUND(HttpStatus.NOT_FOUND, "Identifier not found"),
     INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "Invalid password"),
     USER_ALREADY_ACTIVATED(HttpStatus.CONFLICT, "User is already activated"),
+    USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "Username already exists"),
 
-    JWT_KEY_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Invalid JWT signing key"),
+    // ===== Application — problemy w przepływie use-case (handler loguje WARN) =====
+    EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "Email not found"),
     JWT_BLACKLISTED(HttpStatus.UNAUTHORIZED, "JWT token already used"),
-    JWT_SIGNING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to sign or verify JWT"),
-    JWT_INVALID_ROLES(HttpStatus.UNAUTHORIZED, "JWT token does not contain valid roles"),
-    JWT_INVALID_ALGORITHM(HttpStatus.UNAUTHORIZED, "Invalid JWT algorithm"),
-    JWT_INVALID_SUBJECT(HttpStatus.UNAUTHORIZED, "JWT token does not contain a valid subject"),
-    JWT_INVALID_SIGNATURE(HttpStatus.UNAUTHORIZED, "Invalid JWT signature"),
     JWT_EXPIRED(HttpStatus.UNAUTHORIZED, "JWT token has expired"),
+    JWT_INVALID_ALGORITHM(HttpStatus.UNAUTHORIZED, "Invalid JWT algorithm"),
+    JWT_INVALID_SIGNATURE(HttpStatus.UNAUTHORIZED, "Invalid JWT signature"),
     JWT_INVALID_TYPE(HttpStatus.UNAUTHORIZED, "JWT token has invalid type"),
     JWT_INVALID_JTI(HttpStatus.UNAUTHORIZED, "Invalid or revoked JWT JTI"),
+    JWT_INVALID_SUBJECT(HttpStatus.UNAUTHORIZED, "JWT token does not contain a valid subject"),
+    JWT_INVALID_ROLES(HttpStatus.UNAUTHORIZED, "JWT token does not contain valid roles"),
     JWT_PARSE_ERROR(HttpStatus.BAD_REQUEST, "Failed to parse JWT"),
+    ROLE_NOT_FOUND(HttpStatus.NOT_FOUND, "Role not found"),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
+    USER_NOT_ACTIVATED(HttpStatus.FORBIDDEN, "User account is not activated"),
+    USERNAME_OR_EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "Username or email not found"),
 
+    // ===== Infrastructure — awarie systemów zewnętrznych / techniczne (handler loguje ERROR + stack) =====
     EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to send email"),
-
+    JWT_KEY_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Invalid JWT signing key"),
+    JWT_SIGNING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to sign or verify JWT"),
     REDIS_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Token service temporarily unavailable"),
 
+    // ===== Handler-only — nierzucane bezpośrednio, używane przez GlobalExceptionHandler =====
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "Access denied"),
-    VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Validation failed"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred"),
+    VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Validation failed");
 
-    CANNOT_MODIFY_OWN_ACCOUNT(HttpStatus.FORBIDDEN, "Cannot modify your own account"),
-    CANNOT_REMOVE_LAST_ADMIN(HttpStatus.CONFLICT, "Cannot remove last administrator"); //czy poprawny http status?
 
     private final HttpStatus httpStatus;
     private final String defaultMessage;

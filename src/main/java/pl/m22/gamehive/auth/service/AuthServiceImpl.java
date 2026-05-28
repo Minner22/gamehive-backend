@@ -11,6 +11,7 @@ import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.common.email.service.MailService;
 import pl.m22.gamehive.common.exception.ApplicationException;
+import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.model.AppUser;
@@ -36,6 +37,7 @@ public class AuthServiceImpl implements AuthService{
     @Transactional
     @Override
     public void register(RegistrationDto registrationDto) {
+
         AppUser appUser = registerUser(registrationDto);
         String activationToken = generateActivationToken(appUser);
         mailService.sendActivationEmail(appUser.getEmail(), activationToken);
@@ -43,13 +45,14 @@ public class AuthServiceImpl implements AuthService{
 
     @Override
     public AppUser registerUser(RegistrationDto registrationDto) {
+
         if (userRepository.existsByEmail(registrationDto.email())) {
-            throw new ApplicationException(ErrorCode.EMAIL_ALREADY_EXISTS,
+            throw new DomainException(ErrorCode.EMAIL_ALREADY_EXISTS,
                     "Email already exists: " + registrationDto.email());
         }
 
         if (userRepository.existsByUsername(registrationDto.username())) {
-            throw new ApplicationException(ErrorCode.USERNAME_ALREADY_EXISTS,
+            throw new DomainException(ErrorCode.USERNAME_ALREADY_EXISTS,
                     "Username already exists: " + registrationDto.username());
         }
 
@@ -69,6 +72,7 @@ public class AuthServiceImpl implements AuthService{
 
     @Override
     public String generateActivationToken(AppUser appUser) {
+
         return jwtService.generateToken(appUser.getEmail(), JwtTokenType.ACTIVATION, null);
     }
 
@@ -78,14 +82,14 @@ public class AuthServiceImpl implements AuthService{
 
         String identifier = loginDto.usernameOrEmail();
         AppUser appUser = userRepository.findByEmailOrUsername(identifier, identifier)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.IDENTIFIER_NOT_FOUND, "Username or email not found: " + identifier));
+                .orElseThrow(() -> new ApplicationException(ErrorCode.USERNAME_OR_EMAIL_NOT_FOUND, "Username or email not found: " + identifier));
 
         if (!appUser.isEnabled()) {
             throw new ApplicationException(ErrorCode.USER_NOT_ACTIVATED, "User not activated: " + appUser.getEmail());
         }
 
         if (!passwordEncoder.matches(loginDto.password(), appUser.getPassword())) {
-            throw new ApplicationException(ErrorCode.INVALID_PASSWORD);
+            throw new DomainException(ErrorCode.INVALID_PASSWORD);
         }
 
         return userMapper.toCredentialsDto(appUser);
@@ -94,11 +98,12 @@ public class AuthServiceImpl implements AuthService{
     @Transactional
     @Override
     public void activateUser(String email) {
+
         AppUser appUser = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email));
 
         if (appUser.isEnabled()) {
-            throw new ApplicationException(ErrorCode.USER_ALREADY_ACTIVATED, "User with email " + email + " is already activated.");
+            throw new DomainException(ErrorCode.USER_ALREADY_ACTIVATED, "User with email " + email + " is already activated.");
         }
 
         appUser.setEnabled(true);
@@ -119,6 +124,7 @@ public class AuthServiceImpl implements AuthService{
 
     @Override
     public void confirmPasswordReset(String email, String newPassword) {
+
         AppUser appUser = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email));
 

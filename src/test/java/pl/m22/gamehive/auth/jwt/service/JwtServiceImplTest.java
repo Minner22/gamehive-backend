@@ -14,7 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.TokenPairDto;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
-import pl.m22.gamehive.common.exception.ApplicationException;
+import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.repository.UserRepository;
@@ -25,8 +25,7 @@ import java.util.Date;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -39,16 +38,19 @@ class JwtServiceImplTest {
     private static final String ACTIVATION_SECRET = "test-activation-secret-abcdefghijklmnopqrstuvwxyz1234";
 
     private CredentialsDto johnCreds() {
+
         Optional<AppUser> userOpt = userRepository.findByEmail("john.doe@example.com");
         if (userOpt.isEmpty()) {
             throw new IllegalStateException("Seed user john.doe@example.com not found (did schema/data.sql run?)");
         }
+
         return new CredentialsDto("john.doe@example.com", Set.of("ROLE_ADMIN","ROLE_USER"));
     }
 
     @Test
     @DisplayName("generateToken/access -> token się weryfikuje poprawnie")
     void generate_and_validate_access_token_ok() {
+
         String token = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN","ROLE_USER"));
         jwtService.validateToken(token, JwtTokenType.ACCESS);
     }
@@ -56,6 +58,7 @@ class JwtServiceImplTest {
     @Test
     @DisplayName("generateTokenPair/refresh -> JTI zapisany, a token refresh przechodzi weryfikację")
     void refresh_token_persisted_and_valid() {
+
         TokenPairDto pair = jwtService.generateTokenPair(johnCreds());
         jwtService.validateToken(pair.refreshToken(), JwtTokenType.REFRESH);
     }
@@ -63,28 +66,37 @@ class JwtServiceImplTest {
     @Test
     @DisplayName("refresh token po revokeUsersTokens(email) -> JWT_INVALID_JTI")
     void refresh_token_revoked_fails() {
+
         TokenPairDto pair = jwtService.generateTokenPair(johnCreds());
         String refresh = pair.refreshToken();
         jwtService.revokeUsersTokens("john.doe@example.com");
-        ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> jwtService.validateToken(refresh, JwtTokenType.REFRESH));
-        assertEquals(ErrorCode.JWT_INVALID_JTI, ex.getErrorCode());
+
+        assertThatThrownBy(() -> jwtService.validateToken(refresh, JwtTokenType.REFRESH))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.JWT_INVALID_JTI);
+
     }
 
     @Test
     @DisplayName("niepoprawny podpis -> JWT_INVALID_SIGNATURE")
     void invalid_signature() {
+
         String token = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN"));
         // psujemy podpis – najprościej: dokładamy śmieci na końcu, parsuje się, ale weryfikacja podpisu padnie
         String broken = token + "AA";
-        ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> jwtService.validateToken(broken, JwtTokenType.ACCESS));
-        assertEquals(ErrorCode.JWT_INVALID_SIGNATURE, ex.getErrorCode());
+
+        assertThatThrownBy(() -> jwtService.validateToken(broken, JwtTokenType.ACCESS))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.JWT_INVALID_SIGNATURE);
+
     }
 
     @Test
     @DisplayName("refresh token sprawdzany jako ACCESS -> JWT_INVALID_TYPE")
     void invalid_type() {
+
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject("jane.smith@example.com")
                 .issueTime(new Date())
@@ -102,14 +114,18 @@ class JwtServiceImplTest {
         String token = jwt.serialize();
 
         // 3) walidacja powinna polec na typie
-        ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> jwtService.validateToken(token, JwtTokenType.ACCESS));
-        assertEquals(ErrorCode.JWT_INVALID_TYPE, ex.getErrorCode());
+
+        assertThatThrownBy(() -> jwtService.validateToken(token, JwtTokenType.ACCESS))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.JWT_INVALID_TYPE);
+
     }
 
     @Test
     @DisplayName("wygasły activation token -> JWT_EXPIRED")
     void expired_activation_token() {
+
         Instant now = Instant.now();
 
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
@@ -127,14 +143,18 @@ class JwtServiceImplTest {
         }
 
         String token = jwt.serialize();
-        ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> jwtService.validateToken(token, JwtTokenType.ACTIVATION));
-        assertEquals(ErrorCode.JWT_EXPIRED, ex.getErrorCode());
+
+        assertThatThrownBy(() -> jwtService.validateToken(token, JwtTokenType.ACTIVATION))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.JWT_EXPIRED);
+
     }
 
     @Test
     @DisplayName("wygasły access token -> JWT_EXPIRED")
     void expired_access_token() {
+
         Instant now = Instant.now();
 
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
@@ -153,8 +173,11 @@ class JwtServiceImplTest {
         }
 
         String token = jwt.serialize();
-        ApplicationException ex = assertThrows(ApplicationException.class,
-                () -> jwtService.validateToken(token, JwtTokenType.ACCESS));
-        assertEquals(ErrorCode.JWT_EXPIRED, ex.getErrorCode());
+
+        assertThatThrownBy(() -> jwtService.validateToken(token, JwtTokenType.ACCESS))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.JWT_EXPIRED);
+
     }
 }
