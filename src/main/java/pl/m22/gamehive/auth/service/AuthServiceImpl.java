@@ -82,7 +82,7 @@ public class AuthServiceImpl implements AuthService{
 
         String identifier = loginDto.usernameOrEmail();
         AppUser appUser = userRepository.findByEmailOrUsername(identifier, identifier)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.IDENTIFIER_NOT_FOUND, "Username or email not found: " + identifier));
+                .orElseThrow(() -> new ApplicationException(ErrorCode.USERNAME_OR_EMAIL_NOT_FOUND, "Username or email not found: " + identifier));
 
         if (!appUser.isEnabled()) {
             throw new ApplicationException(ErrorCode.USER_NOT_ACTIVATED, "User not activated: " + appUser.getEmail());
