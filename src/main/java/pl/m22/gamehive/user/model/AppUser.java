@@ -16,9 +16,7 @@ import java.util.Set;
 @Entity
 @Table(name = "application_users")
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true)
 public class AppUser extends AbstractEntity {

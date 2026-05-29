@@ -28,8 +28,7 @@ class UserMapperTest {
     @DisplayName("toUserResponseDto() -> mapuje AppUser na UserResponseDto z rolami i profilem")
     void toUserResponseDto_maps_all_fields() {
 
-        UserRole role = new UserRole();
-        role.setName("ROLE_USER");
+        UserRole role = new UserRole("ROLE_USER", null);
 
         UserProfile profile = new UserProfile(
                 "Jan", "Kowalski", "Warszawa", "+48123456789",
@@ -58,8 +57,7 @@ class UserMapperTest {
     @DisplayName("toUserResponseDto() -> null profile -> profile jest null w DTO")
     void toUserResponseDto_null_profile() {
 
-        UserRole role = new UserRole();
-        role.setName("ROLE_USER");
+        UserRole role = new UserRole("ROLE_USER", null);
 
         AppUser user = AppUser.register("test", "test@example.com", "secret123");
         user.setId(1L);

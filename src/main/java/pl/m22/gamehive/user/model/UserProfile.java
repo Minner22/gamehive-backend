@@ -5,7 +5,6 @@ import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.validator.constraints.URL;
 import pl.m22.gamehive.common.AbstractEntity;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
@@ -15,7 +14,6 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "user_profiles")
 @Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserProfile extends AbstractEntity {
