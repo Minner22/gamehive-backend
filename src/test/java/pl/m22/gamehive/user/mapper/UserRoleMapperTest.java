@@ -35,13 +35,11 @@ class UserRoleMapperTest {
     @BeforeEach
     void setUp() {
 
-        adminRole = new UserRole();
+        adminRole = new UserRole("ROLE_ADMIN", null);
         adminRole.setId(1L);
-        adminRole.setName("ROLE_ADMIN");
 
-        userRole = new UserRole();
+        userRole = new UserRole("ROLE_USER", null);
         userRole.setId(2L);
-        userRole.setName("ROLE_USER");
     }
 
     @Test

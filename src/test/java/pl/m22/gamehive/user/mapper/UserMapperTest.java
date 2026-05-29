@@ -27,25 +27,20 @@ class UserMapperTest {
     @Test
     @DisplayName("toUserResponseDto() -> mapuje AppUser na UserResponseDto z rolami i profilem")
     void toUserResponseDto_maps_all_fields() {
+
         UserRole role = new UserRole();
         role.setName("ROLE_USER");
 
-        UserProfile profile = new UserProfile();
-        profile.setFirstName("Jan");
-        profile.setLastName("Kowalski");
-        profile.setPhoneNumber("+48123456789");
-        profile.setAddress("Warszawa");
-        profile.setDateOfBirth(LocalDate.of(1990, 1, 15));
-        profile.setProfilePictureUrl("https://example.com/avatar.png");
+        UserProfile profile = new UserProfile(
+                "Jan", "Kowalski", "Warszawa", "+48123456789",
+                LocalDate.of(1990, 1, 15), "https://example.com/avatar.png"
+        );
 
-        AppUser user = new AppUser();
+        AppUser user = AppUser.register("jan_kowalski", "jan@example.com", "secret123");
         user.setId(1L);
-        user.setUsername("jan_kowalski");
-        user.setEmail("jan@example.com");
-        user.setPassword("secret123");
-        user.setEnabled(true);
-        user.setRoles(Set.of(role));
-        user.setUserProfile(profile);
+        user.activate();
+        user.assignRole(role);
+        user.attachProfile(profile);
 
         UserResponseDto result = userMapper.toUserResponseDto(user);
 
@@ -62,17 +57,15 @@ class UserMapperTest {
     @Test
     @DisplayName("toUserResponseDto() -> null profile -> profile jest null w DTO")
     void toUserResponseDto_null_profile() {
+
         UserRole role = new UserRole();
         role.setName("ROLE_USER");
 
-        AppUser user = new AppUser();
+        AppUser user = AppUser.register("test", "test@example.com", "secret123");
         user.setId(1L);
-        user.setUsername("test");
-        user.setEmail("test@example.com");
-        user.setPassword("secret123");
-        user.setEnabled(false);
-        user.setRoles(Set.of(role));
-        user.setUserProfile(null);
+        user.activate();
+        user.assignRole(role);
+        user.attachProfile(null);
 
         UserResponseDto result = userMapper.toUserResponseDto(user);
 
@@ -83,13 +76,12 @@ class UserMapperTest {
     @Test
     @DisplayName("toUserProfileResponseDto() -> mapuje UserProfile na UserProfileResponseDto")
     void toUserProfileResponseDto_maps_all_fields() {
-        UserProfile profile = new UserProfile();
-        profile.setFirstName("Anna");
-        profile.setLastName("Nowak");
-        profile.setPhoneNumber("+48987654321");
-        profile.setAddress("Krakow");
-        profile.setDateOfBirth(LocalDate.of(1985, 6, 20));
-        profile.setProfilePictureUrl("https://example.com/photo.jpg");
+
+        UserProfile profile = new UserProfile(
+                "Anna", "Nowak", "Krakow", "+48987654321",
+                LocalDate.of(1985, 6, 20), "https://example.com/photo.jpg"
+        );
+
 
         UserProfileResponseDto result = userMapper.toUserProfileResponseDto(profile);
 
@@ -104,12 +96,12 @@ class UserMapperTest {
     @Test
     @DisplayName("toCredentialsDto() -> mapuje AppUser na CredentialsDto z rolami jako String")
     void toCredentialsDto_maps_email_and_roles() {
-        UserRole role = new UserRole();
-        role.setName("ROLE_ADMIN");
 
-        AppUser user = new AppUser();
-        user.setEmail("admin@example.com");
-        user.setRoles(Set.of(role));
+        UserRole role = new UserRole("ROLE_ADMIN", null);
+
+        AppUser user = AppUser.register("admin", "admin@example.com", "password");
+
+        user.assignRole(role);
 
         CredentialsDto result = userMapper.toCredentialsDto(user);
 
