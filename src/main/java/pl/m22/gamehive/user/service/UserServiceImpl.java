@@ -104,7 +104,8 @@ public class UserServiceImpl implements UserService {
             user.attachProfile(profile);
         }
 
-        userMapper.updateUserProfileFromDto(userProfileUpdateDto, profile);
+        profile.updateFrom(userProfileUpdateDto);
+
         userRepository.save(user);
 
         return profile;
