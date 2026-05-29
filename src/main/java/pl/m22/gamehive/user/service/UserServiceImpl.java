@@ -101,10 +101,11 @@ public class UserServiceImpl implements UserService {
 
         if (profile == null) {
             profile = new UserProfile();
-            user.setUserProfile(profile);
+            user.attachProfile(profile);
         }
 
-        userMapper.updateUserProfileFromDto(userProfileUpdateDto, profile);
+        profile.updateFrom(userProfileUpdateDto);
+
         userRepository.save(user);
 
         return profile;
@@ -121,7 +122,9 @@ public class UserServiceImpl implements UserService {
                 .map(name -> userRoleRepository.findByName(name)
                         .orElseThrow(() -> new ApplicationException(ErrorCode.ROLE_NOT_FOUND)))
                 .collect(Collectors.toSet());
-        user.setRoles(userRoles);
+
+        user.replaceRoles(userRoles);
+
         userRepository.save(user);
 
         return user;
@@ -135,7 +138,8 @@ public class UserServiceImpl implements UserService {
         AppUser user = findUserById(userId);
 
         guardLastAdmin(user);
-        user.setEnabled(false);
+
+        user.deactivate();
 
         userRepository.save(user);
         redisRefreshTokenStore.revokeAllByUserEmail(user.getEmail());
@@ -149,7 +153,8 @@ public class UserServiceImpl implements UserService {
 
         AppUser user = findUserById(userId);
 
-        user.setEnabled(true);
+        user.activate();
+
         userRepository.save(user);
 
         return user;

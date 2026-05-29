@@ -198,7 +198,7 @@ class UserServiceImplTest {
     void updateCurrentUserProfile_creates_profile_when_null() {
 
         AppUser user = userService.findUserByEmail("john.doe@example.com");
-        user.setUserProfile(null);
+        user.attachProfile(null);
 
         UserProfileUpdateDto dto = new UserProfileUpdateDto(
                 "New", "Profile", "+48111222333", "Warszawa",
