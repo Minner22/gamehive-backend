@@ -15,7 +15,6 @@ import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.model.AppUser;
-import pl.m22.gamehive.user.model.UserProfile;
 import pl.m22.gamehive.user.model.UserRole;
 import pl.m22.gamehive.user.repository.UserRepository;
 import pl.m22.gamehive.user.repository.UserRoleRepository;
@@ -56,16 +55,17 @@ public class AuthServiceImpl implements AuthService{
                     "Username already exists: " + registrationDto.username());
         }
 
-        AppUser appUser = userMapper.toUser(registrationDto);
-        appUser.setEnabled(false);
-        appUser.setPassword(passwordEncoder.encode(registrationDto.password()));
-        appUser.setUserProfile(new UserProfile());
+        AppUser appUser = AppUser.register(
+                registrationDto.username(),
+                registrationDto.email(),
+                passwordEncoder.encode(registrationDto.password())
+        );
 
         UserRole role = userRoleRepository.findByName(USER_ROLE)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.ROLE_NOT_FOUND,
                         "Role not found: " + USER_ROLE));
 
-        appUser.getRoles().add(role);
+        appUser.assignRole(role);
 
         return userRepository.save(appUser);
     }
@@ -102,11 +102,7 @@ public class AuthServiceImpl implements AuthService{
         AppUser appUser = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email));
 
-        if (appUser.isEnabled()) {
-            throw new DomainException(ErrorCode.USER_ALREADY_ACTIVATED, "User with email " + email + " is already activated.");
-        }
-
-        appUser.setEnabled(true);
+        appUser.activate();
 
         userRepository.save(appUser);
     }
@@ -128,7 +124,8 @@ public class AuthServiceImpl implements AuthService{
         AppUser appUser = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email));
 
-        appUser.setPassword(passwordEncoder.encode(newPassword));
+        appUser.changePassword(passwordEncoder.encode(newPassword));
+
         userRepository.save(appUser);
     }
 }
