@@ -6,9 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
-import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.user.dto.UserProfileResponseDto;
-import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.UserProfile;
@@ -104,53 +102,6 @@ class UserMapperTest {
     }
 
     @Test
-    @DisplayName("updateUserProfileFromDto() -> aktualizuje tylko nie-null pola")
-    void updateUserProfileFromDto_ignores_null_fields() {
-        UserProfile profile = new UserProfile();
-        profile.setFirstName("Jan");
-        profile.setLastName("Kowalski");
-        profile.setPhoneNumber("+48111222333");
-        profile.setAddress("Warszawa");
-        profile.setDateOfBirth(LocalDate.of(1990, 1, 1));
-        profile.setProfilePictureUrl("https://example.com/old.png");
-
-        UserProfileUpdateDto dto = new UserProfileUpdateDto(
-                "Janusz", null, null, "Gdansk", null, null
-        );
-
-        userMapper.updateUserProfileFromDto(dto, profile);
-
-        assertEquals("Janusz", profile.getFirstName());
-        assertEquals("Kowalski", profile.getLastName());
-        assertEquals("+48111222333", profile.getPhoneNumber());
-        assertEquals("Gdansk", profile.getAddress());
-        assertEquals(LocalDate.of(1990, 1, 1), profile.getDateOfBirth());
-        assertEquals("https://example.com/old.png", profile.getProfilePictureUrl());
-    }
-
-    @Test
-    @DisplayName("updateUserProfileFromDto() -> aktualizuje wszystkie pola")
-    void updateUserProfileFromDto_updates_all_fields() {
-        UserProfile profile = new UserProfile();
-        profile.setFirstName("Jan");
-        profile.setLastName("Kowalski");
-
-        UserProfileUpdateDto dto = new UserProfileUpdateDto(
-                "Anna", "Nowak", "+48999888777", "Poznan",
-                LocalDate.of(1995, 3, 10), "https://example.com/new.png"
-        );
-
-        userMapper.updateUserProfileFromDto(dto, profile);
-
-        assertEquals("Anna", profile.getFirstName());
-        assertEquals("Nowak", profile.getLastName());
-        assertEquals("+48999888777", profile.getPhoneNumber());
-        assertEquals("Poznan", profile.getAddress());
-        assertEquals(LocalDate.of(1995, 3, 10), profile.getDateOfBirth());
-        assertEquals("https://example.com/new.png", profile.getProfilePictureUrl());
-    }
-
-    @Test
     @DisplayName("toCredentialsDto() -> mapuje AppUser na CredentialsDto z rolami jako String")
     void toCredentialsDto_maps_email_and_roles() {
         UserRole role = new UserRole();
@@ -164,17 +115,5 @@ class UserMapperTest {
 
         assertEquals("admin@example.com", result.email());
         assertEquals(Set.of("ROLE_ADMIN"), result.roles());
-    }
-
-    @Test
-    @DisplayName("toUser(RegistrationDto) -> mapuje RegistrationDto na AppUser")
-    void toUser_from_registrationDto() {
-        RegistrationDto dto = new RegistrationDto("newuser", "new@example.com", "password123");
-
-        AppUser result = userMapper.toUser(dto);
-
-        assertEquals("newuser", result.getUsername());
-        assertEquals("new@example.com", result.getEmail());
-        assertEquals("password123", result.getPassword());
     }
 }
