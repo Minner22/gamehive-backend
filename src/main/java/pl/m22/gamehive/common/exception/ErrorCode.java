@@ -13,6 +13,7 @@ public enum ErrorCode {
     CANNOT_REMOVE_LAST_ADMIN(HttpStatus.CONFLICT, "Cannot remove last administrator"),
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
     INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "Invalid password"),
+    ROLE_ALREADY_ASSIGNED(HttpStatus.CONFLICT, "Role already assigned to user"),
     USER_ALREADY_ACTIVATED(HttpStatus.CONFLICT, "User is already activated"),
     USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "Username already exists"),
 
