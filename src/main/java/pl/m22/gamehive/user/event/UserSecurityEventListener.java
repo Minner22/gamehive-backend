@@ -11,6 +11,11 @@ import pl.m22.gamehive.auth.jwt.service.RedisRefreshTokenStore;
 import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.config.CacheConfig;
 
+/**
+ * Unieważnia sesje usera w reakcji na zmiany jego stanu/credentiali. Wszystkie handlery są AFTER_COMMIT —
+ * efekty uboczne (Redis, cache) odpalają się tylko, gdy zmiana w DB faktycznie się scommitowała
+ * (rollback => brak unieważnienia).
+ */
 @Slf4j
 @RequiredArgsConstructor
 @Component
@@ -32,6 +37,8 @@ public class UserSecurityEventListener {
         revoke(event.email());
     }
 
+    // Reaktywacja i zmiana ról tylko eksmitują cache — NIE czyszczą epoch ani nie ruszają refresh tokenów.
+    // Dzięki temu reaktywacja nie wskrzesza starych tokenów (user musi zalogować się od nowa).
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void onUserReactivated(UserReactivatedEvent event) {
 
@@ -57,6 +64,8 @@ public class UserSecurityEventListener {
         evictAuthState(email);
     }
 
+    // Eviction programowa (nie @CacheEvict): metody listenera są package-private i wołane przez
+    // infrastrukturę zdarzeń, więc interceptcja przez proxy AOP cache'a nie jest gwarantowana.
     private void evictAuthState(String email) {
 
         Cache cache = cacheManager.getCache(CacheConfig.USER_AUTH_STATE);

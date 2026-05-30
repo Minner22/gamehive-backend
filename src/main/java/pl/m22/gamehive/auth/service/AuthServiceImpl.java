@@ -94,6 +94,8 @@ public class AuthServiceImpl implements AuthService{
 
         userRepository.save(appUser);
 
+        // @Transactional jest tu wymagane: listener UserCredentialsChangedEvent jest AFTER_COMMIT,
+        // bez aktywnej transakcji zdarzenie nie zostałoby dostarczone (sesje nie zostałyby unieważnione).
         eventPublisher.publishEvent(new UserCredentialsChangedEvent(email));
     }
 

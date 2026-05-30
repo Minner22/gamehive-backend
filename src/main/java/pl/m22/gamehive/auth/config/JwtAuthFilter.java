@@ -51,6 +51,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String jti = jwtService.extractJtiFromToken(jwt);
             if (jti != null && tokenBlacklistService.isBlacklisted(jti)) {
                 log.debug("Access token blacklisted for request [{}]", request.getRequestURI());
+                // Blacklist (i pozostałe nieprawidłowe tokeny) przepuszczamy do authenticationEntryPoint
+                // (generyczne 401 ACCESS_DENIED). Własne kody piszemy tylko dla disabled/epoch niżej.
                 filterChain.doFilter(request, response);
                 return;
             }
@@ -71,6 +73,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 Instant issuedAt = jwtService.extractIssuedAtFromToken(jwt);
                 Long invalidAfter = authState.invalidAfter();
 
+                // iat jest w sekundach (ucięte), invalidAfter w ms — token wydany przed unieważnieniem ma
+                // zawsze mniejszy iat. Porównanie ostre (<): token z tej samej sekundy też odrzucamy.
                 if (invalidAfter != null && issuedAt != null && issuedAt.toEpochMilli() < invalidAfter) {
                     log.debug("User [{}] token has been revoked, rejecting access for request [{}]", email, request.getRequestURI());
 
@@ -79,6 +83,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     return;
                 }
 
+                // principal = email (String), nie UserDetails — downstream używa tylko authentication.getName().
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         email,
                         null,

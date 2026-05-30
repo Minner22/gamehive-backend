@@ -26,6 +26,8 @@ public class RedisSessionEpochStore {
     public void invalidateNow(String email) {
 
         try {
+            // TTL = żywotność ACCESS tokenu: po niej wszystkie access tokeny sprzed unieważnienia i tak
+            // wygasły, więc epoch przestaje być potrzebny i Redis usuwa go sam.
             redisTemplate.opsForValue().set(
                     PREFIX + email,
                     String.valueOf(Instant.now().toEpochMilli()),
