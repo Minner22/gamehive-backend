@@ -13,6 +13,8 @@ import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
 import pl.m22.gamehive.user.event.UserDeactivatedEvent;
 import pl.m22.gamehive.user.event.UserDeletedEvent;
+import pl.m22.gamehive.user.event.UserReactivatedEvent;
+import pl.m22.gamehive.user.event.UserRolesUpdatedEvent;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.UserProfile;
@@ -135,6 +137,7 @@ public class UserServiceImpl implements UserService {
         user.replaceRoles(userRoles);
 
         userRepository.save(user);
+        eventPublisher.publishEvent(new UserRolesUpdatedEvent(user.getEmail()));
 
         return user;
     }
@@ -165,6 +168,7 @@ public class UserServiceImpl implements UserService {
         user.activate();
 
         userRepository.save(user);
+        eventPublisher.publishEvent(new UserReactivatedEvent(user.getEmail()));
 
         return user;
     }

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -19,11 +21,18 @@ import static org.junit.jupiter.api.Assertions.*;
 class RedisRefreshTokenStoreTest {
 
     @Autowired RedisRefreshTokenStore store;
+    @Autowired CacheManager cacheManager;
     @Autowired RedisTemplate<String, String> redisTemplate;
 
     @BeforeEach
     void cleanRedis() {
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
+
+        Cache c = cacheManager.getCache("userAuthState");
+
+        if (c != null) {
+            c.clear();
+        }
     }
 
     @Test

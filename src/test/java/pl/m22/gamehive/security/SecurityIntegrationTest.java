@@ -1,10 +1,13 @@
 package pl.m22.gamehive.security;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
@@ -31,7 +34,17 @@ class SecurityIntegrationTest {
     @Autowired JwtService jwtService;
     @Autowired TokenBlacklistService tokenBlacklistService;
     @Autowired UserService userService;
+    @Autowired CacheManager cacheManager;
     @MockitoBean JavaMailSender mailSender;
+
+    @BeforeEach
+    void clearAuthStateCache() {
+        Cache c = cacheManager.getCache("userAuthState");
+
+        if (c != null) {
+            c.clear();
+        }
+    }
 
     @Test
     @DisplayName("GET /api/v1/users/me without token -> 401")

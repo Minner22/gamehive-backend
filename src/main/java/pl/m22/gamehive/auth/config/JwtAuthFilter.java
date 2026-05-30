@@ -9,17 +9,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
-import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
+import pl.m22.gamehive.auth.jwt.service.UserAuthState;
+import pl.m22.gamehive.auth.jwt.service.UserAuthStateProvider;
 import pl.m22.gamehive.common.exception.ApiError;
 import pl.m22.gamehive.common.exception.ErrorCode;
-import pl.m22.gamehive.user.service.AppUserDetailsService;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -31,10 +30,9 @@ import java.time.Instant;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final AppUserDetailsService appUserDetailsService;
     private final TokenBlacklistService tokenBlacklistService;
-    private final RedisSessionEpochStore sessionEpochStore;
     private final ObjectMapper objectMapper;
+    private final UserAuthStateProvider userAuthStateProvider;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -60,9 +58,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             final String email = jwtService.extractEmailFromToken(jwt);
 
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = appUserDetailsService.loadUserByUsername(email);
+                UserAuthState authState = userAuthStateProvider.getAuthState(email);
 
-                if (!userDetails.isEnabled()) {
+                if (!authState.enabled()) {
                     log.debug("User [{}] is disabled, rejecting access token for request [{}]", email, request.getRequestURI());
 
                     writeUnauthorized(response, ErrorCode.ACCOUNT_DISABLED);
@@ -71,7 +69,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 }
 
                 Instant issuedAt = jwtService.extractIssuedAtFromToken(jwt);
-                Long invalidAfter = sessionEpochStore.getInvalidAfter(email);
+                Long invalidAfter = authState.invalidAfter();
 
                 if (invalidAfter != null && issuedAt != null && issuedAt.toEpochMilli() < invalidAfter) {
                     log.debug("User [{}] token has been revoked, rejecting access for request [{}]", email, request.getRequestURI());
@@ -82,9 +80,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 }
 
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
+                        email,
                         null,
-                        userDetails.getAuthorities());
+                        authState.authorities());
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }

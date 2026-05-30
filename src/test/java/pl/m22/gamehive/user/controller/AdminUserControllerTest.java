@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -33,6 +35,7 @@ class AdminUserControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired JwtService jwtService;
     @Autowired RedisTemplate<String, String> redisTemplate;
+    @Autowired CacheManager cacheManager;
     @MockitoBean JavaMailSender mailSender;
 
     private String adminToken;
@@ -43,6 +46,12 @@ class AdminUserControllerTest {
         adminToken = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN", "ROLE_USER"));
         userToken = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
+
+        Cache c = cacheManager.getCache("userAuthState");
+
+        if (c != null) {
+            c.clear();
+        }
     }
 
     // --- getAllUsers ---
