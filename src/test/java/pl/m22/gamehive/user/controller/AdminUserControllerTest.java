@@ -47,11 +47,7 @@ class AdminUserControllerTest {
         userToken = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
 
-        Cache c = cacheManager.getCache("userAuthState");
-
-        if (c != null) {
-            c.clear();
-        }
+        clearCache();
     }
 
     // --- getAllUsers ---
@@ -342,5 +338,13 @@ class AdminUserControllerTest {
         mockMvc.perform(delete("/api/v1/admin/users/1")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isForbidden());
+    }
+
+    private void clearCache() {
+        Cache c = cacheManager.getCache("userAuthState");
+
+        if (c != null) {
+            c.clear();
+        }
     }
 }

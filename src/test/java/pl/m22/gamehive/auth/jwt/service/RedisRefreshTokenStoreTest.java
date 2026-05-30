@@ -27,7 +27,10 @@ class RedisRefreshTokenStoreTest {
     @BeforeEach
     void cleanRedis() {
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
+    }
 
+    @BeforeEach
+    void clearCache() {
         Cache c = cacheManager.getCache("userAuthState");
 
         if (c != null) {

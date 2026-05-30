@@ -45,12 +45,7 @@ class AccessTokenInvalidationTest {
     void setUp() {
         adminToken = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN", "ROLE_USER"));
         flushRedis();
-
-        Cache c = cacheManager.getCache("userAuthState");
-
-        if (c != null) {
-            c.clear();
-        }
+        clearCache();
     }
 
     @AfterEach
@@ -108,5 +103,13 @@ class AccessTokenInvalidationTest {
 
     private void flushRedis() {
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
+    }
+
+    private void clearCache() {
+        Cache c = cacheManager.getCache("userAuthState");
+
+        if (c != null) {
+            c.clear();
+        }
     }
 }
