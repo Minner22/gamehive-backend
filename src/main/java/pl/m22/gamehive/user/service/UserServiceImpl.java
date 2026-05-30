@@ -1,16 +1,18 @@
 package pl.m22.gamehive.user.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
-import pl.m22.gamehive.auth.jwt.service.RedisRefreshTokenStore;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
+import pl.m22.gamehive.user.event.UserDeactivatedEvent;
+import pl.m22.gamehive.user.event.UserDeletedEvent;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.UserProfile;
@@ -32,8 +34,9 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final UserRoleRepository userRoleRepository;
-    private final RedisRefreshTokenStore redisRefreshTokenStore;
+    private final ApplicationEventPublisher eventPublisher;
 
+    @Deprecated
     @Override
     public Optional<CredentialsDto> findCredentialsByEmail(String email) {
 
@@ -41,6 +44,7 @@ public class UserServiceImpl implements UserService {
                 .map(userMapper::toCredentialsDto);
     }
 
+    @Deprecated
     @Override
     public List<String> findAllUserEmails() {
 
@@ -49,17 +53,22 @@ public class UserServiceImpl implements UserService {
                 .toList();
     }
 
+    @Deprecated
     @Transactional
     @Override
     public void deleteUserByEmail(String email) {
+
         userRepository.deleteByEmail(email);
+        eventPublisher.publishEvent(new UserDeletedEvent(email));
     }
 
+    @Deprecated
     @Override
     public boolean emailExists(String email) {
         return userRepository.findByEmail(email).isPresent();
     }
 
+    @Deprecated
     @Override
     public boolean usernameExists(String username) {
         return userRepository.findByUsername(username).isPresent();
@@ -142,7 +151,7 @@ public class UserServiceImpl implements UserService {
         user.deactivate();
 
         userRepository.save(user);
-        redisRefreshTokenStore.revokeAllByUserEmail(user.getEmail());
+        eventPublisher.publishEvent(new UserDeactivatedEvent(user.getEmail()));
 
         return user;
     }
@@ -171,7 +180,7 @@ public class UserServiceImpl implements UserService {
         String email = user.getEmail();
 
         userRepository.delete(user);
-        redisRefreshTokenStore.revokeAllByUserEmail(email);
+        eventPublisher.publishEvent(new UserDeletedEvent(email));
     }
 
     private void guardOwnAccount(Long targetUserId, String requesterEmail) {
