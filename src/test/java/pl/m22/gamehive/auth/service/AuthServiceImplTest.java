@@ -19,9 +19,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
+// NOTE: this class must NOT be @Transactional — verify(mailSender) relies on register()/requestPasswordReset()
+// actually committing so the @TransactionalEventListener(AFTER_COMMIT) fires. A test-level @Transactional would
+// roll back, the listener would never run, and the mail verifications would fail misleadingly.
 @SpringBootTest
 @ActiveProfiles("test")
 class AuthServiceImplTest {
@@ -60,6 +62,36 @@ class AuthServiceImplTest {
         assertDoesNotThrow(() -> authService.register(dto));
 
         assertTrue(userRepository.existsByEmail(NEW_USER_EMAIL));
+        // proves the AFTER_COMMIT listener fired and the SMTP failure was swallowed (not skipped)
+        verify(mailSender).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    @DisplayName("requestPasswordReset() istniejący email -> mail wysłany")
+    void requestPasswordReset_existingEmail_sendsMail() {
+
+        authService.requestPasswordReset("john.doe@example.com");
+
+        verify(mailSender).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    @DisplayName("requestPasswordReset() nieistniejący email -> mail NIE wysłany (anty-enumeracja)")
+    void requestPasswordReset_nonExistingEmail_doesNotSendMail() {
+
+        authService.requestPasswordReset("nobody@test.com");
+
+        verify(mailSender, never()).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    @DisplayName("requestPasswordReset() błąd SMTP -> brak wyjątku do usera (istniejący email)")
+    void requestPasswordReset_mail_fails_no_error_to_user() {
+
+        doThrow(new MailSendException("SMTP error")).when(mailSender).send(any(SimpleMailMessage.class));
+
+        assertDoesNotThrow(() -> authService.requestPasswordReset("john.doe@example.com"));
+        verify(mailSender).send(any(SimpleMailMessage.class));
     }
 
     @Test

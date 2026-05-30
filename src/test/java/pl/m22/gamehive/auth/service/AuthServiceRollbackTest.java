@@ -4,7 +4,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
@@ -15,10 +14,10 @@ import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.user.repository.UserRepository;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -52,14 +51,5 @@ class AuthServiceRollbackTest {
 
         verify(mailSender, never()).send(any(SimpleMailMessage.class));
         assertFalse(userRepository.existsByEmail("rollback@test.com"));
-    }
-
-    @Test
-    @DisplayName("requestPasswordReset() błąd SMTP -> brak wyjątku do usera (istniejący email)")
-    void requestPasswordReset_mail_fails_no_error_to_user() {
-
-        doThrow(new MailSendException("SMTP error")).when(mailSender).send(any(SimpleMailMessage.class));
-
-        assertDoesNotThrow(() -> authService.requestPasswordReset("jon.doe@example.com"));
     }
 }

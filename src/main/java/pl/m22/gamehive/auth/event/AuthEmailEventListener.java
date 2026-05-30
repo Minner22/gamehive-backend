@@ -10,6 +10,8 @@ import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.common.email.service.MailService;
 import pl.m22.gamehive.common.logging.LoggingUtils;
 
+import java.util.function.BiConsumer;
+
 @Slf4j
 @RequiredArgsConstructor
 @Component
@@ -21,24 +23,22 @@ public class AuthEmailEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserRegistered(UserRegisteredEvent event) {
 
-        String token = jwtService.generateToken(event.email(), JwtTokenType.ACTIVATION, null);
-
-        try {
-            mailService.sendActivationEmail(event.email(), token);
-        } catch (Exception e) {
-            log.error("Failed to send activation email to {}: {}", LoggingUtils.obfuscateEmail(event.email()), e.getMessage());
-        }
+        dispatch(event.email(), JwtTokenType.ACTIVATION, mailService::sendActivationEmail, "activation");
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPasswordResetRequested(PasswordResetRequestedEvent event) {
 
-        String token = jwtService.generateToken(event.email(), JwtTokenType.PASSWORD_RESET, null);
+        dispatch(event.email(), JwtTokenType.PASSWORD_RESET, mailService::sendPasswordResetEmail, "password reset");
+    }
+
+    private void dispatch(String email, JwtTokenType tokenType, BiConsumer<String, String> sender, String emailKind) {
 
         try {
-            mailService.sendPasswordResetEmail(event.email(), token);
+            String token = jwtService.generateToken(email, tokenType, null);
+            sender.accept(email, token);
         } catch (Exception e) {
-            log.error("Failed to send password reset email to {}: {}", LoggingUtils.obfuscateEmail(event.email()), e.getMessage());
+            log.error("Failed to send {} email to {}: {}", emailKind, LoggingUtils.obfuscateEmail(email), e.getMessage());
         }
     }
 }
