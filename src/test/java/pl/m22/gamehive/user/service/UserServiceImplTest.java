@@ -9,16 +9,18 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.annotation.Transactional;
-import pl.m22.gamehive.auth.jwt.service.RedisRefreshTokenStore;
 import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
+import pl.m22.gamehive.user.event.UserDeactivatedEvent;
+import pl.m22.gamehive.user.event.UserDeletedEvent;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.UserProfile;
 import pl.m22.gamehive.user.model.UserRole;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
@@ -30,11 +32,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@RecordApplicationEvents
 class UserServiceImplTest {
 
     @Autowired UserService userService;
-    @Autowired RedisRefreshTokenStore redisRefreshTokenStore;
     @Autowired RedisTemplate<String, String> redisTemplate;
+    @Autowired ApplicationEvents applicationEvents;
 
     @BeforeEach
     void cleanRedis() {
@@ -347,16 +350,15 @@ class UserServiceImplTest {
 
     @Test
     @Transactional
-    @DisplayName("deactivateUser() -> usuwa refresh tokeny usera z Redisa")
-    void deactivateUser_revokes_refresh_tokens() {
-
-        String jti = "test-jti-deactivate";
-        redisRefreshTokenStore.saveRefreshToken(jti, "jane.smith@example.com", Instant.now().plusSeconds(3600));
-        assertTrue(redisRefreshTokenStore.existsByJti(jti));
+    @DisplayName("deactivateUser() -> publikuje UserDeactivatedEvent (rewokacja Redis dzieje się AFTER_COMMIT)")
+    void deactivateUser_publishes_event() {
 
         userService.deactivateUser(2L, "john.doe@example.com");
 
-        assertFalse(redisRefreshTokenStore.existsByJti(jti));
+        long count = applicationEvents.stream(UserDeactivatedEvent.class)
+                .filter(e -> e.email().equals("jane.smith@example.com"))
+                .count();
+        assertEquals(1, count);
     }
 
     @Test
@@ -444,16 +446,15 @@ class UserServiceImplTest {
 
     @Test
     @Transactional
-    @DisplayName("deleteUser() -> usuwa refresh tokeny usera z Redisa")
-    void deleteUser_revokes_refresh_tokens() {
-
-        String jti = "test-jti-delete";
-        redisRefreshTokenStore.saveRefreshToken(jti, "jane.smith@example.com", Instant.now().plusSeconds(3600));
-        assertTrue(redisRefreshTokenStore.existsByJti(jti));
+    @DisplayName("deleteUser() -> publikuje UserDeletedEvent (rewokacja Redis dzieje się AFTER_COMMIT)")
+    void deleteUser_publishes_event() {
 
         userService.deleteUser(2L, "john.doe@example.com");
 
-        assertFalse(redisRefreshTokenStore.existsByJti(jti));
+        long count = applicationEvents.stream(UserDeletedEvent.class)
+                .filter(e -> e.email().equals("jane.smith@example.com"))
+                .count();
+        assertEquals(1, count);
     }
 
     @Test

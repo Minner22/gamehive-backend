@@ -144,6 +144,22 @@ public class JwtServiceImpl implements JwtService {
         redisRefreshTokenStore.revokeAllByUserEmail(email);
     }
 
+    @Override
+    public Instant extractIssuedAtFromToken(String token) {
+        try {
+            SignedJWT signedJWT = SignedJWT.parse(token);
+            Date issuedAt = signedJWT.getJWTClaimsSet().getIssueTime();
+
+            return issuedAt == null ? null : issuedAt.toInstant();
+
+        } catch (ParseException e) {
+            throw new ApplicationException(
+                    ErrorCode.JWT_PARSE_ERROR,
+                    "Failed to parse JWT: " + e.getMessage()
+            );
+        }
+    }
+
     private SignedJWT generateSignedJwt(JWTClaimsSet claimSet, JwtTokenType tokenType) {
         JWSHeader header = new JWSHeader.Builder(jwsAlgorithm)
                 .type(JOSEObjectType.JWT)
