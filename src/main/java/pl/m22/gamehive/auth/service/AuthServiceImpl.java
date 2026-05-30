@@ -1,15 +1,15 @@
 package pl.m22.gamehive.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
-import pl.m22.gamehive.auth.jwt.JwtTokenType;
-import pl.m22.gamehive.auth.jwt.service.JwtService;
-import pl.m22.gamehive.common.email.service.MailService;
+import pl.m22.gamehive.auth.event.PasswordResetRequestedEvent;
+import pl.m22.gamehive.auth.event.UserRegisteredEvent;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
@@ -30,52 +30,16 @@ public class AuthServiceImpl implements AuthService{
     private final PasswordEncoder passwordEncoder;
     private final UserRoleRepository userRoleRepository;
     private final UserMapper userMapper;
-    private final JwtService jwtService;
-    private final MailService mailService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     @Override
     public void register(RegistrationDto registrationDto) {
 
         AppUser appUser = registerUser(registrationDto);
-        String activationToken = generateActivationToken(appUser);
-        mailService.sendActivationEmail(appUser.getEmail(), activationToken);
+
+        eventPublisher.publishEvent(new UserRegisteredEvent(appUser.getEmail()));
     }
-
-    @Override
-    public AppUser registerUser(RegistrationDto registrationDto) {
-
-        if (userRepository.existsByEmail(registrationDto.email())) {
-            throw new DomainException(ErrorCode.EMAIL_ALREADY_EXISTS,
-                    "Email already exists: " + registrationDto.email());
-        }
-
-        if (userRepository.existsByUsername(registrationDto.username())) {
-            throw new DomainException(ErrorCode.USERNAME_ALREADY_EXISTS,
-                    "Username already exists: " + registrationDto.username());
-        }
-
-        AppUser appUser = AppUser.register(
-                registrationDto.username(),
-                registrationDto.email(),
-                passwordEncoder.encode(registrationDto.password())
-        );
-
-        UserRole role = userRoleRepository.findByName(USER_ROLE)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.ROLE_NOT_FOUND,
-                        "Role not found: " + USER_ROLE));
-
-        appUser.assignRole(role);
-
-        return userRepository.save(appUser);
-    }
-
-    @Override
-    public String generateActivationToken(AppUser appUser) {
-
-        return jwtService.generateToken(appUser.getEmail(), JwtTokenType.ACTIVATION, null);
-    }
-
 
     @Override
     public CredentialsDto login(LoginDto loginDto) {
@@ -107,14 +71,14 @@ public class AuthServiceImpl implements AuthService{
         userRepository.save(appUser);
     }
 
+    @Transactional(readOnly = true)
     @Override
     public void requestPasswordReset(String email) {
 
         Optional<AppUser> appUser = userRepository.findByEmail(email);
 
         if (appUser.isPresent()) {
-            String token = jwtService.generateToken(email, JwtTokenType.PASSWORD_RESET, null);
-            mailService.sendPasswordResetEmail(email, token);
+            eventPublisher.publishEvent(new PasswordResetRequestedEvent(email));
         }
     }
 
@@ -127,5 +91,32 @@ public class AuthServiceImpl implements AuthService{
         appUser.changePassword(passwordEncoder.encode(newPassword));
 
         userRepository.save(appUser);
+    }
+
+    private AppUser registerUser(RegistrationDto registrationDto) {
+
+        if (userRepository.existsByEmail(registrationDto.email())) {
+            throw new DomainException(ErrorCode.EMAIL_ALREADY_EXISTS,
+                    "Email already exists: " + registrationDto.email());
+        }
+
+        if (userRepository.existsByUsername(registrationDto.username())) {
+            throw new DomainException(ErrorCode.USERNAME_ALREADY_EXISTS,
+                    "Username already exists: " + registrationDto.username());
+        }
+
+        AppUser appUser = AppUser.register(
+                registrationDto.username(),
+                registrationDto.email(),
+                passwordEncoder.encode(registrationDto.password())
+        );
+
+        UserRole role = userRoleRepository.findByName(USER_ROLE)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.ROLE_NOT_FOUND,
+                        "Role not found: " + USER_ROLE));
+
+        appUser.assignRole(role);
+
+        return userRepository.save(appUser);
     }
 }

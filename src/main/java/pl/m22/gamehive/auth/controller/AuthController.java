@@ -38,7 +38,7 @@ public class AuthController {
     public ResponseEntity<String> register(@Valid @RequestBody RegistrationDto registrationDto) {
 
         authService.register(registrationDto);
-        log.info("User registered and activation email sent to: {}", LoggingUtils.obfuscateEmail(registrationDto.email()));
+        log.info("User registered; activation email dispatch scheduled");
 
         return ResponseEntity.ok("User registration successful. Please check your email to confirm your account.");
     }
