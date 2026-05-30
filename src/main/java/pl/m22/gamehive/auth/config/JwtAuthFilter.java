@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -14,10 +15,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
+import pl.m22.gamehive.common.exception.ApiError;
+import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.service.AppUserDetailsService;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.time.Instant;
 
 @Slf4j
 @Component
@@ -27,6 +33,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final AppUserDetailsService appUserDetailsService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final RedisSessionEpochStore sessionEpochStore;
+    private final ObjectMapper objectMapper;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -53,11 +61,26 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = appUserDetailsService.loadUserByUsername(email);
+
                 if (!userDetails.isEnabled()) {
                     log.debug("User [{}] is disabled, rejecting access token for request [{}]", email, request.getRequestURI());
-                    filterChain.doFilter(request, response);
+
+                    writeUnauthorized(response, ErrorCode.ACCOUNT_DISABLED);
+
                     return;
                 }
+
+                Instant issuedAt = jwtService.extractIssuedAtFromToken(jwt);
+                Long invalidAfter = sessionEpochStore.getInvalidAfter(email);
+
+                if (invalidAfter != null && issuedAt != null && issuedAt.toEpochMilli() < invalidAfter) {
+                    log.debug("User [{}] token has been revoked, rejecting access for request [{}]", email, request.getRequestURI());
+
+                    writeUnauthorized(response, ErrorCode.TOKEN_REVOKED);
+
+                    return;
+                }
+
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,
@@ -78,5 +101,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         return path.startsWith("/api/v1/auth/refresh") ||
                 path.startsWith("/api/v1/auth/login") ||
                 path.startsWith("/api/v1/auth/register");
+    }
+
+    private void writeUnauthorized(HttpServletResponse response, ErrorCode errorCode) {
+        try {
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            response.setContentType("application/json");
+            response.getWriter()
+                    .write(objectMapper.writeValueAsString(new ApiError(errorCode.name(), errorCode.getDefaultMessage())));
+        }  catch (IOException e) {
+            log.warn("Failed to write unauthorized response: {}", e.getMessage());
+        }
     }
 }

@@ -19,6 +19,7 @@ import pl.m22.gamehive.user.service.UserService;
 import java.util.Set;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -87,6 +88,7 @@ class SecurityIntegrationTest {
         userService.deactivateUser(2L, "john.doe@example.com");
 
         mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-            .andExpect(status().isUnauthorized());
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.errorCode").value("ACCOUNT_DISABLED"));
     }
 }

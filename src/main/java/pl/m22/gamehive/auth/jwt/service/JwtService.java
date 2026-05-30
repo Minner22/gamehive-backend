@@ -4,6 +4,7 @@ import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.TokenPairDto;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 
+import java.time.Instant;
 import java.util.Set;
 
 public interface JwtService {
@@ -14,4 +15,6 @@ public interface JwtService {
     String extractJtiFromToken(String token);
 
     void revokeUsersTokens(String email);
+
+    Instant extractIssuedAtFromToken(String token);
 }

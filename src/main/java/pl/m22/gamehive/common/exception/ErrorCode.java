@@ -18,6 +18,7 @@ public enum ErrorCode {
     USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "Username already exists"),
 
     // ===== Application — problemy w przepływie use-case (handler loguje WARN) =====
+    ACCOUNT_DISABLED(HttpStatus.UNAUTHORIZED, "Account is disabled"),
     EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "Email not found"),
     JWT_BLACKLISTED(HttpStatus.UNAUTHORIZED, "JWT token already used"),
     JWT_EXPIRED(HttpStatus.UNAUTHORIZED, "JWT token has expired"),
@@ -29,6 +30,7 @@ public enum ErrorCode {
     JWT_INVALID_ROLES(HttpStatus.UNAUTHORIZED, "JWT token does not contain valid roles"),
     JWT_PARSE_ERROR(HttpStatus.BAD_REQUEST, "Failed to parse JWT"),
     ROLE_NOT_FOUND(HttpStatus.NOT_FOUND, "Role not found"),
+    TOKEN_REVOKED(HttpStatus.UNAUTHORIZED, "Token has been revoked"),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
     USER_NOT_ACTIVATED(HttpStatus.FORBIDDEN, "User account is not activated"),
     USERNAME_OR_EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "Username or email not found"),

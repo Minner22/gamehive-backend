@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import pl.m22.gamehive.auth.jwt.service.RedisRefreshTokenStore;
+import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -13,6 +14,7 @@ import pl.m22.gamehive.auth.jwt.service.RedisRefreshTokenStore;
 public class UserSecurityEventListener {
 
     private final RedisRefreshTokenStore refreshTokenStore;
+    private final RedisSessionEpochStore sessionEpochStore;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void onUserDeactivated(UserDeactivatedEvent event) {
@@ -29,5 +31,6 @@ public class UserSecurityEventListener {
     private void revoke(String email) {
 
         refreshTokenStore.revokeAllByUserEmail(email);
+        sessionEpochStore.invalidateNow(email);
     }
 }
