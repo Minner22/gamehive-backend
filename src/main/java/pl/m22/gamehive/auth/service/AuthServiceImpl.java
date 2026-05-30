@@ -1,12 +1,14 @@
 package pl.m22.gamehive.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
+import pl.m22.gamehive.auth.event.UserRegisteredEvent;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.common.email.service.MailService;
@@ -32,14 +34,15 @@ public class AuthServiceImpl implements AuthService{
     private final UserMapper userMapper;
     private final JwtService jwtService;
     private final MailService mailService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     @Override
     public void register(RegistrationDto registrationDto) {
 
         AppUser appUser = registerUser(registrationDto);
-        String activationToken = generateActivationToken(appUser);
-        mailService.sendActivationEmail(appUser.getEmail(), activationToken);
+
+        eventPublisher.publishEvent(new UserRegisteredEvent(appUser.getEmail()));
     }
 
     @Override
