@@ -2,7 +2,10 @@ package pl.m22.gamehive.user.model;
 
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.common.domain.HashedPassword;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.DomainException;
 
@@ -15,6 +18,10 @@ import static pl.m22.gamehive.common.exception.ErrorCode.ROLE_ALREADY_ASSIGNED;
 import static pl.m22.gamehive.common.exception.ErrorCode.USER_ALREADY_ACTIVATED;
 
 public class AppUserTest {
+
+    private static final PasswordEncoder ENCODER =
+            PasswordEncoderFactories.createDelegatingPasswordEncoder();
+
 
     @Test
     void register_starts_disabled_with_empty_profile() {
@@ -49,10 +56,13 @@ public class AppUserTest {
     void changePassword_sets_new_hash() {
 
         AppUser appUser = sampleAppUser();
-        appUser.changePassword("newhash");
+        HashedPassword newPw = HashedPassword.fromRaw("newhash123", ENCODER);
+        appUser.changePassword(newPw);
 
-        assertThat(appUser.getPassword()).isEqualTo("newhash");
+        assertThat(appUser.getPassword()).isEqualTo(newPw);
+        assertThat(appUser.getPassword().matches("newhash123", ENCODER)).isTrue();
     }
+
 
     @Test
     void assignRole_adds_unique_role() {
@@ -104,6 +114,10 @@ public class AppUserTest {
     }
 
     private static @NonNull AppUser sampleAppUser() {
-        return AppUser.register(new Username("testuser"), new Email("test@example.org"), "HashedPassword123");
+        return AppUser.register(
+                new Username("testuser"),
+                new Email("test@example.org"),
+                HashedPassword.fromRaw("Password123", ENCODER));
     }
+
 }

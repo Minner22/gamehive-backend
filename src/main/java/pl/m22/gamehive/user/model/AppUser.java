@@ -2,11 +2,10 @@ package pl.m22.gamehive.user.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.*;
 import pl.m22.gamehive.common.AbstractEntity;
 import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.common.domain.HashedPassword;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
@@ -27,11 +26,10 @@ public class AppUser extends AbstractEntity {
     @AttributeOverride(name = "value", column = @Column(name = "username", nullable = false, unique = true))
     private Username username;
 
-    @Column(nullable = false)
-    @NotBlank
-    @Size(min = 8)
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "password", nullable = false))
     @JsonIgnore
-    private String password;
+    private HashedPassword password;
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "email", nullable = false, unique = true))
@@ -52,7 +50,7 @@ public class AppUser extends AbstractEntity {
     @Column(nullable = false)
     private boolean enabled = false;
 
-    public static AppUser register(Username username, Email email, String hashedPassword) {
+    public static AppUser register(Username username, Email email, HashedPassword hashedPassword) {
 
         AppUser appUser = new AppUser();
         appUser.username = username;
@@ -78,7 +76,7 @@ public class AppUser extends AbstractEntity {
         this.enabled = false;
     }
 
-    public void changePassword(String hashedPassword) {
+    public void changePassword(HashedPassword hashedPassword) {
 
         this.password =  hashedPassword;
     }

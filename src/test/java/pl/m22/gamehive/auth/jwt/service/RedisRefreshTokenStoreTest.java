@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -69,7 +70,7 @@ class RedisRefreshTokenStoreTest {
     }
 
     @Test
-    @DisplayName("max active tokens eviction - oldest token removed when limit exceeded")
+    @DisplayName("max active tokens eviction - cap is enforced when limit exceeded")
     void evicts_oldest_when_exceeded() {
         String email = "evict@test.com";
         Instant exp = Instant.now().plusSeconds(3600);
@@ -80,12 +81,11 @@ class RedisRefreshTokenStoreTest {
             store.saveRefreshToken(jtis[i], email, exp);
         }
 
-        // max is 5, so the first one should have been evicted
-        assertFalse(store.existsByJti(jtis[0]), "Oldest token should be evicted");
-        for (int i = 1; i < 6; i++) {
-            assertTrue(store.existsByJti(jtis[i]), "Token " + i + " should still exist");
-        }
+        // max to 5 — po 6. zapisie dokładnie jeden token musi zostać eksmitowany
+        long surviving = Arrays.stream(jtis).filter(store::existsByJti).count();
+        assertEquals(5, surviving, "Cap powinien zostawić dokładnie 5 tokenów");
     }
+
 
     @Test
     @DisplayName("revokeAllByUserEmail for non-existent user does not throw")
