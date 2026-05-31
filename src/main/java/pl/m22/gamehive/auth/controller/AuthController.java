@@ -12,6 +12,7 @@ import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
 import pl.m22.gamehive.auth.service.AuthService;
+import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.logging.LoggingUtils;
@@ -27,6 +28,8 @@ import java.util.Objects;
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
+
+    private static final String BEARER_PREFIX = "Bearer ";
 
     private final AuthService authService;
     private final JwtService jwtService;
@@ -52,12 +55,12 @@ public class AuthController {
             throw new ApplicationException(ErrorCode.JWT_BLACKLISTED, "Activation token has already been used or is invalid.");
         }
 
-        String email = jwtService.extractEmailFromToken(token);
+        Email email = new Email(jwtService.extractEmailFromToken(token));
         authService.activateUser(email);
 
         tokenBlacklistService.blacklistToken(token);
 
-        log.info("User account activated: {}", LoggingUtils.obfuscateEmail(email));
+        log.info("User account activated: {}", email.obfuscated());
 
         return ResponseEntity.ok("Account has been successfully activated.");
     }
@@ -66,7 +69,7 @@ public class AuthController {
     public ResponseEntity<Map<String, String>> login(@Valid @RequestBody LoginDto loginDto) {
 
         CredentialsDto userCredentials = authService.login(loginDto);
-        log.info("User logged in: {}", LoggingUtils.obfuscateEmail(userCredentials.email()));
+        log.info("User logged in: {}", new Email(userCredentials.email()).obfuscated());
 
         return generateTokens(userCredentials);
     }
@@ -76,11 +79,11 @@ public class AuthController {
 
         jwtService.validateToken(refreshToken, JwtTokenType.REFRESH);
 
-        String email = jwtService.extractEmailFromToken(refreshToken);
+        Email email = new Email(jwtService.extractEmailFromToken(refreshToken));
         CredentialsDto userCredentials = userMapper.toCredentialsDto(
                 userService.findUserByEmail(email));
 
-        log.info("User refreshed access token: {}", LoggingUtils.obfuscateEmail(userCredentials.email()));
+        log.info("User refreshed access token: {}", email.obfuscated());
 
         return generateTokens(userCredentials);
     }
@@ -88,7 +91,7 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@RequestHeader("Authorization") String accessTokenHeader) {
 
-        String accessToken = Objects.nonNull(accessTokenHeader) && accessTokenHeader.startsWith("Bearer ") ? accessTokenHeader.substring(7) : accessTokenHeader;
+        String accessToken = Objects.nonNull(accessTokenHeader) && accessTokenHeader.startsWith(BEARER_PREFIX) ? accessTokenHeader.substring(BEARER_PREFIX.length()) : accessTokenHeader;
 
         jwtService.validateToken(accessToken, JwtTokenType.ACCESS);
         tokenBlacklistService.blacklistToken(accessToken);
@@ -113,8 +116,10 @@ public class AuthController {
     @PostMapping("/password-reset/request")
     public ResponseEntity<Void> requestPasswordReset(@Valid @RequestBody PasswordResetRequestDto requestDto) {
 
-        authService.requestPasswordReset(requestDto.email());
-        log.info("Password reset requested for email: {}", LoggingUtils.obfuscateEmail(requestDto.email()));
+        Email email = new Email(requestDto.email());
+
+        authService.requestPasswordReset(email);
+        log.info("Password reset requested for email: {}", email.obfuscated());
 
         return ResponseEntity.ok().build();
     }
@@ -129,12 +134,12 @@ public class AuthController {
             throw new ApplicationException(ErrorCode.JWT_BLACKLISTED, "Activation token has already been used or is invalid.");
         }
 
-        String email = jwtService.extractEmailFromToken(token);
+        Email email = new Email(jwtService.extractEmailFromToken(token));
 
         authService.confirmPasswordReset(email, confirmDto.newPassword());
 
         tokenBlacklistService.blacklistToken(token);
-        log.info("Password reset confirmed for email: {}", LoggingUtils.obfuscateEmail(email));
+        log.info("Password reset confirmed for email: {}", email.obfuscated());
 
         return ResponseEntity.ok().build();
     }

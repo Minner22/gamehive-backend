@@ -3,6 +3,7 @@ package pl.m22.gamehive.auth.service;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
+import pl.m22.gamehive.common.domain.Email;
 
 public interface AuthService {
 
@@ -10,9 +11,9 @@ public interface AuthService {
 
     CredentialsDto login(LoginDto loginDto);
 
-    void activateUser(String email);
+    void activateUser(Email email);
 
-    void requestPasswordReset(String email);
+    void requestPasswordReset(Email email);
 
-    void confirmPasswordReset(String token, String newPassword);
+    void confirmPasswordReset(Email email, String newPassword);
 }

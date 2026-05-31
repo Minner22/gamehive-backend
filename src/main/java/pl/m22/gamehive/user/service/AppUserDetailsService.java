@@ -1,12 +1,14 @@
 package pl.m22.gamehive.user.service;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.logging.LoggingUtils;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.repository.UserRepository;
 import pl.m22.gamehive.user.util.AppUserDetails;
@@ -18,11 +20,11 @@ public class AppUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
 
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(@NonNull String email) throws UsernameNotFoundException {
 
-        AppUser appUser = userRepository.findByEmail(username)
-                .orElseGet(() -> userRepository.findByUsername(username)
-                        .orElseThrow(() -> new ApplicationException(ErrorCode.USERNAME_OR_EMAIL_NOT_FOUND, "Username or email not found: " + username)));
+        AppUser appUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + LoggingUtils.obfuscateEmail(email)));
+
         return new AppUserDetails(appUser);
     }
 }

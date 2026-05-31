@@ -24,7 +24,7 @@ class UserRepositoryTest {
     void findByEmail_ok() {
         Optional<AppUser> u = userRepository.findByEmail("john.doe@example.com");
         assertThat(u).isPresent();
-        assertThat(u.get().getUsername()).isEqualTo("john_doe");
+        assertThat(u.get().getUsername().value()).isEqualTo("john_doe");
     }
 
     @Test
@@ -38,7 +38,7 @@ class UserRepositoryTest {
     @DisplayName("findAllUsersByRoles_Name('ROLE_ADMIN') -> zwraca adminów")
     void findAllByRole() {
         List<AppUser> admins = userRepository.findAllUsersByRoles_Name("ROLE_ADMIN");
-        assertThat(admins).extracting(AppUser::getEmail).contains("john.doe@example.com");
-        assertThat(admins).extracting(AppUser::getEmail).doesNotContain("jane.smith@example.com");
+        assertThat(admins).extracting(x -> x.getEmail().value()).contains("john.doe@example.com");
+        assertThat(admins).extracting(x -> x.getEmail().value()).doesNotContain("jane.smith@example.com");
     }
 }

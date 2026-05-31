@@ -10,6 +10,8 @@ import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.auth.event.PasswordResetRequestedEvent;
 import pl.m22.gamehive.auth.event.UserRegisteredEvent;
+import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
@@ -39,18 +41,19 @@ public class AuthServiceImpl implements AuthService{
 
         AppUser appUser = registerUser(registrationDto);
 
-        eventPublisher.publishEvent(new UserRegisteredEvent(appUser.getEmail()));
+        eventPublisher.publishEvent(new UserRegisteredEvent(appUser.getEmail().value()));
     }
 
     @Override
     public CredentialsDto login(LoginDto loginDto) {
 
-        String identifier = loginDto.usernameOrEmail();
-        AppUser appUser = userRepository.findByEmailOrUsername(identifier, identifier)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.USERNAME_OR_EMAIL_NOT_FOUND, "Username or email not found: " + identifier));
+        Email email = new Email(loginDto.email());
+
+        AppUser appUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email.obfuscated()));
 
         if (!appUser.isEnabled()) {
-            throw new ApplicationException(ErrorCode.USER_NOT_ACTIVATED, "User not activated: " + appUser.getEmail());
+            throw new ApplicationException(ErrorCode.USER_NOT_ACTIVATED, "User not activated: " + appUser.getEmail().obfuscated());
         }
 
         if (!passwordEncoder.matches(loginDto.password(), appUser.getPassword())) {
@@ -62,10 +65,10 @@ public class AuthServiceImpl implements AuthService{
 
     @Transactional
     @Override
-    public void activateUser(String email) {
+    public void activateUser(Email email) {
 
         AppUser appUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email));
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email.obfuscated()));
 
         appUser.activate();
 
@@ -74,21 +77,21 @@ public class AuthServiceImpl implements AuthService{
 
     @Transactional(readOnly = true)
     @Override
-    public void requestPasswordReset(String email) {
+    public void requestPasswordReset(Email email) {
 
         Optional<AppUser> appUser = userRepository.findByEmail(email);
 
         if (appUser.isPresent()) {
-            eventPublisher.publishEvent(new PasswordResetRequestedEvent(email));
+            eventPublisher.publishEvent(new PasswordResetRequestedEvent(email.value()));
         }
     }
 
     @Transactional
     @Override
-    public void confirmPasswordReset(String email, String newPassword) {
+    public void confirmPasswordReset(Email email, String newPassword) {
 
         AppUser appUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email));
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email.obfuscated()));
 
         appUser.changePassword(passwordEncoder.encode(newPassword));
 
@@ -96,24 +99,27 @@ public class AuthServiceImpl implements AuthService{
 
         // @Transactional jest tu wymagane: listener UserCredentialsChangedEvent jest AFTER_COMMIT,
         // bez aktywnej transakcji zdarzenie nie zostałoby dostarczone (sesje nie zostałyby unieważnione).
-        eventPublisher.publishEvent(new UserCredentialsChangedEvent(email));
+        eventPublisher.publishEvent(new UserCredentialsChangedEvent(email.value()));
     }
 
     private AppUser registerUser(RegistrationDto registrationDto) {
 
-        if (userRepository.existsByEmail(registrationDto.email())) {
+        Email email = new Email(registrationDto.email());
+        Username username = new Username(registrationDto.username());
+
+        if (userRepository.existsByEmail(email)) {
             throw new DomainException(ErrorCode.EMAIL_ALREADY_EXISTS,
-                    "Email already exists: " + registrationDto.email());
+                    "Email already exists: " + email.obfuscated());
         }
 
-        if (userRepository.existsByUsername(registrationDto.username())) {
+        if (userRepository.existsByUsername(username)) {
             throw new DomainException(ErrorCode.USERNAME_ALREADY_EXISTS,
-                    "Username already exists: " + registrationDto.username());
+                    "Username already exists: " + username);
         }
 
         AppUser appUser = AppUser.register(
-                registrationDto.username(),
-                registrationDto.email(),
+                username,
+                email,
                 passwordEncoder.encode(registrationDto.password())
         );
 

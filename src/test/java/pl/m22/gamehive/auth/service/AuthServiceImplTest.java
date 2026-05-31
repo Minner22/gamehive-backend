@@ -11,6 +11,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
+import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.repository.UserRepository;
@@ -70,7 +71,7 @@ class AuthServiceImplTest {
     @DisplayName("requestPasswordReset() istniejący email -> mail wysłany")
     void requestPasswordReset_existingEmail_sendsMail() {
 
-        authService.requestPasswordReset("john.doe@example.com");
+        authService.requestPasswordReset(new Email("john.doe@example.com"));
 
         verify(mailSender).send(any(SimpleMailMessage.class));
     }
@@ -79,7 +80,7 @@ class AuthServiceImplTest {
     @DisplayName("requestPasswordReset() nieistniejący email -> mail NIE wysłany (anty-enumeracja)")
     void requestPasswordReset_nonExistingEmail_doesNotSendMail() {
 
-        authService.requestPasswordReset("nobody@test.com");
+        authService.requestPasswordReset(new Email("nobody@test.com"));
 
         verify(mailSender, never()).send(any(SimpleMailMessage.class));
     }
@@ -90,7 +91,7 @@ class AuthServiceImplTest {
 
         doThrow(new MailSendException("SMTP error")).when(mailSender).send(any(SimpleMailMessage.class));
 
-        assertDoesNotThrow(() -> authService.requestPasswordReset("john.doe@example.com"));
+        assertDoesNotThrow(() -> authService.requestPasswordReset(new Email("john.doe@example.com")));
         verify(mailSender).send(any(SimpleMailMessage.class));
     }
 

@@ -8,6 +8,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.user.dto.UpdateUserRolesDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
 import pl.m22.gamehive.user.mapper.UserMapper;
@@ -42,7 +44,9 @@ public class AdminUserController {
     @GetMapping("/by-username/{username}")
     public ResponseEntity<UserResponseDto> getUserByUsername(@PathVariable String username) {
 
-        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.findUserByUsername(username));
+        Username usernameObj = new Username(username);
+
+        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.findUserByUsername(usernameObj));
 
         return ResponseEntity.ok(userResponseDto);
     }
@@ -50,7 +54,9 @@ public class AdminUserController {
     @GetMapping("/by-email/{email}")
     public ResponseEntity<UserResponseDto> getUserByEmail(@PathVariable String email) {
 
-        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.findUserByEmail(email));
+        Email emailObj = new Email(email);
+
+        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.findUserByEmail(emailObj));
 
         return ResponseEntity.ok(userResponseDto);
     }
@@ -58,7 +64,9 @@ public class AdminUserController {
     @PutMapping("/{id}/roles")
     public ResponseEntity<UserResponseDto> updateUserRoles(@PathVariable Long id, @Valid @RequestBody UpdateUserRolesDto dto, Authentication authentication) {
 
-        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.updateUserRoles(id, dto.roles(), authentication.getName()));
+        Email requester = new Email(authentication.getName());
+
+        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.updateUserRoles(id, dto.roles(), requester));
 
         return ResponseEntity.ok(userResponseDto);
     }
@@ -66,7 +74,9 @@ public class AdminUserController {
     @PatchMapping("/{id}/deactivate")
     public ResponseEntity<UserResponseDto> deactivateUser(@PathVariable Long id, Authentication authentication) {
 
-        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.deactivateUser(id, authentication.getName()));
+        Email requester = new Email(authentication.getName());
+
+        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.deactivateUser(id, requester));
 
         return ResponseEntity.ok(userResponseDto);
     }
@@ -82,7 +92,9 @@ public class AdminUserController {
     @DeleteMapping("/{id}")
     public ResponseEntity<UserResponseDto> deleteUser(@PathVariable Long id, Authentication authentication) {
 
-        userService.deleteUser(id, authentication.getName());
+        Email requester = new Email(authentication.getName());
+
+        userService.deleteUser(id, requester);
 
         return ResponseEntity.noContent().build();
     }

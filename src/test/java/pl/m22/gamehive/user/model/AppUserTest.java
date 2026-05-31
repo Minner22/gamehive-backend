@@ -1,6 +1,9 @@
 package pl.m22.gamehive.user.model;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
+import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.DomainException;
 
 import java.util.HashSet;
@@ -16,7 +19,7 @@ public class AppUserTest {
     @Test
     void register_starts_disabled_with_empty_profile() {
 
-        AppUser appUser = AppUser.register("testuser", "test@example.org", "HashedPassword123");
+        AppUser appUser = sampleAppUser();
 
         assertThat(appUser.isEnabled()).isFalse();
     }
@@ -24,7 +27,7 @@ public class AppUserTest {
     @Test
     void activate_enables_disabled_user() {
 
-        AppUser appUser = AppUser.register("testuser", "test@example.org", "HashedPassword123");
+        AppUser appUser = sampleAppUser();
         appUser.activate();
 
         assertThat(appUser.isEnabled()).isTrue();
@@ -33,7 +36,7 @@ public class AppUserTest {
     @Test
     void activate_on_active_user_throws() {
 
-        AppUser appUser = AppUser.register("testuser", "test@example.org", "HashedPassword123");
+        AppUser appUser = sampleAppUser();
         appUser.activate();
 
         assertThatThrownBy(appUser::activate)
@@ -45,7 +48,7 @@ public class AppUserTest {
     @Test
     void changePassword_sets_new_hash() {
 
-        AppUser appUser = AppUser.register("testuser", "test@example.org", "HashedPassword123");
+        AppUser appUser = sampleAppUser();
         appUser.changePassword("newhash");
 
         assertThat(appUser.getPassword()).isEqualTo("newhash");
@@ -54,7 +57,7 @@ public class AppUserTest {
     @Test
     void assignRole_adds_unique_role() {
 
-        AppUser appUser = AppUser.register("testuser", "test@example.org", "HashedPassword123");
+        AppUser appUser = sampleAppUser();
         UserRole userRole = new UserRole("ROLE_USER", "test role");
 
         appUser.assignRole(userRole);
@@ -65,7 +68,7 @@ public class AppUserTest {
     @Test
     void assignRole_duplicate_throws() {
 
-        AppUser appUser = AppUser.register("testuser", "test@example.org", "HashedPassword123");
+        AppUser appUser = sampleAppUser();
         UserRole userRole = new UserRole("ROLE_USER", "test role");
         userRole.setId(1L);
 
@@ -80,7 +83,7 @@ public class AppUserTest {
     @Test
     void replaceRoles_defensive_copy() {
 
-        AppUser appUser = AppUser.register("testuser", "test@example.org", "HashedPassword123");
+        AppUser appUser = sampleAppUser();
         UserRole userRole = new UserRole("ROLE_USER", "test user role");
         userRole.setId(1L);
         UserRole adminRole = new UserRole("ROLE_ADMIN", "test admin role");
@@ -100,4 +103,7 @@ public class AppUserTest {
                 .containsExactlyInAnyOrder(userRole, adminRole);
     }
 
+    private static @NonNull AppUser sampleAppUser() {
+        return AppUser.register(new Username("testuser"), new Email("test@example.org"), "HashedPassword123");
+    }
 }

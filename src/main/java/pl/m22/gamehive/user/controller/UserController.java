@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.user.dto.UserProfileResponseDto;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
@@ -23,7 +24,7 @@ public class UserController {
     @GetMapping("/me")
     public ResponseEntity<UserResponseDto> me(Authentication authentication) {
 
-        String email = authentication.getName();
+        Email email = new Email(authentication.getName());
         UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.findUserByEmail(email));
 
         return ResponseEntity.ok(userResponseDto);
@@ -33,7 +34,7 @@ public class UserController {
     public ResponseEntity<UserProfileResponseDto> profile(Authentication authentication,
                                                            @Valid @RequestBody UserProfileUpdateDto userProfileUpdateDto) {
 
-        String email = authentication.getName();
+        Email email = new Email(authentication.getName());
         UserProfile updatedUserProfile = userService.updateCurrentUserProfile(email, userProfileUpdateDto);
 
         return ResponseEntity.ok(userMapper.toUserProfileResponseDto(updatedUserProfile));

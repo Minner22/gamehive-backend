@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
+import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.user.service.UserService;
 
 import java.util.Set;
@@ -98,7 +99,7 @@ class SecurityIntegrationTest {
     void users_me_disabled_user_401() throws Exception {
         String token = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
 
-        userService.deactivateUser(2L, "john.doe@example.com");
+        userService.deactivateUser(2L, new Email("john.doe@example.com"));
 
         mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
             .andExpect(status().isUnauthorized())

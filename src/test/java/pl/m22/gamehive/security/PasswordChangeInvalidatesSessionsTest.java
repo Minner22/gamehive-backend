@@ -73,7 +73,7 @@ class PasswordChangeInvalidatesSessionsTest {
         MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                  {"usernameOrEmail":"%s","password":"oldPassword1"}
+                                  {"email":"%s","password":"oldPassword1"}
                                   """.formatted(EMAIL)))
                 .andExpect(status().isOk())
                 .andReturn();
