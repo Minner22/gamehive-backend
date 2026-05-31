@@ -45,9 +45,8 @@ public class AuthServiceImpl implements AuthService{
     @Override
     public CredentialsDto login(LoginDto loginDto) {
 
-        String identifier = loginDto.usernameOrEmail();
-        AppUser appUser = userRepository.findByEmailOrUsername(identifier, identifier)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.USERNAME_OR_EMAIL_NOT_FOUND, "Username or email not found: " + identifier));
+        AppUser appUser = userRepository.findByEmail(loginDto.email())
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + loginDto.email()));
 
         if (!appUser.isEnabled()) {
             throw new ApplicationException(ErrorCode.USER_NOT_ACTIVATED, "User not activated: " + appUser.getEmail());

@@ -24,8 +24,6 @@ public interface UserRepository extends JpaRepository<AppUser, Long> {
         return findByUsername(username.value());
     }
 
-    Optional<AppUser> findByEmailOrUsername(String email, String username);
-
     List<AppUser> findAllUsersByRoles_Name(String role);
 
     void deleteByEmail(String email);

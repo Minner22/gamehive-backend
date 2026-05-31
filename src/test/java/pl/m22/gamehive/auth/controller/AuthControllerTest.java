@@ -90,7 +90,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"usernameOrEmail":"john.doe@example.com","password":"password123"}
+                                {"email":"john.doe@example.com","password":"password123"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").exists())
@@ -103,7 +103,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"usernameOrEmail":"john.doe@example.com","password":"wrongpassword"}
+                                {"email":"john.doe@example.com","password":"wrongpassword"}
                                 """))
                 .andExpect(status().isUnauthorized());
     }
@@ -121,7 +121,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"usernameOrEmail":"ctrl_notactivated@test.com","password":"password123"}
+                                {"email":"ctrl_notactivated@test.com","password":"password123"}
                                 """))
                 .andExpect(status().isForbidden());
     }
@@ -157,7 +157,7 @@ class AuthControllerTest {
         MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"usernameOrEmail":"john.doe@example.com","password":"password123"}
+                                {"email":"john.doe@example.com","password":"password123"}
                                 """))
                 .andExpect(status().isOk())
                 .andReturn();
