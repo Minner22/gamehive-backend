@@ -4,6 +4,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.common.domain.PhoneNumber;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.user.dto.UserProfileResponseDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
@@ -36,5 +37,13 @@ public abstract class UserMapper {
 
     public String fromUsername(Username username) {
         return username == null ? null : username.value();
+    }
+
+    public PhoneNumber toPhoneNumber(String value) {
+        return value == null ? null : new PhoneNumber(value);
+    }
+
+    public String fromPhoneNumber(PhoneNumber phoneNumber) {
+        return phoneNumber == null ? null : phoneNumber.value();
     }
 }

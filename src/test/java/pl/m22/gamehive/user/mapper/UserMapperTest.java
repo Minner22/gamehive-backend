@@ -8,6 +8,7 @@ import org.springframework.test.context.ActiveProfiles;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.domain.HashedPassword;
+import pl.m22.gamehive.common.domain.PhoneNumber;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.user.dto.UserProfileResponseDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
@@ -34,7 +35,7 @@ class UserMapperTest {
         UserRole role = new UserRole("ROLE_USER", null);
 
         UserProfile profile = new UserProfile(
-                "Jan", "Kowalski", "Warszawa", "+48123456789",
+                "Jan", "Kowalski", "Warszawa", new PhoneNumber("+48123456789"),
                 LocalDate.of(1990, 1, 15), "https://example.com/avatar.png"
         );
 
@@ -79,7 +80,7 @@ class UserMapperTest {
     void toUserProfileResponseDto_maps_all_fields() {
 
         UserProfile profile = new UserProfile(
-                "Anna", "Nowak", "Krakow", "+48987654321",
+                "Anna", "Nowak", "Krakow", new PhoneNumber("+48987654321"),
                 LocalDate.of(1985, 6, 20), "https://example.com/photo.jpg"
         );
 

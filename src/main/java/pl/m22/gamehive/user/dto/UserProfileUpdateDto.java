@@ -11,7 +11,7 @@ public record UserProfileUpdateDto(
 
         @Size(max = 50, message = "First name must be at most 50 characters long") String firstName,
         @Size(max = 50, message = "Last name must be at most 50 characters long") String lastName,
-        @Pattern(regexp = "^\\+?[0-9. ()-]{7,25}$", message = "Phone number is invalid") String phoneNumber,
+        @Pattern(regexp = "^\\+?[1-9]\\d{1,14}$", message = "Phone number must be in E.164 format") String phoneNumber,
         @Size(max = 255, message = "Address must be at most 255 characters long") String address,
         @Past LocalDate dateOfBirth, // ISO format: YYYY-MM-DD
         @Size(max = 512, message = "Profile picture URL must be at most 512 characters long") String profilePictureUrl
