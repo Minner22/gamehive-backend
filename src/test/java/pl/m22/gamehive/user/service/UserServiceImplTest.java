@@ -234,7 +234,7 @@ class UserServiceImplTest {
         assertEquals("123456789", result.getPhoneNumber().value());
         assertEquals("Nowy adres", result.getAddress());
         assertEquals(LocalDate.of(1990, 5, 15), result.getDateOfBirth());
-        assertEquals("https://example.com/johndoe.jpg", result.getProfilePictureUrl());
+        assertEquals("https://example.com/johndoe.jpg", result.getProfilePictureUrl().value());
     }
 
     @Test

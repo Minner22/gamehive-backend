@@ -4,9 +4,9 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.validator.constraints.URL;
 import pl.m22.gamehive.common.AbstractEntity;
 import pl.m22.gamehive.common.domain.PhoneNumber;
+import pl.m22.gamehive.common.domain.ProfilePictureUrl;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
 
 import java.time.LocalDate;
@@ -26,8 +26,9 @@ public class UserProfile extends AbstractEntity {
     @AttributeOverride(name = "value", column = @Column(name = "phone_number"))
     private PhoneNumber phoneNumber;
     private LocalDate dateOfBirth;
-    @URL
-    private String profilePictureUrl;
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "profile_picture_url"))
+    private ProfilePictureUrl profilePictureUrl;
 
     public void updateFrom(UserProfileUpdateDto dto) {
 
@@ -36,6 +37,6 @@ public class UserProfile extends AbstractEntity {
         if (dto.phoneNumber() != null) this.phoneNumber = new PhoneNumber(dto.phoneNumber());
         if (dto.address() != null) this.address = dto.address();
         if (dto.dateOfBirth() != null) this.dateOfBirth = dto.dateOfBirth();
-        if (dto.profilePictureUrl() != null) this.profilePictureUrl = dto.profilePictureUrl();
+        if (dto.profilePictureUrl() != null) this.profilePictureUrl = new ProfilePictureUrl(dto.profilePictureUrl());
     }
 }

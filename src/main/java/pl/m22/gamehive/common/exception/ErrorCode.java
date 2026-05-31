@@ -16,6 +16,7 @@ public enum ErrorCode {
     INVALID_HASHED_PASSWORD(HttpStatus.BAD_REQUEST, "Invalid password hash"),
     INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "Invalid password"),
     INVALID_PHONE_NUMBER(HttpStatus.BAD_REQUEST, "Invalid phone number"),
+    INVALID_PROFILE_PICTURE_URL(HttpStatus.BAD_REQUEST, "Invalid profile picture URL"),
     INVALID_USERNAME(HttpStatus.BAD_REQUEST, "Invalid username"),
     ROLE_ALREADY_ASSIGNED(HttpStatus.CONFLICT, "Role already assigned to user"),
     USER_ALREADY_ACTIVATED(HttpStatus.CONFLICT, "User is already activated"),

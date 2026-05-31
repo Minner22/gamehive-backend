@@ -5,6 +5,7 @@ import org.mapstruct.Mapping;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.domain.PhoneNumber;
+import pl.m22.gamehive.common.domain.ProfilePictureUrl;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.user.dto.UserProfileResponseDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
@@ -46,4 +47,13 @@ public abstract class UserMapper {
     public String fromPhoneNumber(PhoneNumber phoneNumber) {
         return phoneNumber == null ? null : phoneNumber.value();
     }
+
+    public ProfilePictureUrl toProfilePictureUrl(String value) {
+        return value == null ? null : new ProfilePictureUrl(value);
+    }
+
+    public String fromProfilePictureUrl(ProfilePictureUrl url) {
+        return url == null ? null : url.value();
+    }
+
 }
