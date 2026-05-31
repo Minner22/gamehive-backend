@@ -10,6 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.common.domain.HashedPassword;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.UserRole;
@@ -46,7 +47,7 @@ public class DevDataInitializer implements ApplicationRunner {
             userRoleRepository.findByName(roleName).ifPresent(roles::add);
         }
 
-        AppUser user = AppUser.register(new Username(username), new Email(email), passwordEncoder.encode(password));
+        AppUser user = AppUser.register(new Username(username), new Email(email), HashedPassword.fromRaw(password, passwordEncoder));
         user.activate();
 
         for (UserRole role : roles) {

@@ -11,6 +11,7 @@ import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.auth.event.PasswordResetRequestedEvent;
 import pl.m22.gamehive.auth.event.UserRegisteredEvent;
 import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.common.domain.HashedPassword;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
@@ -56,7 +57,7 @@ public class AuthServiceImpl implements AuthService{
             throw new ApplicationException(ErrorCode.USER_NOT_ACTIVATED, "User not activated: " + appUser.getEmail().obfuscated());
         }
 
-        if (!passwordEncoder.matches(loginDto.password(), appUser.getPassword())) {
+        if (!appUser.getPassword().matches(loginDto.password(), passwordEncoder)) {
             throw new DomainException(ErrorCode.INVALID_PASSWORD);
         }
 
@@ -93,7 +94,7 @@ public class AuthServiceImpl implements AuthService{
         AppUser appUser = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email.obfuscated()));
 
-        appUser.changePassword(passwordEncoder.encode(newPassword));
+        appUser.changePassword(HashedPassword.fromRaw(newPassword, passwordEncoder));
 
         userRepository.save(appUser);
 
@@ -120,7 +121,7 @@ public class AuthServiceImpl implements AuthService{
         AppUser appUser = AppUser.register(
                 username,
                 email,
-                passwordEncoder.encode(registrationDto.password())
+                HashedPassword.fromRaw(registrationDto.password(), passwordEncoder)
         );
 
         UserRole role = userRoleRepository.findByName(USER_ROLE)
