@@ -50,7 +50,7 @@ class UserServiceImplTest {
     void findUserByEmail_found() {
 
         AppUser user = userService.findUserByEmail("john.doe@example.com");
-        assertEquals("john_doe", user.getUsername());
+        assertEquals("john_doe", user.getUsername().value());
     }
 
     @Test
@@ -118,8 +118,8 @@ class UserServiceImplTest {
 
         AppUser user = userService.findUserById(1L);
 
-        assertEquals("john_doe", user.getUsername());
-        assertEquals("john.doe@example.com", user.getEmail());
+        assertEquals("john_doe", user.getUsername().value());
+        assertEquals("john.doe@example.com", user.getEmail().value());
     }
 
     @Test
@@ -141,7 +141,7 @@ class UserServiceImplTest {
 
         AppUser user = userService.findUserByUsername("jane_smith");
 
-        assertEquals("jane.smith@example.com", user.getEmail());
+        assertEquals("jane.smith@example.com", user.getEmail().value());
     }
 
     @Test
@@ -165,7 +165,7 @@ class UserServiceImplTest {
 
         assertTrue(page.getTotalElements() >= 2);
         assertTrue(page.getContent().stream()
-                .anyMatch(u -> "john_doe".equals(u.getUsername())));
+                .anyMatch(u -> "john_doe".equals(u.getUsername().value())));
     }
 
     @Test

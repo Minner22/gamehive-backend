@@ -10,6 +10,8 @@ import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.auth.event.PasswordResetRequestedEvent;
 import pl.m22.gamehive.auth.event.UserRegisteredEvent;
+import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
@@ -39,7 +41,7 @@ public class AuthServiceImpl implements AuthService{
 
         AppUser appUser = registerUser(registrationDto);
 
-        eventPublisher.publishEvent(new UserRegisteredEvent(appUser.getEmail()));
+        eventPublisher.publishEvent(new UserRegisteredEvent(appUser.getEmail().value()));
     }
 
     @Override
@@ -100,19 +102,22 @@ public class AuthServiceImpl implements AuthService{
 
     private AppUser registerUser(RegistrationDto registrationDto) {
 
-        if (userRepository.existsByEmail(registrationDto.email())) {
+        Email email = new Email(registrationDto.email());
+        Username username = new Username(registrationDto.username());
+
+        if (userRepository.existsByEmail(email)) {
             throw new DomainException(ErrorCode.EMAIL_ALREADY_EXISTS,
-                    "Email already exists: " + registrationDto.email());
+                    "Email already exists: " + email.obfuscated());
         }
 
-        if (userRepository.existsByUsername(registrationDto.username())) {
+        if (userRepository.existsByUsername(username)) {
             throw new DomainException(ErrorCode.USERNAME_ALREADY_EXISTS,
-                    "Username already exists: " + registrationDto.username());
+                    "Username already exists: " + username);
         }
 
         AppUser appUser = AppUser.register(
-                registrationDto.username(),
-                registrationDto.email(),
+                username,
+                email,
                 passwordEncoder.encode(registrationDto.password())
         );
 

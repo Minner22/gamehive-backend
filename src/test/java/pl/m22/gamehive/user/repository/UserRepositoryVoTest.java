@@ -21,7 +21,7 @@ class UserRepositoryVoTest {
         assertThat(userRepository.findByEmail(new Email("john.doe@example.com")))
                 .isPresent()
                 .get()
-                .satisfies(u -> assertThat(u.getUsername()).isEqualTo("john_doe"));
+                .satisfies(u -> assertThat(u.getUsername().value()).isEqualTo("john_doe"));
     }
 
     @Test

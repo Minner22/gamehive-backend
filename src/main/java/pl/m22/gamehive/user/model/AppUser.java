@@ -2,11 +2,12 @@ package pl.m22.gamehive.user.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 import pl.m22.gamehive.common.AbstractEntity;
+import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 
@@ -21,9 +22,10 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 public class AppUser extends AbstractEntity {
 
-    @Column(nullable = false, unique = true)
-    @NotBlank
-    private String username;
+
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "username", nullable = false, unique = true))
+    private Username username;
 
     @Column(nullable = false)
     @NotBlank
@@ -31,9 +33,9 @@ public class AppUser extends AbstractEntity {
     @JsonIgnore
     private String password;
 
-    @Column(nullable = false, unique = true)
-    @Email
-    private String email;
+    @Embedded
+    @AttributeOverride(name = "value", column = @Column(name = "email", nullable = false, unique = true))
+    private Email email;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
@@ -50,7 +52,7 @@ public class AppUser extends AbstractEntity {
     @Column(nullable = false)
     private boolean enabled = false;
 
-    public static AppUser register(String username, String email, String hashedPassword) {
+    public static AppUser register(Username username, Email email, String hashedPassword) {
 
         AppUser appUser = new AppUser();
         appUser.username = username;

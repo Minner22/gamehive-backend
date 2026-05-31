@@ -12,37 +12,37 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<AppUser, Long> {
 
-    Optional<AppUser> findByEmail(String email);
-
-    default Optional<AppUser> findByEmail(Email email) {
-        return findByEmail(email.value());
+    default Optional<AppUser> findByEmail(String email) {
+        return findByEmail(new Email(email));
     }
 
-    Optional<AppUser> findByUsername(String username);
+    Optional<AppUser> findByEmail(Email email);
 
-    default Optional<AppUser> findByUsername(Username username) {
-        return findByUsername(username.value());
+    default Optional<AppUser> findByUsername(String username) {
+        return findByUsername(new Username(username));
     }
+
+    Optional<AppUser> findByUsername(Username username);
 
     List<AppUser> findAllUsersByRoles_Name(String role);
 
-    void deleteByEmail(String email);
-
-    default void deleteByEmail(Email email) {
-        deleteByEmail(email.value());
+    default void deleteByEmail(String email) {
+        deleteByEmail(new Email(email));
     }
 
-    boolean existsByEmail(String email);
+    void deleteByEmail(Email email);
 
-    default boolean existsByEmail(Email email) {
-        return existsByEmail(email.value());
+    default boolean existsByEmail(String email) {
+        return existsByEmail(new Email(email));
     }
 
-    boolean existsByUsername(String username);
+    boolean existsByEmail(Email email);
 
-    default boolean existsByUsername(Username username) {
-        return existsByUsername(username.value());
+    default boolean existsByUsername(String username) {
+        return existsByUsername(new Username(username));
     }
+
+    boolean existsByUsername(Username username);
 
     long countByRoles_Name(String roleName);
 }

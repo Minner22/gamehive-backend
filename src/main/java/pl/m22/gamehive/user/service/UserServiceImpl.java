@@ -51,7 +51,7 @@ public class UserServiceImpl implements UserService {
     public List<String> findAllUserEmails() {
 
         return userRepository.findAllUsersByRoles_Name(USER_ROLE).stream()
-                .map(AppUser::getEmail)
+                .map(u -> u.getEmail().value())
                 .toList();
     }
 
@@ -137,7 +137,7 @@ public class UserServiceImpl implements UserService {
         user.replaceRoles(userRoles);
 
         userRepository.save(user);
-        eventPublisher.publishEvent(new UserRolesUpdatedEvent(user.getEmail()));
+        eventPublisher.publishEvent(new UserRolesUpdatedEvent(user.getEmail().value()));
 
         return user;
     }
@@ -154,7 +154,7 @@ public class UserServiceImpl implements UserService {
         user.deactivate();
 
         userRepository.save(user);
-        eventPublisher.publishEvent(new UserDeactivatedEvent(user.getEmail()));
+        eventPublisher.publishEvent(new UserDeactivatedEvent(user.getEmail().value()));
 
         return user;
     }
@@ -168,7 +168,7 @@ public class UserServiceImpl implements UserService {
         user.activate();
 
         userRepository.save(user);
-        eventPublisher.publishEvent(new UserReactivatedEvent(user.getEmail()));
+        eventPublisher.publishEvent(new UserReactivatedEvent(user.getEmail().value()));
 
         return user;
     }
@@ -181,7 +181,7 @@ public class UserServiceImpl implements UserService {
         AppUser user = findUserById(userId);
 
         guardLastAdmin(user);
-        String email = user.getEmail();
+        String email = user.getEmail().value();
 
         userRepository.delete(user);
         eventPublisher.publishEvent(new UserDeletedEvent(email));

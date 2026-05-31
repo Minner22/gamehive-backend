@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
+import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.user.dto.UserProfileResponseDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
 import pl.m22.gamehive.user.model.AppUser;
@@ -35,7 +37,7 @@ class UserMapperTest {
                 LocalDate.of(1990, 1, 15), "https://example.com/avatar.png"
         );
 
-        AppUser user = AppUser.register("jan_kowalski", "jan@example.com", "secret123");
+        AppUser user = AppUser.register(new Username("jan_kowalski"), new Email("jan@example.com"), "secret123");
         user.setId(1L);
         user.activate();
         user.assignRole(role);
@@ -59,7 +61,7 @@ class UserMapperTest {
 
         UserRole role = new UserRole("ROLE_USER", null);
 
-        AppUser user = AppUser.register("test", "test@example.com", "secret123");
+        AppUser user = AppUser.register(new Username("test"), new Email("test@example.com"), "secret123");
         user.setId(1L);
         user.activate();
         user.assignRole(role);
@@ -97,7 +99,7 @@ class UserMapperTest {
 
         UserRole role = new UserRole("ROLE_ADMIN", null);
 
-        AppUser user = AppUser.register("admin", "admin@example.com", "password");
+        AppUser user = AppUser.register(new Username("admin"), new Email("admin@example.com"), "password");
 
         user.assignRole(role);
 
