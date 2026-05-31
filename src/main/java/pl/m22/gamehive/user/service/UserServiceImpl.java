@@ -7,6 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
+import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
@@ -77,7 +79,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public AppUser findUserByEmail(String email) {
+    public AppUser findUserByEmail(Email email) {
 
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));
@@ -91,7 +93,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public AppUser findUserByUsername(String username) {
+    public AppUser findUserByUsername(Username username) {
 
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));
@@ -104,7 +106,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserProfile updateCurrentUserProfile(String email, UserProfileUpdateDto userProfileUpdateDto) {
+    public UserProfile updateCurrentUserProfile(Email email, UserProfileUpdateDto userProfileUpdateDto) {
 
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));
@@ -124,7 +126,7 @@ public class UserServiceImpl implements UserService {
 
     @Transactional
     @Override
-    public AppUser updateUserRoles(Long userId, Set<String> roleNames, String requesterEmail) {
+    public AppUser updateUserRoles(Long userId, Set<String> roleNames, Email requesterEmail) {
 
         guardOwnAccount(userId, requesterEmail);
         AppUser user = findUserById(userId);
@@ -144,7 +146,7 @@ public class UserServiceImpl implements UserService {
 
     @Transactional
     @Override
-    public AppUser deactivateUser(Long userId, String requesterEmail) {
+    public AppUser deactivateUser(Long userId, Email requesterEmail) {
 
         guardOwnAccount(userId, requesterEmail);
         AppUser user = findUserById(userId);
@@ -175,7 +177,7 @@ public class UserServiceImpl implements UserService {
 
     @Transactional
     @Override
-    public void deleteUser(Long userId, String requesterEmail) {
+    public void deleteUser(Long userId, Email requesterEmail) {
 
         guardOwnAccount(userId, requesterEmail);
         AppUser user = findUserById(userId);
@@ -187,7 +189,7 @@ public class UserServiceImpl implements UserService {
         eventPublisher.publishEvent(new UserDeletedEvent(email));
     }
 
-    private void guardOwnAccount(Long targetUserId, String requesterEmail) {
+    private void guardOwnAccount(Long targetUserId, Email requesterEmail) {
 
         AppUser requester = userRepository.findByEmail(requesterEmail)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));

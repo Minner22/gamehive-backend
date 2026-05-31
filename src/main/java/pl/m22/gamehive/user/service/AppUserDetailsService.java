@@ -8,6 +8,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.logging.LoggingUtils;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.repository.UserRepository;
 import pl.m22.gamehive.user.util.AppUserDetails;
@@ -22,7 +23,7 @@ public class AppUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(@NonNull String email) throws UsernameNotFoundException {
 
         AppUser appUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email));
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + LoggingUtils.obfuscateEmail(email)));
 
         return new AppUserDetails(appUser);
     }

@@ -67,7 +67,7 @@ public class AppUser extends AbstractEntity {
     public void activate() {
 
         if (enabled) {
-            throw new DomainException(ErrorCode.USER_ALREADY_ACTIVATED, "User is already activated: " + email);
+            throw new DomainException(ErrorCode.USER_ALREADY_ACTIVATED, "User is already activated: " + email.obfuscated());
         }
 
         this.enabled = true;

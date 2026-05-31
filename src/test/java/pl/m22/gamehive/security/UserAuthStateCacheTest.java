@@ -15,6 +15,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.user.service.UserService;
 
 import java.util.Objects;
@@ -52,7 +53,7 @@ class UserAuthStateCacheTest {
         if (!userService.findUserById(2L).isEnabled()) {
             userService.activateUser(2L);
         }
-        userService.updateUserRoles(2L, Set.of("ROLE_USER"), "john.doe@example.com"); // przywróć role jane
+        userService.updateUserRoles(2L, Set.of("ROLE_USER"), new Email("john.doe@example.com")); // przywróć role jane
         flushRedis();
         clearCache();
     }
