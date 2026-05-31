@@ -18,18 +18,22 @@ public interface UserRepository extends JpaRepository<AppUser, Long> {
 
     Optional<AppUser> findByEmail(Email email);
 
+    @Deprecated
     default Optional<AppUser> findByUsername(String username) {
         return findByUsername(new Username(username));
     }
 
     Optional<AppUser> findByUsername(Username username);
 
+    @Deprecated
     List<AppUser> findAllUsersByRoles_Name(String role);
 
+    @Deprecated
     default void deleteByEmail(String email) {
         deleteByEmail(new Email(email));
     }
 
+    @Deprecated
     void deleteByEmail(Email email);
 
     default boolean existsByEmail(String email) {
@@ -38,6 +42,7 @@ public interface UserRepository extends JpaRepository<AppUser, Long> {
 
     boolean existsByEmail(Email email);
 
+    @Deprecated
     default boolean existsByUsername(String username) {
         return existsByUsername(new Username(username));
     }
