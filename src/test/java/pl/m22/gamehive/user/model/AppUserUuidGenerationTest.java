@@ -1,5 +1,6 @@
 package pl.m22.gamehive.user.model;
 
+import org.hibernate.proxy.HibernateProxy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +11,8 @@ import org.springframework.test.context.ActiveProfiles;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.domain.HashedPassword;
 import pl.m22.gamehive.common.domain.Username;
+
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -63,5 +66,23 @@ class AppUserUuidGenerationTest {
 
         assertThat(first.getId().toString())
                 .isLessThan(second.getId().toString());
+    }
+
+    @Test
+    @DisplayName("equals/hashCode działają z proxy Hibernate (porównanie po klasie docelowej i ID)")
+    void equals_and_hashCode_handle_hibernate_proxy() {
+        AppUser user = newUser("proxyuser", "proxy@example.com");
+        em.persist(user);
+        em.flush();
+        UUID id = user.getId();
+        em.clear(); // wyczyść kontekst, by getReference zwrócił nieinicjalizowane proxy
+
+        AppUser proxy = em.getEntityManager().getReference(AppUser.class, id);
+        assertThat(proxy).isInstanceOf(HibernateProxy.class);
+
+        // 'user' jest teraz odłączoną, zwykłą instancją o tym samym ID
+        assertThat(proxy).isEqualTo(user);                       // proxy.equals(real): gałąź proxy po stronie this
+        assertThat(user).isEqualTo(proxy);                       // real.equals(proxy): gałąź proxy po stronie o
+        assertThat(proxy.hashCode()).isEqualTo(user.hashCode()); // gałąź proxy w hashCode
     }
 }

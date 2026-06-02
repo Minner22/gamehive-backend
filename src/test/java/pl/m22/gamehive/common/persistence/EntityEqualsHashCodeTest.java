@@ -2,6 +2,7 @@ package pl.m22.gamehive.common.persistence;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import pl.m22.gamehive.user.model.UserProfile;
 import pl.m22.gamehive.user.model.UserRole;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,6 +40,26 @@ class EntityEqualsHashCodeTest {
         b.setId(2L);
 
         assertThat(a).isNotEqualTo(b);
+    }
+
+    @Test
+    @DisplayName("equals(null) -> false")
+    void not_equal_to_null() {
+        UserRole role = new UserRole("ROLE_USER", null);
+        role.setId(1L);
+
+        assertThat(role.equals(null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Encje różnych klas z tym samym ID nie są równe")
+    void different_class_same_id_not_equal() {
+        UserRole role = new UserRole("ROLE_USER", null);
+        role.setId(5L);
+        UserProfile profile = new UserProfile();
+        profile.setId(5L);
+
+        assertThat(role).isNotEqualTo(profile);
     }
 
     @Test
