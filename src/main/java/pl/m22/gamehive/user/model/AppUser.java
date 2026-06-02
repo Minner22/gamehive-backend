@@ -2,13 +2,16 @@ package pl.m22.gamehive.user.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.*;
-import pl.m22.gamehive.common.AbstractEntity;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.domain.HashedPassword;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.persistence.LongEntity;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -18,8 +21,7 @@ import java.util.Set;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @ToString(callSuper = true)
-@EqualsAndHashCode(callSuper = true)
-public class AppUser extends AbstractEntity {
+public class AppUser extends LongEntity {
 
 
     @Embedded

@@ -4,9 +4,9 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import pl.m22.gamehive.common.AbstractEntity;
 import pl.m22.gamehive.common.domain.PhoneNumber;
 import pl.m22.gamehive.common.domain.ProfilePictureUrl;
+import pl.m22.gamehive.common.persistence.LongEntity;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
 
 import java.time.LocalDate;
@@ -16,7 +16,7 @@ import java.time.LocalDate;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserProfile extends AbstractEntity {
+public class UserProfile extends LongEntity {
 
     private String firstName;
     private String lastName;
