@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.common.domain.*;
+import pl.m22.gamehive.support.SeededUsers;
 import pl.m22.gamehive.user.dto.UserProfileResponseDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
 import pl.m22.gamehive.user.model.AppUser;
@@ -37,14 +38,14 @@ class UserMapperTest {
         );
 
         AppUser user = AppUser.register(new Username("jan_kowalski"), new Email("jan@example.com"), HashedPassword.fromHash("{noop}secret123"));
-        user.setId(1L);
+        user.setId(SeededUsers.JOHN_ID);
         user.activate();
         user.assignRole(role);
         user.attachProfile(profile);
 
         UserResponseDto result = userMapper.toUserResponseDto(user);
 
-        assertEquals(1L, result.id());
+        assertEquals(SeededUsers.JOHN_ID, result.id());
         assertEquals("jan_kowalski", result.username());
         assertEquals("jan@example.com", result.email());
         assertTrue(result.enabled());
@@ -61,7 +62,7 @@ class UserMapperTest {
         UserRole role = new UserRole("ROLE_USER", null);
 
         AppUser user = AppUser.register(new Username("test"), new Email("test@example.com"), HashedPassword.fromHash("{noop}secret123"));
-        user.setId(1L);
+        user.setId(SeededUsers.JOHN_ID);
         user.activate();
         user.assignRole(role);
         user.attachProfile(null);

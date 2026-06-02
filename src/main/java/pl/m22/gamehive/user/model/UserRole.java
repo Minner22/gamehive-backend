@@ -6,14 +6,14 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import pl.m22.gamehive.common.AbstractEntity;
+import pl.m22.gamehive.common.persistence.LongEntity;
 
 @Entity
 @Table(name = "user_role")
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserRole extends AbstractEntity {
+public class UserRole extends LongEntity {
 
 
     @NotBlank

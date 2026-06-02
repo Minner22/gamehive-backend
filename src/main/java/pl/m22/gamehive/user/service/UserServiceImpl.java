@@ -27,6 +27,7 @@ import pl.m22.gamehive.user.repository.UserRoleRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -86,7 +87,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public AppUser findUserById(Long id) {
+    public AppUser findUserById(UUID id) {
 
         return userRepository.findById(id)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));
@@ -126,7 +127,7 @@ public class UserServiceImpl implements UserService {
 
     @Transactional
     @Override
-    public AppUser updateUserRoles(Long userId, Set<String> roleNames, Email requesterEmail) {
+    public AppUser updateUserRoles(UUID userId, Set<String> roleNames, Email requesterEmail) {
 
         guardOwnAccount(userId, requesterEmail);
         AppUser user = findUserById(userId);
@@ -146,7 +147,7 @@ public class UserServiceImpl implements UserService {
 
     @Transactional
     @Override
-    public AppUser deactivateUser(Long userId, Email requesterEmail) {
+    public AppUser deactivateUser(UUID userId, Email requesterEmail) {
 
         guardOwnAccount(userId, requesterEmail);
         AppUser user = findUserById(userId);
@@ -163,7 +164,7 @@ public class UserServiceImpl implements UserService {
 
     @Transactional
     @Override
-    public AppUser activateUser(Long userId) {
+    public AppUser activateUser(UUID userId) {
 
         AppUser user = findUserById(userId);
 
@@ -177,7 +178,7 @@ public class UserServiceImpl implements UserService {
 
     @Transactional
     @Override
-    public void deleteUser(Long userId, Email requesterEmail) {
+    public void deleteUser(UUID userId, Email requesterEmail) {
 
         guardOwnAccount(userId, requesterEmail);
         AppUser user = findUserById(userId);
@@ -189,7 +190,7 @@ public class UserServiceImpl implements UserService {
         eventPublisher.publishEvent(new UserDeletedEvent(email));
     }
 
-    private void guardOwnAccount(Long targetUserId, Email requesterEmail) {
+    private void guardOwnAccount(UUID targetUserId, Email requesterEmail) {
 
         AppUser requester = userRepository.findByEmail(requesterEmail)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));

@@ -17,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.support.SeededUsers;
 import pl.m22.gamehive.user.service.UserService;
 
 import java.util.Objects;
@@ -50,8 +51,8 @@ class AccessTokenInvalidationTest {
 
     @AfterEach
     void tearDown() {
-        if (!userService.findUserById(2L).isEnabled()) {
-            userService.activateUser(2L);
+        if (!userService.findUserById(SeededUsers.JANE_ID).isEnabled()) {
+            userService.activateUser(SeededUsers.JANE_ID);
         }
         flushRedis();
     }
@@ -61,7 +62,7 @@ class AccessTokenInvalidationTest {
     void accessTokenRejectedWithAccountDisabled() throws Exception {
         String janeToken = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
 
-        mockMvc.perform(patch("/api/v1/admin/users/2/deactivate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/deactivate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isOk());
 
@@ -75,11 +76,11 @@ class AccessTokenInvalidationTest {
     void oldAccessTokenStaysRevokedAfterReactivation() throws Exception {
         String janeToken = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
 
-        mockMvc.perform(patch("/api/v1/admin/users/2/deactivate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/deactivate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(patch("/api/v1/admin/users/2/activate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/activate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isOk());
 
@@ -93,7 +94,7 @@ class AccessTokenInvalidationTest {
     void deactivationDoesNotAffectOtherUsers() throws Exception {
         String johnToken = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN", "ROLE_USER"));
 
-        mockMvc.perform(patch("/api/v1/admin/users/2/deactivate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/deactivate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isOk());
 

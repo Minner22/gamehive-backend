@@ -12,6 +12,7 @@ import pl.m22.gamehive.user.model.UserProfile;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 public interface UserService {
     @Deprecated
@@ -30,15 +31,15 @@ public interface UserService {
     boolean usernameExists(String username);
 
     AppUser findUserByEmail(Email email);
-    AppUser findUserById(Long id);
+    AppUser findUserById(UUID id);
     AppUser findUserByUsername(Username username);
 
     Page<AppUser> findAllUsers(Pageable pageable);
 
-    AppUser updateUserRoles(Long userId, Set<String> roleNames, Email requesterEmail);
-    AppUser deactivateUser(Long userId, Email requesterEmail);
-    AppUser activateUser(Long userId);
-    void deleteUser(Long userId, Email requesterEmail);
+    AppUser updateUserRoles(UUID userId, Set<String> roleNames, Email requesterEmail);
+    AppUser deactivateUser(UUID userId, Email requesterEmail);
+    AppUser activateUser(UUID userId);
+    void deleteUser(UUID userId, Email requesterEmail);
 
     UserProfile updateCurrentUserProfile(Email email, UserProfileUpdateDto userProfileUpdateDto);
 
