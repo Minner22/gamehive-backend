@@ -11,7 +11,7 @@ import pl.m22.gamehive.common.domain.HashedPassword;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
-import pl.m22.gamehive.common.persistence.LongEntity;
+import pl.m22.gamehive.common.persistence.UuidEntity;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -21,7 +21,7 @@ import java.util.Set;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @ToString(callSuper = true)
-public class AppUser extends LongEntity {
+public class AppUser extends UuidEntity {
 
 
     @Embedded

@@ -18,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.support.SeededUsers;
 import pl.m22.gamehive.user.service.UserService;
 
 import java.util.Objects;
@@ -52,8 +53,8 @@ class RefreshTokenRevocationTest {
 
     @AfterEach
     void tearDown() {
-        if (!userService.findUserById(2L).isEnabled()) { // reaktywuj tylko jeśli zdezaktywowana
-            userService.activateUser(2L);
+        if (!userService.findUserById(SeededUsers.JANE_ID).isEnabled()) { // reaktywuj tylko jeśli zdezaktywowana
+            userService.activateUser(SeededUsers.JANE_ID);
         }
         flushRedis();
     }
@@ -64,7 +65,7 @@ class RefreshTokenRevocationTest {
         // refresh token zapisany w Redis bezpośrednio (bez zależności od hasła jane w fixtures)
         String refreshToken = jwtService.generateToken("jane.smith@example.com", JwtTokenType.REFRESH, null);
 
-        mockMvc.perform(patch("/api/v1/admin/users/2/deactivate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/deactivate")
                             .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isOk());
 

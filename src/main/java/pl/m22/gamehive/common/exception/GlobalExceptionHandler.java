@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 
@@ -79,6 +80,19 @@ public class GlobalExceptionHandler {
         log.error("Infrastructure failure: {} ({})", ex.getMessage(), ex.getErrorCode(), ex);
 
         return buildResponse(ex);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError>  handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+
+        log.warn("Path/param type mismatch: {}", ex.getMessage());
+
+        ApiError apiError = new ApiError(
+                ErrorCode.VALIDATION_ERROR.name(),
+                ErrorCode.VALIDATION_ERROR.getDefaultMessage()
+        );
+
+        return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus()).body(apiError);
     }
 
     private ResponseEntity<ApiError> buildResponse(BaseException ex) {

@@ -1,19 +1,19 @@
--- === user_profiles ===
+-- === user_profiles === (Long IDENTITY – bez zmian)
 CREATE TABLE user_profiles (
-                              id BIGSERIAL PRIMARY KEY,
-                              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-                              updated_at TIMESTAMP WITH TIME ZONE,
-                              first_name VARCHAR(255),
-                              last_name VARCHAR(255),
-                              address VARCHAR(255),
-                              phone_number VARCHAR(15),
-                              date_of_birth DATE,
-                              profile_picture_url VARCHAR(255)
+                               id BIGSERIAL PRIMARY KEY,
+                               created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                               updated_at TIMESTAMP WITH TIME ZONE,
+                               first_name VARCHAR(255),
+                               last_name VARCHAR(255),
+                               address VARCHAR(255),
+                               phone_number VARCHAR(15),
+                               date_of_birth DATE,
+                               profile_picture_url VARCHAR(255)
 );
 
--- === application_users ===
+-- === application_users === (PK uuid; user_profile_id nadal BIGINT)
 CREATE TABLE application_users (
-                                   id BIGSERIAL PRIMARY KEY,
+                                   id uuid PRIMARY KEY,
                                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
                                    updated_at TIMESTAMP WITH TIME ZONE,
                                    username VARCHAR(255) NOT NULL UNIQUE,
@@ -25,7 +25,7 @@ CREATE TABLE application_users (
                                        REFERENCES user_profiles(id) ON DELETE SET NULL
 );
 
--- === user_role ===
+-- === user_role === (Long IDENTITY – bez zmian)
 CREATE TABLE user_role (
                            id BIGSERIAL PRIMARY KEY,
                            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -34,9 +34,9 @@ CREATE TABLE user_role (
                            description VARCHAR(255)
 );
 
--- === user_roles (relacja N:M użytkownik – role) ===
+-- === user_roles (N:M) === (user_id uuid -> application_users.id)
 CREATE TABLE user_roles (
-                            user_id BIGINT NOT NULL,
+                            user_id uuid NOT NULL,
                             role_id BIGINT NOT NULL,
                             PRIMARY KEY (user_id, role_id),
                             CONSTRAINT fk_user_roles_user FOREIGN KEY (user_id) REFERENCES application_users(id) ON DELETE CASCADE,

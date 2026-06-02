@@ -15,6 +15,8 @@ import pl.m22.gamehive.user.dto.UserResponseDto;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.service.UserService;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/v1/admin/users")
 @PreAuthorize("hasRole('ADMIN')")
@@ -34,7 +36,7 @@ public class AdminUserController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UserResponseDto> getUserById(@PathVariable Long id) {
+    public ResponseEntity<UserResponseDto> getUserById(@PathVariable UUID id) {
 
         UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.findUserById(id));
 
@@ -62,7 +64,7 @@ public class AdminUserController {
     }
 
     @PutMapping("/{id}/roles")
-    public ResponseEntity<UserResponseDto> updateUserRoles(@PathVariable Long id, @Valid @RequestBody UpdateUserRolesDto dto, Authentication authentication) {
+    public ResponseEntity<UserResponseDto> updateUserRoles(@PathVariable UUID id, @Valid @RequestBody UpdateUserRolesDto dto, Authentication authentication) {
 
         Email requester = new Email(authentication.getName());
 
@@ -72,7 +74,7 @@ public class AdminUserController {
     }
 
     @PatchMapping("/{id}/deactivate")
-    public ResponseEntity<UserResponseDto> deactivateUser(@PathVariable Long id, Authentication authentication) {
+    public ResponseEntity<UserResponseDto> deactivateUser(@PathVariable UUID id, Authentication authentication) {
 
         Email requester = new Email(authentication.getName());
 
@@ -82,7 +84,7 @@ public class AdminUserController {
     }
 
     @PatchMapping("/{id}/activate")
-    public ResponseEntity<UserResponseDto> activateUser(@PathVariable Long id) {
+    public ResponseEntity<UserResponseDto> activateUser(@PathVariable UUID id) {
 
         UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.activateUser(id));
 
@@ -90,7 +92,7 @@ public class AdminUserController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<UserResponseDto> deleteUser(@PathVariable Long id, Authentication authentication) {
+    public ResponseEntity<UserResponseDto> deleteUser(@PathVariable UUID id, Authentication authentication) {
 
         Email requester = new Email(authentication.getName());
 

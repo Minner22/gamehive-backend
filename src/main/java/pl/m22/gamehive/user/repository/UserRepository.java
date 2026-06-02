@@ -8,9 +8,10 @@ import pl.m22.gamehive.user.model.AppUser;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface UserRepository extends JpaRepository<AppUser, Long> {
+public interface UserRepository extends JpaRepository<AppUser, UUID> {
 
     default Optional<AppUser> findByEmail(String email) {
         return findByEmail(new Email(email));

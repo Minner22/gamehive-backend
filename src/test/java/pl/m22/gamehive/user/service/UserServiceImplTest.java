@@ -16,6 +16,7 @@ import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.support.SeededUsers;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
 import pl.m22.gamehive.user.event.UserDeactivatedEvent;
 import pl.m22.gamehive.user.event.UserDeletedEvent;
@@ -118,7 +119,7 @@ class UserServiceImplTest {
     @DisplayName("findUserById() -> znaleziony")
     void findUserById_found() {
 
-        AppUser user = userService.findUserById(1L);
+        AppUser user = userService.findUserById(SeededUsers.JOHN_ID);
 
         assertEquals("john_doe", user.getUsername().value());
         assertEquals("john.doe@example.com", user.getEmail().value());
@@ -128,7 +129,7 @@ class UserServiceImplTest {
     @DisplayName("findUserById() -> nieznaleziony -> DomainException USER_NOT_FOUND")
     void findUserById_not_found() {
 
-        assertThatThrownBy(() -> userService.findUserById(999L))
+        assertThatThrownBy(() -> userService.findUserById(SeededUsers.UNKNOWN_ID))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
@@ -258,9 +259,9 @@ class UserServiceImplTest {
     @DisplayName("updateUserRoles() -> aktualizuje role usera (admin edytuje innego)")
     void updateUserRoles_updates() {
 
-        userService.updateUserRoles(2L, Set.of("ROLE_MODERATOR"), new Email("john.doe@example.com"));
+        userService.updateUserRoles(SeededUsers.JANE_ID, Set.of("ROLE_MODERATOR"), new Email("john.doe@example.com"));
 
-        AppUser user = userService.findUserById(2L);
+        AppUser user = userService.findUserById(SeededUsers.JANE_ID);
         Set<String> names = user.getRoles().stream()
                 .map(UserRole::getName)
                 .collect(Collectors.toSet());
@@ -272,9 +273,9 @@ class UserServiceImplTest {
     @DisplayName("updateUserRoles() -> zastępuje istniejące role nowym zestawem")
     void updateUserRoles_replaces() {
 
-        userService.updateUserRoles(2L, Set.of("ROLE_USER", "ROLE_MODERATOR"), new Email("john.doe@example.com"));
+        userService.updateUserRoles(SeededUsers.JANE_ID, Set.of("ROLE_USER", "ROLE_MODERATOR"), new Email("john.doe@example.com"));
 
-        AppUser user = userService.findUserById(2L);
+        AppUser user = userService.findUserById(SeededUsers.JANE_ID);
         Set<String> names = user.getRoles().stream()
                 .map(UserRole::getName)
                 .collect(Collectors.toSet());
@@ -285,7 +286,7 @@ class UserServiceImplTest {
     @DisplayName("updateUserRoles() -> nieistniejący user -> DomainException USER_NOT_FOUND")
     void updateUserRoles_user_not_found() {
 
-        assertThatThrownBy(() -> userService.updateUserRoles(999L, Set.of("ROLE_USER"), new Email("john.doe@example.com")))
+        assertThatThrownBy(() -> userService.updateUserRoles(SeededUsers.UNKNOWN_ID, Set.of("ROLE_USER"), new Email("john.doe@example.com")))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
@@ -295,7 +296,7 @@ class UserServiceImplTest {
     @DisplayName("updateUserRoles() -> nieistniejąca rola -> DomainException ROLE_NOT_FOUND")
     void updateUserRoles_role_not_found() {
 
-        assertThatThrownBy(() ->userService.updateUserRoles(2L, Set.of("ROLE_GHOST"), new Email("john.doe@example.com")))
+        assertThatThrownBy(() ->userService.updateUserRoles(SeededUsers.JANE_ID, Set.of("ROLE_GHOST"), new Email("john.doe@example.com")))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.ROLE_NOT_FOUND);
@@ -305,7 +306,7 @@ class UserServiceImplTest {
     @DisplayName("updateUserRoles() -> self -> DomainException CANNOT_MODIFY_OWN_ACCOUNT")
     void updateUserRoles_self_blocked() {
 
-        assertThatThrownBy(() -> userService.updateUserRoles(1L, Set.of("ROLE_USER"), new Email("john.doe@example.com")))
+        assertThatThrownBy(() -> userService.updateUserRoles(SeededUsers.JOHN_ID, Set.of("ROLE_USER"), new Email("john.doe@example.com")))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CANNOT_MODIFY_OWN_ACCOUNT);
@@ -315,7 +316,7 @@ class UserServiceImplTest {
     @DisplayName("updateUserRoles() -> odbiera ROLE_ADMIN ostatniemu adminowi -> CANNOT_REMOVE_LAST_ADMIN")
     void updateUserRoles_last_admin_demote_blocked() {
 
-        assertThatThrownBy(() ->userService.updateUserRoles(1L, Set.of("ROLE_USER"), new Email("jane.smith@example.com")))
+        assertThatThrownBy(() ->userService.updateUserRoles(SeededUsers.JOHN_ID, Set.of("ROLE_USER"), new Email("jane.smith@example.com")))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CANNOT_REMOVE_LAST_ADMIN);
@@ -326,11 +327,11 @@ class UserServiceImplTest {
     @DisplayName("updateUserRoles() -> demote admina gdy są inni admini -> OK")
     void updateUserRoles_demote_admin_when_others_exist_ok() {
 
-        userService.updateUserRoles(2L, Set.of("ROLE_USER", "ROLE_ADMIN"), new Email("john.doe@example.com"));
+        userService.updateUserRoles(SeededUsers.JANE_ID, Set.of("ROLE_USER", "ROLE_ADMIN"), new Email("john.doe@example.com"));
 
-        userService.updateUserRoles(1L, Set.of("ROLE_USER"), new Email("jane.smith@example.com"));
+        userService.updateUserRoles(SeededUsers.JOHN_ID, Set.of("ROLE_USER"), new Email("jane.smith@example.com"));
 
-        AppUser john = userService.findUserById(1L);
+        AppUser john = userService.findUserById(SeededUsers.JOHN_ID);
         Set<String> names = john.getRoles().stream()
                 .map(UserRole::getName)
                 .collect(Collectors.toSet());
@@ -344,9 +345,9 @@ class UserServiceImplTest {
     @DisplayName("deactivateUser() -> ustawia enabled=false")
     void deactivateUser_disables() {
 
-        userService.deactivateUser(2L, new Email("john.doe@example.com"));
+        userService.deactivateUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
 
-        AppUser user = userService.findUserById(2L);
+        AppUser user = userService.findUserById(SeededUsers.JANE_ID);
         assertFalse(user.isEnabled());
     }
 
@@ -355,7 +356,7 @@ class UserServiceImplTest {
     @DisplayName("deactivateUser() -> publikuje UserDeactivatedEvent (rewokacja Redis dzieje się AFTER_COMMIT)")
     void deactivateUser_publishes_event() {
 
-        userService.deactivateUser(2L, new Email("john.doe@example.com"));
+        userService.deactivateUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
 
         long count = applicationEvents.stream(UserDeactivatedEvent.class)
                 .filter(e -> e.email().equals("jane.smith@example.com"))
@@ -367,7 +368,7 @@ class UserServiceImplTest {
     @DisplayName("deactivateUser() -> nieistniejący user -> DomainException USER_NOT_FOUND")
     void deactivateUser_user_not_found() {
 
-        assertThatThrownBy(() -> userService.deactivateUser(999L, new Email("john.doe@example.com")))
+        assertThatThrownBy(() -> userService.deactivateUser(SeededUsers.UNKNOWN_ID, new Email("john.doe@example.com")))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
@@ -377,7 +378,7 @@ class UserServiceImplTest {
     @DisplayName("deactivateUser() -> self -> DomainException CANNOT_MODIFY_OWN_ACCOUNT")
     void deactivateUser_self_blocked() {
 
-        assertThatThrownBy(() -> userService.deactivateUser(1L, new Email("john.doe@example.com")))
+        assertThatThrownBy(() -> userService.deactivateUser(SeededUsers.JOHN_ID, new Email("john.doe@example.com")))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CANNOT_MODIFY_OWN_ACCOUNT);
@@ -387,7 +388,7 @@ class UserServiceImplTest {
     @DisplayName("deactivateUser() -> ostatni admin -> CANNOT_REMOVE_LAST_ADMIN")
     void deactivateUser_last_admin_blocked() {
 
-        assertThatThrownBy(() -> userService.deactivateUser(1L, new Email("jane.smith@example.com")))
+        assertThatThrownBy(() -> userService.deactivateUser(SeededUsers.JOHN_ID, new Email("jane.smith@example.com")))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CANNOT_REMOVE_LAST_ADMIN);
@@ -398,11 +399,11 @@ class UserServiceImplTest {
     @DisplayName("deactivateUser() -> dezaktywacja admina gdy są inni admini -> OK")
     void deactivateUser_admin_when_others_exist_ok() {
 
-        userService.updateUserRoles(2L, Set.of("ROLE_USER", "ROLE_ADMIN"), new Email("john.doe@example.com"));
+        userService.updateUserRoles(SeededUsers.JANE_ID, Set.of("ROLE_USER", "ROLE_ADMIN"), new Email("john.doe@example.com"));
 
-        userService.deactivateUser(1L, new Email("jane.smith@example.com"));
+        userService.deactivateUser(SeededUsers.JOHN_ID, new Email("jane.smith@example.com"));
 
-        AppUser john = userService.findUserById(1L);
+        AppUser john = userService.findUserById(SeededUsers.JOHN_ID);
         assertFalse(john.isEnabled());
     }
 
@@ -413,11 +414,11 @@ class UserServiceImplTest {
     @DisplayName("activateUser() -> ustawia enabled=true dla zdezaktywowanego usera")
     void activateUser_enables() {
 
-        userService.deactivateUser(2L, new Email("john.doe@example.com"));
+        userService.deactivateUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
 
-        userService.activateUser(2L);
+        userService.activateUser(SeededUsers.JANE_ID);
 
-        AppUser user = userService.findUserById(2L);
+        AppUser user = userService.findUserById(SeededUsers.JANE_ID);
         assertTrue(user.isEnabled());
     }
 
@@ -425,7 +426,7 @@ class UserServiceImplTest {
     @DisplayName("activateUser() -> nieistniejący user -> DomainException USER_NOT_FOUND")
     void activateUser_user_not_found() {
 
-        assertThatThrownBy(() -> userService.activateUser(999L))
+        assertThatThrownBy(() -> userService.activateUser(SeededUsers.UNKNOWN_ID))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
@@ -438,9 +439,9 @@ class UserServiceImplTest {
     @DisplayName("deleteUser() -> usuwa usera z bazy")
     void deleteUser_removes_user() {
 
-        userService.deleteUser(2L, new Email("john.doe@example.com"));
+        userService.deleteUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
 
-        assertThatThrownBy(() -> userService.findUserById(2L))
+        assertThatThrownBy(() -> userService.findUserById(SeededUsers.JANE_ID))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
@@ -451,7 +452,7 @@ class UserServiceImplTest {
     @DisplayName("deleteUser() -> publikuje UserDeletedEvent (rewokacja Redis dzieje się AFTER_COMMIT)")
     void deleteUser_publishes_event() {
 
-        userService.deleteUser(2L, new Email("john.doe@example.com"));
+        userService.deleteUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
 
         long count = applicationEvents.stream(UserDeletedEvent.class)
                 .filter(e -> e.email().equals("jane.smith@example.com"))
@@ -463,7 +464,7 @@ class UserServiceImplTest {
     @DisplayName("deleteUser() -> nieistniejący user -> DomainException USER_NOT_FOUND")
     void deleteUser_user_not_found() {
 
-        assertThatThrownBy(() -> userService.deleteUser(999L, new Email("john.doe@example.com")))
+        assertThatThrownBy(() -> userService.deleteUser(SeededUsers.UNKNOWN_ID, new Email("john.doe@example.com")))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
@@ -473,7 +474,7 @@ class UserServiceImplTest {
     @DisplayName("deleteUser() -> self -> DomainException CANNOT_MODIFY_OWN_ACCOUNT")
     void deleteUser_self_blocked() {
 
-        assertThatThrownBy(() -> userService.deleteUser(1L, new Email("john.doe@example.com")))
+        assertThatThrownBy(() -> userService.deleteUser(SeededUsers.JOHN_ID, new Email("john.doe@example.com")))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CANNOT_MODIFY_OWN_ACCOUNT);
@@ -483,7 +484,7 @@ class UserServiceImplTest {
     @DisplayName("deleteUser() -> ostatni admin -> CANNOT_REMOVE_LAST_ADMIN")
     void deleteUser_last_admin_blocked() {
 
-        assertThatThrownBy(() -> userService.deleteUser(1L, new Email("jane.smith@example.com")))
+        assertThatThrownBy(() -> userService.deleteUser(SeededUsers.JOHN_ID, new Email("jane.smith@example.com")))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CANNOT_REMOVE_LAST_ADMIN);

@@ -1,10 +1,11 @@
 package pl.m22.gamehive.user.dto;
 
 import java.util.Set;
+import java.util.UUID;
 
 public record UserResponseDto(
 
-        Long id,
+        UUID id,
         String username,
         String email,
         boolean enabled,

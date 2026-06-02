@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.common.domain.Email;
+import pl.m22.gamehive.support.SeededUsers;
 import pl.m22.gamehive.user.service.UserService;
 
 import java.util.Objects;
@@ -50,10 +51,10 @@ class UserAuthStateCacheTest {
 
     @AfterEach
     void tearDown() {
-        if (!userService.findUserById(2L).isEnabled()) {
-            userService.activateUser(2L);
+        if (!userService.findUserById(SeededUsers.JANE_ID).isEnabled()) {
+            userService.activateUser(SeededUsers.JANE_ID);
         }
-        userService.updateUserRoles(2L, Set.of("ROLE_USER"), new Email("john.doe@example.com")); // przywróć role jane
+        userService.updateUserRoles(SeededUsers.JANE_ID, Set.of("ROLE_USER"), new Email("john.doe@example.com")); // przywróć role jane
         flushRedis();
         clearCache();
     }
@@ -67,7 +68,7 @@ class UserAuthStateCacheTest {
                 .andExpect(status().isOk());
         Assertions.assertNotNull(cache().get(JANE), "wpis powinien trafić do cache po żądaniu");
 
-        mockMvc.perform(patch("/api/v1/admin/users/2/deactivate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/deactivate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isOk());
 
@@ -83,7 +84,7 @@ class UserAuthStateCacheTest {
                 .andExpect(status().isOk());
         Assertions.assertNotNull(cache().get(JANE));
 
-        mockMvc.perform(put("/api/v1/admin/users/2/roles")
+        mockMvc.perform(put("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/roles")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roles\":[\"ROLE_MODERATOR\"]}"))

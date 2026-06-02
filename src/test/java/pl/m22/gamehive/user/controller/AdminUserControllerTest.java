@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.support.SeededUsers;
 
 import java.util.Objects;
 import java.util.Set;
@@ -88,7 +89,7 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("GET /api/v1/admin/users/{id} istniejący -> 200")
     void getUserById_found_200() throws Exception {
-        mockMvc.perform(get("/api/v1/admin/users/1")
+        mockMvc.perform(get("/api/v1/admin/users/" + SeededUsers.JOHN_ID)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("john_doe"))
@@ -99,9 +100,18 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("GET /api/v1/admin/users/{id} nieistniejący -> 404")
     void getUserById_notFound_404() throws Exception {
-        mockMvc.perform(get("/api/v1/admin/users/999")
+        mockMvc.perform(get("/api/v1/admin/users/" + SeededUsers.UNKNOWN_ID)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/admin/users/{id} zły format UUID -> 400 (VALIDATION_ERROR)")
+    void getUserById_invalidUuid_400() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/users/not-a-uuid")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
     }
 
     // --- getUserByUsername ---
@@ -149,19 +159,19 @@ class AdminUserControllerTest {
     @Transactional
     @DisplayName("PUT /api/v1/admin/users/{id}/roles jako ADMIN -> 200 + zaktualizowane role")
     void updateUserRoles_asAdmin_200() throws Exception {
-        mockMvc.perform(put("/api/v1/admin/users/2/roles")
+        mockMvc.perform(put("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/roles")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roles\":[\"ROLE_MODERATOR\"]}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(2))
+                .andExpect(jsonPath("$.id").value(SeededUsers.JANE_ID.toString()))
                 .andExpect(jsonPath("$.roles", containsInAnyOrder("ROLE_MODERATOR")));
     }
 
     @Test
     @DisplayName("PUT /api/v1/admin/users/{id}/roles jako USER -> 403")
     void updateUserRoles_asUser_403() throws Exception {
-        mockMvc.perform(put("/api/v1/admin/users/2/roles")
+        mockMvc.perform(put("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/roles")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roles\":[\"ROLE_MODERATOR\"]}"))
@@ -171,7 +181,7 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("PUT /api/v1/admin/users/{id}/roles bez tokena -> 401")
     void updateUserRoles_unauthenticated_401() throws Exception {
-        mockMvc.perform(put("/api/v1/admin/users/2/roles")
+        mockMvc.perform(put("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/roles")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roles\":[\"ROLE_MODERATOR\"]}"))
                 .andExpect(status().isUnauthorized());
@@ -180,7 +190,7 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("PUT /api/v1/admin/users/{id}/roles nieistniejący user -> 404")
     void updateUserRoles_userNotFound_404() throws Exception {
-        mockMvc.perform(put("/api/v1/admin/users/999/roles")
+        mockMvc.perform(put("/api/v1/admin/users/" + SeededUsers.UNKNOWN_ID + "/roles")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roles\":[\"ROLE_USER\"]}"))
@@ -190,7 +200,7 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("PUT /api/v1/admin/users/{id}/roles nieistniejąca rola -> 404")
     void updateUserRoles_roleNotFound_404() throws Exception {
-        mockMvc.perform(put("/api/v1/admin/users/2/roles")
+        mockMvc.perform(put("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/roles")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roles\":[\"ROLE_GHOST\"]}"))
@@ -200,7 +210,7 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("PUT /api/v1/admin/users/{id}/roles self -> 403 (CANNOT_MODIFY_OWN_ACCOUNT)")
     void updateUserRoles_self_403() throws Exception {
-        mockMvc.perform(put("/api/v1/admin/users/1/roles")
+        mockMvc.perform(put("/api/v1/admin/users/" + SeededUsers.JOHN_ID + "/roles")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roles\":[\"ROLE_USER\"]}"))
@@ -210,7 +220,7 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("PUT /api/v1/admin/users/{id}/roles pusty zbiór ról -> 400 (validation)")
     void updateUserRoles_emptyRoles_400() throws Exception {
-        mockMvc.perform(put("/api/v1/admin/users/2/roles")
+        mockMvc.perform(put("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/roles")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roles\":[]}"))
@@ -223,17 +233,17 @@ class AdminUserControllerTest {
     @Transactional
     @DisplayName("PATCH /api/v1/admin/users/{id}/deactivate jako ADMIN -> 200 + enabled=false")
     void deactivateUser_asAdmin_200() throws Exception {
-        mockMvc.perform(patch("/api/v1/admin/users/2/deactivate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/deactivate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(2))
+                .andExpect(jsonPath("$.id").value(SeededUsers.JANE_ID.toString()))
                 .andExpect(jsonPath("$.enabled").value(false));
     }
 
     @Test
     @DisplayName("PATCH /api/v1/admin/users/{id}/deactivate jako USER -> 403")
     void deactivateUser_asUser_403() throws Exception {
-        mockMvc.perform(patch("/api/v1/admin/users/2/deactivate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/deactivate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }
@@ -241,7 +251,7 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("PATCH /api/v1/admin/users/{id}/deactivate nieistniejący user -> 404")
     void deactivateUser_userNotFound_404() throws Exception {
-        mockMvc.perform(patch("/api/v1/admin/users/999/deactivate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.UNKNOWN_ID + "/deactivate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }
@@ -249,7 +259,7 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("PATCH /api/v1/admin/users/{id}/deactivate self -> 403 (CANNOT_MODIFY_OWN_ACCOUNT)")
     void deactivateUser_self_403() throws Exception {
-        mockMvc.perform(patch("/api/v1/admin/users/1/deactivate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JOHN_ID + "/deactivate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isForbidden());
     }
@@ -260,21 +270,21 @@ class AdminUserControllerTest {
     @Transactional
     @DisplayName("PATCH /api/v1/admin/users/{id}/activate jako ADMIN -> 200 + enabled=true")
     void activateUser_asAdmin_200() throws Exception {
-        mockMvc.perform(patch("/api/v1/admin/users/2/deactivate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/deactivate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(patch("/api/v1/admin/users/2/activate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/activate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(2))
+                .andExpect(jsonPath("$.id").value(SeededUsers.JANE_ID.toString()))
                 .andExpect(jsonPath("$.enabled").value(true));
     }
 
     @Test
     @DisplayName("PATCH /api/v1/admin/users/{id}/activate jako USER -> 403")
     void activateUser_asUser_403() throws Exception {
-        mockMvc.perform(patch("/api/v1/admin/users/2/activate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/activate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }
@@ -282,14 +292,14 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("PATCH /api/v1/admin/users/{id}/activate bez tokena -> 401")
     void activateUser_unauthenticated_401() throws Exception {
-        mockMvc.perform(patch("/api/v1/admin/users/2/activate"))
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/activate"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     @DisplayName("PATCH /api/v1/admin/users/{id}/activate nieistniejący user -> 404")
     void activateUser_userNotFound_404() throws Exception {
-        mockMvc.perform(patch("/api/v1/admin/users/999/activate")
+        mockMvc.perform(patch("/api/v1/admin/users/" + SeededUsers.UNKNOWN_ID + "/activate")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }
@@ -300,11 +310,11 @@ class AdminUserControllerTest {
     @Transactional
     @DisplayName("DELETE /api/v1/admin/users/{id} jako ADMIN -> 204")
     void deleteUser_asAdmin_204() throws Exception {
-        mockMvc.perform(delete("/api/v1/admin/users/2")
+        mockMvc.perform(delete("/api/v1/admin/users/" + SeededUsers.JANE_ID)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/v1/admin/users/2")
+        mockMvc.perform(get("/api/v1/admin/users/" + SeededUsers.JANE_ID)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }
@@ -312,7 +322,7 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("DELETE /api/v1/admin/users/{id} jako USER -> 403")
     void deleteUser_asUser_403() throws Exception {
-        mockMvc.perform(delete("/api/v1/admin/users/2")
+        mockMvc.perform(delete("/api/v1/admin/users/" + SeededUsers.JANE_ID)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }
@@ -320,14 +330,14 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("DELETE /api/v1/admin/users/{id} bez tokena -> 401")
     void deleteUser_unauthenticated_401() throws Exception {
-        mockMvc.perform(delete("/api/v1/admin/users/2"))
+        mockMvc.perform(delete("/api/v1/admin/users/" + SeededUsers.JANE_ID))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     @DisplayName("DELETE /api/v1/admin/users/{id} nieistniejący user -> 404")
     void deleteUser_userNotFound_404() throws Exception {
-        mockMvc.perform(delete("/api/v1/admin/users/999")
+        mockMvc.perform(delete("/api/v1/admin/users/" + SeededUsers.UNKNOWN_ID)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }
@@ -335,7 +345,7 @@ class AdminUserControllerTest {
     @Test
     @DisplayName("DELETE /api/v1/admin/users/{id} self -> 403 (CANNOT_MODIFY_OWN_ACCOUNT)")
     void deleteUser_self_403() throws Exception {
-        mockMvc.perform(delete("/api/v1/admin/users/1")
+        mockMvc.perform(delete("/api/v1/admin/users/" + SeededUsers.JOHN_ID)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isForbidden());
     }
