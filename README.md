@@ -35,6 +35,17 @@
 
 ---
 
+## Uwagi o migracjach (dev/test)
+
+- `V3__migrate_app_user_to_uuid.sql` zmienia PK `application_users` z `BIGINT` na `uuid`
+  (UUID v7) metodą **drop & recreate**: usuwa FK, robi `TRUNCATE` na `application_users`
+  i `user_roles`, zmienia typy kolumn, odtwarza FK. **Migracja jest destrukcyjna** —
+  czyści użytkowników (w dev odtwarza ich `DevDataInitializer`). Dozwolona tylko dlatego,
+  że nie ma danych produkcyjnych. Na bazie z realnymi danymi należałoby zamiast tego użyć
+  kolumny `id_new uuid` + backfill + przepięcie FK + drop starej kolumny.
+- Flyway pod **Spring Boot 4** wymaga zależności `spring-boot-starter-flyway` — sam
+  `flyway-core` nie aktywuje już autokonfiguracji (migracje po cichu się nie wykonują).
+
 ## Plan działania: Użytkownicy i autoryzacja
 
 1. ***Projektowanie bazy danych***
