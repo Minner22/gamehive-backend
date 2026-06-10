@@ -57,6 +57,12 @@ public class UserSecurityEventListener {
         revoke(event.email());
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    void onUserForceLoggedOut(UserForceLoggedOutEvent event) {
+
+        revoke(event.email());
+    }
+
     private void revoke(String email) {
 
         refreshTokenStore.revokeAllByUserEmail(email);
