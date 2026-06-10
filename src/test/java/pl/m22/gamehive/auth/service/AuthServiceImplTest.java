@@ -32,6 +32,7 @@ import static org.mockito.Mockito.*;
 class AuthServiceImplTest {
 
     private static final String NEW_USER_EMAIL = "newuser@test.com";
+    private static final String RESEND_EMAIL = "resend_svc@test.com";
 
     @Autowired AuthService authService;
     @Autowired UserRepository userRepository;
@@ -41,6 +42,7 @@ class AuthServiceImplTest {
     void deleteNewUsers() {
 
         userRepository.findByEmail(NEW_USER_EMAIL).ifPresent(userRepository::delete);
+        userRepository.findByEmail(RESEND_EMAIL).ifPresent(userRepository::delete);
     }
 
     @Test
@@ -120,5 +122,36 @@ class AuthServiceImplTest {
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.USERNAME_ALREADY_EXISTS);
 
+    }
+
+    @Test
+    @DisplayName("resendActivationEmail() nieaktywne konto -> mail wysłany")
+    void resendActivationEmail_inactiveUser_sendsMail() {
+
+        authService.register(new RegistrationDto("resend_svc", RESEND_EMAIL, "password123"));
+        clearInvocations(mailSender);   // pomiń mail z rejestracji
+
+        authService.resendActivationEmail(new Email(RESEND_EMAIL));
+
+        verify(mailSender).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    @DisplayName("resendActivationEmail() aktywne konto -> mail NIE wysłany")
+    void resendActivationEmail_activeUser_doesNotSendMail() {
+
+        // john.doe@example.com jest seedowany w data.sql jako aktywny (loguje się w innych testach)
+        authService.resendActivationEmail(new Email("john.doe@example.com"));
+
+        verify(mailSender, never()).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    @DisplayName("resendActivationEmail() nieistniejące konto -> mail NIE wysłany (anty-enumeracja)")
+    void resendActivationEmail_nonExistingUser_doesNotSendMail() {
+
+        authService.resendActivationEmail(new Email("nobody@test.com"));
+
+        verify(mailSender, never()).send(any(SimpleMailMessage.class));
     }
 }

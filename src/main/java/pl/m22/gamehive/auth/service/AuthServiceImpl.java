@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
+import pl.m22.gamehive.auth.event.ActivationEmailResendRequestedEvent;
 import pl.m22.gamehive.auth.event.PasswordResetRequestedEvent;
 import pl.m22.gamehive.auth.event.UserRegisteredEvent;
 import pl.m22.gamehive.common.domain.Email;
@@ -101,6 +102,15 @@ public class AuthServiceImpl implements AuthService{
         // @Transactional jest tu wymagane: listener UserCredentialsChangedEvent jest AFTER_COMMIT,
         // bez aktywnej transakcji zdarzenie nie zostałoby dostarczone (sesje nie zostałyby unieważnione).
         eventPublisher.publishEvent(new UserCredentialsChangedEvent(email.value()));
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public void resendActivationEmail(Email email) {
+
+        userRepository.findByEmail(email)
+                .filter(user -> !user.isEnabled())
+                .ifPresent(_ -> eventPublisher.publishEvent(new ActivationEmailResendRequestedEvent(email.value())));
     }
 
     private AppUser registerUser(RegistrationDto registrationDto) {

@@ -16,4 +16,6 @@ public interface AuthService {
     void requestPasswordReset(Email email);
 
     void confirmPasswordReset(Email email, String newPassword);
+
+    void resendActivationEmail(Email email);
 }

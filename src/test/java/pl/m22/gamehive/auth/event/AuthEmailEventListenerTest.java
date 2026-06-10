@@ -3,11 +3,13 @@ package pl.m22.gamehive.auth.event;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.common.email.service.MailService;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -22,6 +24,7 @@ class AuthEmailEventListenerTest {
 
     @Mock JwtService jwtService;
     @Mock MailService mailService;
+    @Mock RedisSessionEpochStore sessionEpochStore;
     @InjectMocks AuthEmailEventListener listener;
 
     @Test
@@ -86,5 +89,30 @@ class AuthEmailEventListenerTest {
         assertDoesNotThrow(() -> listener.onPasswordResetRequested(new PasswordResetRequestedEvent(EMAIL)));
 
         verifyNoInteractions(mailService);
+    }
+
+    @Test
+    @DisplayName("onActivationEmailResendRequested() -> ustawia epokę PRZED tokenem i wysyła świeży mail aktywacyjny")
+    void onActivationEmailResendRequested_invalidatesThenSends() {
+
+        when(jwtService.generateToken(EMAIL, JwtTokenType.ACTIVATION, null)).thenReturn("fresh-activation-token");
+
+        listener.onActivationEmailResendRequested(new ActivationEmailResendRequestedEvent(EMAIL));
+
+        // kolejność jest istotna poprawnościowo: epoka -> generacja tokenu -> wysyłka
+        InOrder inOrder = inOrder(sessionEpochStore, jwtService, mailService);
+        inOrder.verify(sessionEpochStore).invalidateActivationNow(EMAIL);
+        inOrder.verify(jwtService).generateToken(EMAIL, JwtTokenType.ACTIVATION, null);
+        inOrder.verify(mailService).sendActivationEmail(EMAIL, "fresh-activation-token");
+    }
+
+    @Test
+    @DisplayName("onActivationEmailResendRequested() -> błąd wysyłki maila nie propaguje wyjątku")
+    void onActivationEmailResendRequested_mailFails_doesNotPropagate() {
+
+        when(jwtService.generateToken(EMAIL, JwtTokenType.ACTIVATION, null)).thenReturn("fresh-activation-token");
+        doThrow(new RuntimeException("SMTP down")).when(mailService).sendActivationEmail(eq(EMAIL), any());
+
+        assertDoesNotThrow(() -> listener.onActivationEmailResendRequested(new ActivationEmailResendRequestedEvent(EMAIL)));
     }
 }
