@@ -12,8 +12,7 @@ import pl.m22.gamehive.auth.jwt.service.RedisRefreshTokenStore;
 import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.config.CacheConfig;
 
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserSecurityEventListenerTest {
@@ -36,5 +35,33 @@ class UserSecurityEventListenerTest {
         verify(refreshTokenStore).revokeAllByUserEmail(email);
         verify(sessionEpochStore).invalidateNow(email);
         verify(cache).evict(email);
+    }
+
+    // Inwariant: reaktywacja i zmiana ról to evict-only — NIE wolno im rewokować refresh ani zerować epoch
+    // (inaczej reaktywacja wskrzeszałaby stare tokeny). Integracja pilnuje tylko eviction/utrzymanego epoch;
+    // tu domykamy stronę negatywną na poziomie jednostki.
+
+    @Test
+    @DisplayName("onUserReactivated() -> tylko eviction cache, BEZ rewokacji refresh/epoch")
+    void onUserReactivated_onlyEvictsCache() {
+        String email = "jane.smith@example.com";
+        when(cacheManager.getCache(CacheConfig.USER_AUTH_STATE)).thenReturn(cache);
+
+        listener.onUserReactivated(new UserReactivatedEvent(email));
+
+        verify(cache).evict(email);
+        verifyNoInteractions(refreshTokenStore, sessionEpochStore);
+    }
+
+    @Test
+    @DisplayName("onUserRolesUpdated() -> tylko eviction cache, BEZ rewokacji refresh/epoch")
+    void onUserRolesUpdated_onlyEvictsCache() {
+        String email = "jane.smith@example.com";
+        when(cacheManager.getCache(CacheConfig.USER_AUTH_STATE)).thenReturn(cache);
+
+        listener.onUserRolesUpdated(new UserRolesUpdatedEvent(email));
+
+        verify(cache).evict(email);
+        verifyNoInteractions(refreshTokenStore, sessionEpochStore);
     }
 }
