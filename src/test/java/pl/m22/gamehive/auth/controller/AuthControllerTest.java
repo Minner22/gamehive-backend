@@ -26,7 +26,7 @@ import java.util.Set;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -50,6 +50,9 @@ class AuthControllerTest {
         userService.deleteUserByEmail("ctrl_notactivated@test.com");
         userService.deleteUserByEmail("ctrl_pwreset@test.com");
         userService.deleteUserByEmail("ctrl_actepoch@test.com");
+        userService.deleteUserByEmail("ctrl_resend@test.com");
+        userService.deleteUserByEmail("ctrl_resend_active@test.com");
+        userService.deleteUserByEmail("ctrl_resend_stale@test.com");
     }
 
     @Test
@@ -315,5 +318,107 @@ class AuthControllerTest {
 
         mockMvc.perform(get("/api/v1/auth/activate").param("token", staleToken))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("POST /activation/resend nieaktywne konto -> 200, świeży mail wysłany")
+    void resendActivation_inactiveAccount_200_sendsMail() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""                                                                                                                                                                                                  
+                              {"username":"ctrl_resend","email":"ctrl_resend@test.com","password":"password123"}
+                              """))
+                .andExpect(status().isOk());   // 1. mail (rejestracja)
+
+        mockMvc.perform(post("/api/v1/auth/activation/resend")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""                                                                                                                                                                                                  
+                              {"email":"ctrl_resend@test.com"}
+                              """))
+                .andExpect(status().isOk());
+
+        verify(mailSender, times(2)).send(any(SimpleMailMessage.class));   // rejestracja + resend
+    }
+
+    @Test
+    @DisplayName("POST /activation/resend aktywne konto -> 200, brak wysyłki")
+    void resendActivation_activeAccount_200_noMail() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""                                                                                                                                                                                                  
+                              {"username":"ctrl_res_act","email":"ctrl_resend_active@test.com","password":"password123"}
+                              """))
+                .andExpect(status().isOk());
+
+        String token = jwtService.generateToken("ctrl_resend_active@test.com", JwtTokenType.ACTIVATION, null);
+        mockMvc.perform(get("/api/v1/auth/activate").param("token", token))
+                .andExpect(status().isOk());
+
+        clearInvocations(mailSender);   // pomiń mail z rejestracji
+
+        mockMvc.perform(post("/api/v1/auth/activation/resend")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""                                                                                                                                                                                                  
+                              {"email":"ctrl_resend_active@test.com"}
+                              """))
+                .andExpect(status().isOk());
+
+        verify(mailSender, never()).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    @DisplayName("POST /activation/resend nieistniejące konto -> 200, brak wysyłki (anty-enumeracja)")
+    void resendActivation_nonExisting_200_noMail() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/activation/resend")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""                                                                                                                                                                                                  
+                              {"email":"nobody@test.com"}
+                              """))
+                .andExpect(status().isOk());
+
+        verify(mailSender, never()).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    @DisplayName("POST /activation/resend nieprawidłowy format email -> 400")
+    void resendActivation_invalidEmail_400() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/activation/resend")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""                                                                                                                                                                                                  
+                              {"email":"notanemail"}
+                              """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Po resendzie stary token aktywacyjny -> 401, świeży token -> 200")
+    void resendActivation_oldTokenRevoked_newTokenWorks() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""                                                                                                                                                                                                  
+                              {"username":"ctrl_res_stale","email":"ctrl_resend_stale@test.com","password":"password123"}
+                              """))
+                .andExpect(status().isOk());
+
+        String oldToken = jwtService.generateToken("ctrl_resend_stale@test.com", JwtTokenType.ACTIVATION, null);
+
+        // gwarancja, że epoka resendu trafi w późniejszą pełną sekundę niż iat starego tokenu (iat ucinany do sekund)
+        Thread.sleep(1100);
+
+        mockMvc.perform(post("/api/v1/auth/activation/resend")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""                                                                                                                                                                                                  
+                              {"email":"ctrl_resend_stale@test.com"}
+                              """))
+                .andExpect(status().isOk());
+
+        // stary link już nie działa
+        mockMvc.perform(get("/api/v1/auth/activate").param("token", oldToken))
+                .andExpect(status().isUnauthorized());
+
+        // token wydany po resendzie (iat >= epoki) nadal aktywuje konto
+        String newToken = jwtService.generateToken("ctrl_resend_stale@test.com", JwtTokenType.ACTIVATION, null);
+        mockMvc.perform(get("/api/v1/auth/activate").param("token", newToken))
+                .andExpect(status().isOk());
     }
 }

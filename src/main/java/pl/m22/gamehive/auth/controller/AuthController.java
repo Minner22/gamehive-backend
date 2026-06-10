@@ -154,6 +154,17 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/activation/resend")
+    public ResponseEntity<Void> resendActivationEmail(@Valid @RequestBody ResendActivationEmailDto dto) {
+
+        Email email = new Email(dto.email());
+
+        authService.resendActivationEmail(email);
+        log.info("Activation email resend requested for: {}", email.obfuscated());
+
+        return ResponseEntity.ok().build();
+    }
+
     private ResponseEntity<Map<String, String>> generateTokens(CredentialsDto userCredentials) {
 
         TokenPairDto loginResponse = jwtService.generateTokenPair(userCredentials);
