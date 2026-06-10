@@ -25,6 +25,8 @@ import static org.mockito.Mockito.*;
 // NOTE: this class must NOT be @Transactional — verify(mailSender) relies on register()/requestPasswordReset()
 // actually committing so the @TransactionalEventListener(AFTER_COMMIT) fires. A test-level @Transactional would
 // roll back, the listener would never run, and the mail verifications would fail misleadingly.
+// The listener is also @Async("authEmailExecutor"); under the "test" profile that bean is a SyncTaskExecutor
+// (TestAsyncConfig), so the dispatch runs inline on the caller thread and verify(mailSender) stays deterministic.
 @SpringBootTest
 @ActiveProfiles("test")
 class AuthServiceImplTest {

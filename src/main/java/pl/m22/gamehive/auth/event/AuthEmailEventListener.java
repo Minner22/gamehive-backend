@@ -2,6 +2,7 @@ package pl.m22.gamehive.auth.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -20,12 +21,14 @@ public class AuthEmailEventListener {
     private final JwtService jwtService;
     private final MailService mailService;
 
+    @Async("authEmailExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserRegistered(UserRegisteredEvent event) {
 
         dispatch(event.email(), JwtTokenType.ACTIVATION, mailService::sendActivationEmail, "activation");
     }
 
+    @Async("authEmailExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPasswordResetRequested(PasswordResetRequestedEvent event) {
 
