@@ -41,6 +41,8 @@ public interface UserService {
     AppUser activateUser(UUID userId);
     void deleteUser(UUID userId, Email requesterEmail);
 
+    void forceLogoutUser(UUID userId, Email requesterEmail);
+
     UserProfile updateCurrentUserProfile(Email email, UserProfileUpdateDto userProfileUpdateDto);
 
 }

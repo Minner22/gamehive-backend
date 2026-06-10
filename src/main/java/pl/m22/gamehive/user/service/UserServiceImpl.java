@@ -13,10 +13,7 @@ import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
-import pl.m22.gamehive.user.event.UserDeactivatedEvent;
-import pl.m22.gamehive.user.event.UserDeletedEvent;
-import pl.m22.gamehive.user.event.UserReactivatedEvent;
-import pl.m22.gamehive.user.event.UserRolesUpdatedEvent;
+import pl.m22.gamehive.user.event.*;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.UserProfile;
@@ -188,6 +185,16 @@ public class UserServiceImpl implements UserService {
 
         userRepository.delete(user);
         eventPublisher.publishEvent(new UserDeletedEvent(email));
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public void forceLogoutUser(UUID userId, Email requesterEmail) {
+
+        guardOwnAccount(userId, requesterEmail);
+        AppUser user = findUserById(userId);
+
+        eventPublisher.publishEvent(new UserForceLoggedOutEvent(user.getEmail().value()));
     }
 
     private void guardOwnAccount(UUID targetUserId, Email requesterEmail) {

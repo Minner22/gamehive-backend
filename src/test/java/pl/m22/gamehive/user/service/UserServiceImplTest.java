@@ -20,6 +20,7 @@ import pl.m22.gamehive.support.SeededUsers;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
 import pl.m22.gamehive.user.event.UserDeactivatedEvent;
 import pl.m22.gamehive.user.event.UserDeletedEvent;
+import pl.m22.gamehive.user.event.UserForceLoggedOutEvent;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.UserProfile;
 import pl.m22.gamehive.user.model.UserRole;
@@ -489,4 +490,51 @@ class UserServiceImplTest {
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CANNOT_REMOVE_LAST_ADMIN);
     }
+
+    // --- forceLogout ---
+
+    @Test
+    @Transactional
+    @DisplayName("forceLogout() -> publikuje UserForceLoggedOutEvent (rewokacja Redis dzieje się AFTER_COMMIT)")
+    void forceLogout_publishes_event() {
+
+        userService.forceLogoutUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
+
+        long count = applicationEvents.stream(UserForceLoggedOutEvent.class)
+                .filter(e -> e.email().equals("jane.smith@example.com"))
+                .count();
+        assertEquals(1, count);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("forceLogout() -> nie zmienia stanu konta (enabled pozostaje true)")
+    void forceLogout_does_not_change_account_state() {
+
+        userService.forceLogoutUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
+
+        AppUser user = userService.findUserById(SeededUsers.JANE_ID);
+        assertTrue(user.isEnabled());
+    }
+
+    @Test
+    @DisplayName("forceLogout() -> self -> DomainException CANNOT_MODIFY_OWN_ACCOUNT")
+    void forceLogout_self_blocked() {
+
+        assertThatThrownBy(() -> userService.forceLogoutUser(SeededUsers.JOHN_ID, new Email("john.doe@example.com")))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CANNOT_MODIFY_OWN_ACCOUNT);
+    }
+
+    @Test
+    @DisplayName("forceLogout() -> nieistniejący user -> ApplicationException USER_NOT_FOUND")
+    void forceLogout_user_not_found() {
+
+        assertThatThrownBy(() -> userService.forceLogoutUser(SeededUsers.UNKNOWN_ID, new Email("john.doe@example.com")))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.USER_NOT_FOUND);
+    }
+
 }
