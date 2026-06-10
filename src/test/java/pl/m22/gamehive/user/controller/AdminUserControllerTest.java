@@ -350,6 +350,56 @@ class AdminUserControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    // --- POST /{id}/force-logout ---
+
+    @Test
+    @DisplayName("POST /api/v1/admin/users/{id}/force-logout jako ADMIN -> 204")
+    void forceLogout_asAdmin_204() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/force-logout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/admin/users/{id}/force-logout jako USER -> 403")
+    void forceLogout_asUser_403() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/force-logout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/admin/users/{id}/force-logout bez tokena -> 401")
+    void forceLogout_unauthenticated_401() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/force-logout"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/admin/users/{id}/force-logout nieistniejący user -> 404")
+    void forceLogout_userNotFound_404() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/users/" + SeededUsers.UNKNOWN_ID + "/force-logout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/admin/users/{id}/force-logout self -> 403 (CANNOT_MODIFY_OWN_ACCOUNT)")
+    void forceLogout_self_403() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/users/" + SeededUsers.JOHN_ID + "/force-logout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/admin/users/{id}/force-logout zły format UUID -> 400 (VALIDATION_ERROR)")
+    void forceLogout_invalidUuid_400() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/users/not-a-uuid/force-logout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+    }
+
     private void clearCache() {
         Cache c = cacheManager.getCache("userAuthState");
 
