@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
 import pl.m22.gamehive.user.service.UserService;
 
@@ -39,6 +40,7 @@ class AuthControllerTest {
     @Autowired JwtService jwtService;
     @Autowired UserService userService;
     @Autowired TokenBlacklistService tokenBlacklistService;
+    @Autowired RedisSessionEpochStore sessionEpochStore;
     @MockitoBean JavaMailSender mailSender;
 
     @AfterEach
@@ -47,6 +49,7 @@ class AuthControllerTest {
         userService.deleteUserByEmail("ctrl_activate@test.com");
         userService.deleteUserByEmail("ctrl_notactivated@test.com");
         userService.deleteUserByEmail("ctrl_pwreset@test.com");
+        userService.deleteUserByEmail("ctrl_actepoch@test.com");
     }
 
     @Test
@@ -291,5 +294,26 @@ class AuthControllerTest {
                                 {"token":"","newPassword":""}
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /activate token sprzed epoki aktywacji -> 401 (zrewokowany)")
+    void activate_tokenBeforeActivationEpoch_401() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""                                                                                                                                                                                                  
+                              {"username":"ctrl_actepoch","email":"ctrl_actepoch@test.com","password":"password123"}
+                              """))
+                .andExpect(status().isOk());
+
+        String staleToken = jwtService.generateToken("ctrl_actepoch@test.com", JwtTokenType.ACTIVATION, null);
+
+        // epoka musi trafić w PÓŹNIEJSZĄ pełną sekundę niż iat staleToken (iat jest ucinany do sekund),
+        // inaczej iat == epoka i ostre porównanie (<) by nie odrzuciło tokenu
+        Thread.sleep(1100);
+        sessionEpochStore.invalidateActivationNow("ctrl_actepoch@test.com");
+
+        mockMvc.perform(get("/api/v1/auth/activate").param("token", staleToken))
+                .andExpect(status().isUnauthorized());
     }
 }

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import pl.m22.gamehive.auth.dto.*;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
 import pl.m22.gamehive.auth.service.AuthService;
 import pl.m22.gamehive.common.domain.Email;
@@ -20,6 +21,7 @@ import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.service.UserService;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 
@@ -36,6 +38,7 @@ public class AuthController {
     private final TokenBlacklistService tokenBlacklistService;
     private final UserMapper userMapper;
     private final UserService userService;
+    private final RedisSessionEpochStore sessionEpochStore;
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegistrationDto registrationDto) {
@@ -56,6 +59,13 @@ public class AuthController {
         }
 
         Email email = new Email(jwtService.extractEmailFromToken(token));
+
+        Instant issuedAt = jwtService.extractIssuedAtFromToken(token);
+        Long invalidAfter = sessionEpochStore.getActivationInvalidAfter(email.value());
+        if (invalidAfter != null && issuedAt != null && issuedAt.toEpochMilli() < invalidAfter) {
+            throw new ApplicationException(ErrorCode.TOKEN_REVOKED, "Activation token has been suspended by a newer one");
+        }
+
         authService.activateUser(email);
 
         tokenBlacklistService.blacklistToken(token);
