@@ -100,4 +100,14 @@ public class AdminUserController {
 
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{id}/force-logout")
+    public ResponseEntity<Void> forceLogout(@PathVariable UUID id, Authentication authentication) {
+
+        Email requester = new Email(authentication.getName());
+
+        userService.forceLogoutUser(id, requester);
+
+        return ResponseEntity.noContent().build();
+    }
 }
