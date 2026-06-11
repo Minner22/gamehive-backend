@@ -52,7 +52,7 @@ class UserAuthStateCacheTest {
     @AfterEach
     void tearDown() {
         if (!userService.findUserById(SeededUsers.JANE_ID).isEnabled()) {
-            userService.activateUser(SeededUsers.JANE_ID);
+            userService.activateUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
         }
         userService.updateUserRoles(SeededUsers.JANE_ID, Set.of("ROLE_USER"), new Email("john.doe@example.com")); // przywróć role jane
         flushRedis();

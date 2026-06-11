@@ -38,7 +38,7 @@ public interface UserService {
 
     AppUser updateUserRoles(UUID userId, Set<String> roleNames, Email requesterEmail);
     AppUser deactivateUser(UUID userId, Email requesterEmail);
-    AppUser activateUser(UUID userId);
+    AppUser activateUser(UUID userId, Email requesterEmail);
     void deleteUser(UUID userId, Email requesterEmail);
 
     void forceLogoutUser(UUID userId, Email requesterEmail);

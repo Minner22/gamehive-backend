@@ -18,10 +18,12 @@ import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.support.SeededUsers;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
+import pl.m22.gamehive.user.event.UserAuditEvent;
 import pl.m22.gamehive.user.event.UserDeactivatedEvent;
 import pl.m22.gamehive.user.event.UserDeletedEvent;
 import pl.m22.gamehive.user.event.UserForceLoggedOutEvent;
 import pl.m22.gamehive.user.model.AppUser;
+import pl.m22.gamehive.user.model.AuditAction;
 import pl.m22.gamehive.user.model.UserProfile;
 import pl.m22.gamehive.user.model.UserRole;
 
@@ -339,6 +341,23 @@ class UserServiceImplTest {
         assertEquals(Set.of("ROLE_USER"), names);
     }
 
+    @Test
+    @Transactional
+    @DisplayName("updateUserRoles() -> publikuje UserAuditEvent ROLE_CHANGE z actor + before/after")
+    void updateUserRoles_publishesAuditEvent() {
+
+        userService.updateUserRoles(SeededUsers.JANE_ID, Set.of("ROLE_MODERATOR"), new Email("john.doe@example.com"));
+
+        UserAuditEvent event = applicationEvents.stream(UserAuditEvent.class)
+                .filter(e -> e.targetId().equals(SeededUsers.JANE_ID))
+                .findFirst().orElseThrow();
+        assertEquals(AuditAction.ROLE_CHANGE, event.action());
+        assertEquals("jane.smith@example.com", event.targetEmail());
+        assertEquals("john.doe@example.com", event.actor());
+        assertTrue(event.details().contains("ROLE_USER"));       // before
+        assertTrue(event.details().contains("ROLE_MODERATOR"));  // after
+    }
+
     // --- deactivateUser ---
 
     @Test
@@ -408,6 +427,21 @@ class UserServiceImplTest {
         assertFalse(john.isEnabled());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("deactivateUser() -> publikuje UserAuditEvent DEACTIVATE z actor")
+    void deactivateUser_publishesAuditEvent() {
+
+        userService.deactivateUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
+
+        long count = applicationEvents.stream(UserAuditEvent.class)
+                .filter(e -> e.targetId().equals(SeededUsers.JANE_ID)
+                        && e.action() == AuditAction.DEACTIVATE
+                        && e.actor().equals("john.doe@example.com"))
+                .count();
+        assertEquals(1, count);
+    }
+
     // --- activateUser ---
 
     @Test
@@ -417,7 +451,7 @@ class UserServiceImplTest {
 
         userService.deactivateUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
 
-        userService.activateUser(SeededUsers.JANE_ID);
+        userService.activateUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
 
         AppUser user = userService.findUserById(SeededUsers.JANE_ID);
         assertTrue(user.isEnabled());
@@ -427,10 +461,26 @@ class UserServiceImplTest {
     @DisplayName("activateUser() -> nieistniejący user -> DomainException USER_NOT_FOUND")
     void activateUser_user_not_found() {
 
-        assertThatThrownBy(() -> userService.activateUser(SeededUsers.UNKNOWN_ID))
+        assertThatThrownBy(() -> userService.activateUser(SeededUsers.UNKNOWN_ID, new Email("john.doe@example.com")))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("activateUser() -> publikuje UserAuditEvent ACTIVATE z actor")
+    void activateUser_publishesAuditEvent() {
+
+        userService.deactivateUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
+        userService.activateUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
+
+        long count = applicationEvents.stream(UserAuditEvent.class)
+                .filter(e -> e.targetId().equals(SeededUsers.JANE_ID)
+                        && e.action() == AuditAction.ACTIVATE
+                        && e.actor().equals("john.doe@example.com"))
+                .count();
+        assertEquals(1, count);
     }
 
     // --- deleteUser ---
@@ -491,6 +541,21 @@ class UserServiceImplTest {
                 .isEqualTo(ErrorCode.CANNOT_REMOVE_LAST_ADMIN);
     }
 
+    @Test
+    @Transactional
+    @DisplayName("deleteUser() -> publikuje UserAuditEvent DELETE (target zachowany mimo usunięcia)")
+    void deleteUser_publishesAuditEvent() {
+
+        userService.deleteUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
+
+        UserAuditEvent event = applicationEvents.stream(UserAuditEvent.class)
+                .filter(e -> e.action() == AuditAction.DELETE)
+                .findFirst().orElseThrow();
+        assertEquals(SeededUsers.JANE_ID, event.targetId());
+        assertEquals("jane.smith@example.com", event.targetEmail());
+        assertEquals("john.doe@example.com", event.actor());
+    }
+
     // --- forceLogout ---
 
     @Test
@@ -535,6 +600,21 @@ class UserServiceImplTest {
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("forceLogout() -> publikuje UserAuditEvent FORCE_LOGOUT z actor")
+    void forceLogout_publishesAuditEvent() {
+
+        userService.forceLogoutUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
+
+        long count = applicationEvents.stream(UserAuditEvent.class)
+                .filter(e -> e.targetId().equals(SeededUsers.JANE_ID)
+                        && e.action() == AuditAction.FORCE_LOGOUT
+                        && e.actor().equals("john.doe@example.com"))
+                .count();
+        assertEquals(1, count);
     }
 
 }

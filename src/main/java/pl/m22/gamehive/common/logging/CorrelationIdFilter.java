@@ -12,7 +12,9 @@ import java.util.UUID;
 
 @Component
 public class CorrelationIdFilter implements Filter {
-    private static final String CORRELATION_ID = "correlationId";
+
+    public static final String CORRELATION_ID = "correlationId";
+
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
         HttpServletRequest request = (HttpServletRequest) servletRequest;

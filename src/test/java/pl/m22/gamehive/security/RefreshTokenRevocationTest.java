@@ -18,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.support.SeededUsers;
 import pl.m22.gamehive.user.service.UserService;
 
@@ -54,7 +55,7 @@ class RefreshTokenRevocationTest {
     @AfterEach
     void tearDown() {
         if (!userService.findUserById(SeededUsers.JANE_ID).isEnabled()) { // reaktywuj tylko jeśli zdezaktywowana
-            userService.activateUser(SeededUsers.JANE_ID);
+            userService.activateUser(SeededUsers.JANE_ID, new Email("john.doe@example.com"));
         }
         flushRedis();
     }
