@@ -14,8 +14,15 @@ import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.user.model.AuditAction;
+import pl.m22.gamehive.user.model.UserAuditLogEntry;
+import pl.m22.gamehive.user.repository.UserAuditLogRepository;
 import pl.m22.gamehive.user.repository.UserRepository;
 
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,6 +43,7 @@ class AuthServiceImplTest {
 
     @Autowired AuthService authService;
     @Autowired UserRepository userRepository;
+    @Autowired UserAuditLogRepository auditLogRepository;
     @MockitoBean JavaMailSender mailSender;
 
     @AfterEach
@@ -43,6 +51,8 @@ class AuthServiceImplTest {
 
         userRepository.findByEmail(NEW_USER_EMAIL).ifPresent(userRepository::delete);
         userRepository.findByEmail(RESEND_EMAIL).ifPresent(userRepository::delete);
+
+        auditLogRepository.deleteAll();
     }
 
     @Test
@@ -153,5 +163,23 @@ class AuthServiceImplTest {
         authService.resendActivationEmail(new Email("nobody@test.com"));
 
         verify(mailSender, never()).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    @DisplayName("confirmPasswordReset() -> zapisuje wpis audytu PASSWORD_CHANGE (actor == target)")
+    void confirmPasswordReset_writesAuditEntry() {
+
+        authService.register(new RegistrationDto("pwaudit", NEW_USER_EMAIL, "password123"));
+        clearInvocations(mailSender);   // pomiń mail z rejestracji
+
+        authService.confirmPasswordReset(new Email(NEW_USER_EMAIL), "newPassword1");
+
+        UUID targetId = userRepository.findByEmail(NEW_USER_EMAIL).orElseThrow().getId();
+        List<UserAuditLogEntry> entries = auditLogRepository.findByTargetId(targetId);
+        assertThat(entries).hasSize(1);
+        UserAuditLogEntry entry = entries.getFirst();
+        assertThat(entry.getAction()).isEqualTo(AuditAction.PASSWORD_CHANGE);
+        assertThat(entry.getActor()).isEqualTo(NEW_USER_EMAIL);
+        assertThat(entry.getTargetEmail()).isEqualTo(NEW_USER_EMAIL);
     }
 }
