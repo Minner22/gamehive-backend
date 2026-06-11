@@ -1,5 +1,6 @@
 package pl.m22.gamehive.user.controller;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,10 +20,13 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.support.SeededUsers;
+import pl.m22.gamehive.user.model.AuditAction;
+import pl.m22.gamehive.user.repository.UserAuditLogRepository;
 
 import java.util.Objects;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,6 +41,7 @@ class AdminUserControllerTest {
     @Autowired JwtService jwtService;
     @Autowired RedisTemplate<String, String> redisTemplate;
     @Autowired CacheManager cacheManager;
+    @Autowired UserAuditLogRepository auditLogRepository;
     @MockitoBean JavaMailSender mailSender;
 
     private String adminToken;
@@ -49,6 +54,11 @@ class AdminUserControllerTest {
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
 
         clearCache();
+    }
+
+    @AfterEach
+    void cleanupAudit() {
+        auditLogRepository.deleteAll();   // commitowane wpisy audytu z testów niezarządzanych transakcyjnie
     }
 
     // --- getAllUsers ---
@@ -398,6 +408,24 @@ class AdminUserControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("POST .../force-logout jako ADMIN -> zapisuje wpis audytu (actor, target, correlationId)")
+    void forceLogout_writesAuditEntry() throws Exception {
+
+        mockMvc.perform(post("/api/v1/admin/users/" + SeededUsers.JANE_ID + "/force-logout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .header("X-Correlation-Id", "test-corr-1"))
+                .andExpect(status().isNoContent());
+
+        var entries = auditLogRepository.findByTargetId(SeededUsers.JANE_ID);
+        assertThat(entries).hasSize(1);
+        var entry = entries.getFirst();
+        assertThat(entry.getAction()).isEqualTo(AuditAction.FORCE_LOGOUT);
+        assertThat(entry.getActor()).isEqualTo("john.doe@example.com");
+        assertThat(entry.getTargetEmail()).isEqualTo("jane.smith@example.com");
+        assertThat(entry.getCorrelationId()).isEqualTo("test-corr-1");
     }
 
     private void clearCache() {

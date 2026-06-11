@@ -1,6 +1,7 @@
 package pl.m22.gamehive.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,9 +18,12 @@ import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.logging.CorrelationIdFilter;
+import pl.m22.gamehive.user.event.UserAuditEvent;
 import pl.m22.gamehive.user.event.UserCredentialsChangedEvent;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.model.AppUser;
+import pl.m22.gamehive.user.model.AuditAction;
 import pl.m22.gamehive.user.model.UserRole;
 import pl.m22.gamehive.user.repository.UserRepository;
 import pl.m22.gamehive.user.repository.UserRoleRepository;
@@ -102,6 +106,14 @@ public class AuthServiceImpl implements AuthService{
         // @Transactional jest tu wymagane: listener UserCredentialsChangedEvent jest AFTER_COMMIT,
         // bez aktywnej transakcji zdarzenie nie zostałoby dostarczone (sesje nie zostałyby unieważnione).
         eventPublisher.publishEvent(new UserCredentialsChangedEvent(email.value()));
+        eventPublisher.publishEvent(new UserAuditEvent(
+                AuditAction.PASSWORD_CHANGE,
+                appUser.getId(),
+                email.value(),
+                email.value(),
+                null,
+                MDC.get(CorrelationIdFilter.CORRELATION_ID))
+        );
     }
 
     @Transactional(readOnly = true)

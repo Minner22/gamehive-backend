@@ -84,9 +84,11 @@ public class AdminUserController {
     }
 
     @PatchMapping("/{id}/activate")
-    public ResponseEntity<UserResponseDto> activateUser(@PathVariable UUID id) {
+    public ResponseEntity<UserResponseDto> activateUser(@PathVariable UUID id, Authentication authentication) {
 
-        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.activateUser(id));
+        Email requester = new Email(authentication.getName());
+
+        UserResponseDto userResponseDto = userMapper.toUserResponseDto(userService.activateUser(id, requester));
 
         return ResponseEntity.ok(userResponseDto);
     }

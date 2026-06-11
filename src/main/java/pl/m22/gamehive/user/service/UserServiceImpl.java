@@ -1,6 +1,7 @@
 package pl.m22.gamehive.user.service;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,10 +13,12 @@ import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.logging.CorrelationIdFilter;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
 import pl.m22.gamehive.user.event.*;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.model.AppUser;
+import pl.m22.gamehive.user.model.AuditAction;
 import pl.m22.gamehive.user.model.UserProfile;
 import pl.m22.gamehive.user.model.UserRole;
 import pl.m22.gamehive.user.repository.UserRepository;
@@ -129,6 +132,11 @@ public class UserServiceImpl implements UserService {
         guardOwnAccount(userId, requesterEmail);
         AppUser user = findUserById(userId);
         guardLastAdminOnRoleUpdate(user, roleNames);
+
+        Set<String> rolesBefore = user.getRoles().stream()
+                .map(UserRole::getName)
+                .collect(Collectors.toSet());
+
         Set<UserRole> userRoles = roleNames.stream()
                 .map(name -> userRoleRepository.findByName(name)
                         .orElseThrow(() -> new ApplicationException(ErrorCode.ROLE_NOT_FOUND)))
@@ -138,6 +146,7 @@ public class UserServiceImpl implements UserService {
 
         userRepository.save(user);
         eventPublisher.publishEvent(new UserRolesUpdatedEvent(user.getEmail().value()));
+        publishAudit(AuditAction.ROLE_CHANGE, user.getId(), user.getEmail().value(), requesterEmail, rolesDiffJson(rolesBefore, roleNames));
 
         return user;
     }
@@ -155,13 +164,14 @@ public class UserServiceImpl implements UserService {
 
         userRepository.save(user);
         eventPublisher.publishEvent(new UserDeactivatedEvent(user.getEmail().value()));
+        publishAudit(AuditAction.DEACTIVATE, user.getId(), user.getEmail().value(), requesterEmail, null);
 
         return user;
     }
 
     @Transactional
     @Override
-    public AppUser activateUser(UUID userId) {
+    public AppUser activateUser(UUID userId, Email requesterEmail) {
 
         AppUser user = findUserById(userId);
 
@@ -169,6 +179,7 @@ public class UserServiceImpl implements UserService {
 
         userRepository.save(user);
         eventPublisher.publishEvent(new UserReactivatedEvent(user.getEmail().value()));
+        publishAudit(AuditAction.ACTIVATE, user.getId(), user.getEmail().value(), requesterEmail, null);
 
         return user;
     }
@@ -182,9 +193,11 @@ public class UserServiceImpl implements UserService {
 
         guardLastAdmin(user);
         String email = user.getEmail().value();
+        UUID targetId = user.getId();
 
         userRepository.delete(user);
         eventPublisher.publishEvent(new UserDeletedEvent(email));
+        publishAudit(AuditAction.DELETE, targetId, email, requesterEmail, null);
     }
 
     @Transactional(readOnly = true)
@@ -195,6 +208,7 @@ public class UserServiceImpl implements UserService {
         AppUser user = findUserById(userId);
 
         eventPublisher.publishEvent(new UserForceLoggedOutEvent(user.getEmail().value()));
+        publishAudit(AuditAction.FORCE_LOGOUT, user.getId(), user.getEmail().value(), requesterEmail, null);
     }
 
     private void guardOwnAccount(UUID targetUserId, Email requesterEmail) {
@@ -226,5 +240,29 @@ public class UserServiceImpl implements UserService {
 
         return user.getRoles().stream()
                 .anyMatch(role -> ROLE_ADMIN.equals(role.getName()));
+    }
+
+    private void publishAudit(AuditAction action, UUID targetId, String targetEmail, Email requester, String details) {
+
+        eventPublisher.publishEvent(new UserAuditEvent(action, targetId, targetEmail, requester.value(), details, currentCorrelationId()));
+    }
+
+    private String currentCorrelationId() {
+
+        return MDC.get(CorrelationIdFilter.CORRELATION_ID);
+    }
+
+    // Role to kontrolowany słownik (ROLE_*), bez znaków wymagających escapowania -> bezpieczny ręczny JSON.
+    private static String rolesDiffJson(Set<String> before, Set<String> after) {
+
+        return "{\"before\":" + toJsonArray(before) + ", \"after\":" + toJsonArray(after) + "}";
+    }
+
+    private static String toJsonArray(Set<String> roles) {
+
+        return roles.stream()
+                .sorted()
+                .map(role -> "\"" + role + "\"")
+                .collect(Collectors.joining(",", "[", "]"));
     }
 }
