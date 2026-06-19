@@ -8,6 +8,7 @@ import org.springframework.test.context.ActiveProfiles;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.common.domain.*;
 import pl.m22.gamehive.support.SeededUsers;
+import pl.m22.gamehive.user.dto.AddressDto;
 import pl.m22.gamehive.user.dto.UserProfileResponseDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
 import pl.m22.gamehive.user.model.Address;
@@ -116,4 +117,37 @@ class UserMapperTest {
         assertEquals("admin@example.com", result.email());
         assertEquals(Set.of("ROLE_ADMIN"), result.roles());
     }
+
+    @Test
+    @DisplayName("toUserProfileResponseDto() -> Address ze wszystkimi polami null -> address w DTO null")
+    void toUserProfileResponseDto_emptyAddress_mapsToNull() {
+
+        UserProfile profile = new UserProfile(
+                "Jan", "Kowalski", new Address(null, null, null, null),
+                new PhoneNumber("+48123456789"),
+                LocalDate.of(1990, 1, 15), new ProfilePictureUrl("https://example.com/a.png"));
+
+        assertNull(userMapper.toUserProfileResponseDto(profile).address());
+    }
+
+    @Test
+    @DisplayName("toUserProfileResponseDto() -> profil bez adresu (null) -> address w DTO null")
+    void toUserProfileResponseDto_nullAddress_mapsToNull() {
+
+        UserProfile profile = new UserProfile(
+                "Jan", "Kowalski", null,
+                new PhoneNumber("+48123456789"),
+                LocalDate.of(1990, 1, 15), new ProfilePictureUrl("https://example.com/a.png"));
+
+        assertNull(userMapper.toUserProfileResponseDto(profile).address());
+    }
+
+    @Test
+    @DisplayName("toAddress() -> AddressDto z samymi nullami / null -> null (kierunek zapisu)")
+    void toAddress_emptyOrNullDto_returnsNull() {
+
+        assertNull(userMapper.toAddress(new AddressDto(null, null, null, null)));
+        assertNull(userMapper.toAddress(null));
+    }
+
 }
