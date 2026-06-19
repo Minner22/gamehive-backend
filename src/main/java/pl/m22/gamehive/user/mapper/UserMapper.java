@@ -7,8 +7,10 @@ import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.domain.PhoneNumber;
 import pl.m22.gamehive.common.domain.ProfilePictureUrl;
 import pl.m22.gamehive.common.domain.Username;
+import pl.m22.gamehive.user.dto.AddressDto;
 import pl.m22.gamehive.user.dto.UserProfileResponseDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
+import pl.m22.gamehive.user.model.Address;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.UserProfile;
 
@@ -23,6 +25,27 @@ public abstract class UserMapper {
     public abstract UserResponseDto toUserResponseDto(AppUser user);
 
     public abstract UserProfileResponseDto toUserProfileResponseDto(UserProfile profile);
+
+    public AddressDto toAddressDto(Address address) {
+        if (address == null || address.isEmpty()) {
+
+            return null;
+        }
+
+        return new AddressDto(
+                address.getStreet(),
+                address.getCity(),
+                address.getPostalCode(),
+                address.getCountry()
+        );
+    }
+
+    public Address toAddress(AddressDto addressDto) {
+
+        return addressDto == null
+                ? null
+                : Address.ofNullable(addressDto.street(), addressDto.city(), addressDto.postalCode(), addressDto.country());
+    }
 
     public Email toEmail(String value) {
         return value == null ? null : new Email(value);

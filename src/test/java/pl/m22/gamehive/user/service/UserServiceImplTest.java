@@ -17,6 +17,7 @@ import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.support.SeededUsers;
+import pl.m22.gamehive.user.dto.AddressDto;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
 import pl.m22.gamehive.user.event.UserAuditEvent;
 import pl.m22.gamehive.user.event.UserDeactivatedEvent;
@@ -210,7 +211,8 @@ class UserServiceImplTest {
         user.attachProfile(null);
 
         UserProfileUpdateDto dto = new UserProfileUpdateDto(
-                "New", "Profile", "+48111222333", "Warszawa",
+                "New", "Profile", "+48111222333",
+                new AddressDto("ul. Nowa 2", "Warszawa", "00-002", "Polska"),
                 LocalDate.of(1990, 1, 1), "https://example.com/new.png"
         );
 
@@ -228,7 +230,9 @@ class UserServiceImplTest {
 
         // seed: John Doe, 123 Main St, 123456789, 1990-05-15, https://example.com/johndoe.jpg
         UserProfileUpdateDto dto = new UserProfileUpdateDto(
-                "Johnny", null, null, "Nowy adres", null, null
+                "Johnny", null, null,
+                new AddressDto(null, "Nowy Sącz", null, null),
+                null, null
         );
 
         UserProfile result = userService.updateCurrentUserProfile(new Email("john.doe@example.com"), dto);
@@ -236,7 +240,7 @@ class UserServiceImplTest {
         assertEquals("Johnny", result.getFirstName());
         assertEquals("Doe", result.getLastName());
         assertEquals("123456789", result.getPhoneNumber().value());
-        assertEquals("Nowy adres", result.getAddress());
+        assertEquals("Nowy Sącz", result.getAddress().getCity());
         assertEquals(LocalDate.of(1990, 5, 15), result.getDateOfBirth());
         assertEquals("https://example.com/johndoe.jpg", result.getProfilePictureUrl().value());
     }

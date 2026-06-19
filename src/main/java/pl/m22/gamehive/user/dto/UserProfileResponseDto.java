@@ -7,7 +7,7 @@ public record UserProfileResponseDto(
         String firstName,
         String lastName,
         String phoneNumber,
-        String address,
+        AddressDto address,
         LocalDate dateOfBirth,
         String profilePictureUrl
 ) {

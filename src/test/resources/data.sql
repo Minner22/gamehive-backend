@@ -6,10 +6,10 @@ VALUES
     ('ROLE_MODERATOR', 'Moderator with special permissions');
 
 -- profiles (Long IDENTITY – bez zmian)
-INSERT INTO user_profiles (first_name, last_name, address, phone_number, date_of_birth, profile_picture_url)
+INSERT INTO user_profiles (first_name, last_name, street, city, postal_code, country, phone_number, date_of_birth, profile_picture_url)
 VALUES
-    ('John', 'Doe', '123 Main St', '123456789', '1990-05-15', 'https://example.com/johndoe.jpg'),
-    ('Jane', 'Smith', '456 Elm St', '987654321', '1985-07-20', 'https://example.com/janesmith.jpg');
+    ('John', 'Doe', '123 Main St', 'Springfield', '00-001', 'USA', '123456789', '1990-05-15', 'https://example.com/johndoe.jpg'),
+    ('Jane', 'Smith', '456 Elm St', 'Portland', '00-002', 'USA', '987654321', '1985-07-20', 'https://example.com/janesmith.jpg');
 
 -- users (UUID v7 podane jawnie – kolumna uuid nie ma DEFAULT; zgodne z SeededUsers)
 INSERT INTO application_users (id, username, password, email, user_profile_id, enabled)
