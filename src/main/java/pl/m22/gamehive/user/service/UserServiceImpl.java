@@ -7,7 +7,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.ApplicationException;
@@ -16,7 +15,6 @@ import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.logging.CorrelationIdFilter;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
 import pl.m22.gamehive.user.event.*;
-import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.model.AppUser;
 import pl.m22.gamehive.user.model.AuditAction;
 import pl.m22.gamehive.user.model.UserProfile;
@@ -24,8 +22,6 @@ import pl.m22.gamehive.user.model.UserRole;
 import pl.m22.gamehive.user.repository.UserRepository;
 import pl.m22.gamehive.user.repository.UserRoleRepository;
 
-import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -34,50 +30,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
-    private static final String USER_ROLE = "ROLE_USER";
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
     private final UserRepository userRepository;
-    private final UserMapper userMapper;
     private final UserRoleRepository userRoleRepository;
     private final ApplicationEventPublisher eventPublisher;
-
-    @Deprecated
-    @Override
-    public Optional<CredentialsDto> findCredentialsByEmail(String email) {
-
-        return userRepository.findByEmail(email)
-                .map(userMapper::toCredentialsDto);
-    }
-
-    @Deprecated
-    @Override
-    public List<String> findAllUserEmails() {
-
-        return userRepository.findAllUsersByRoles_Name(USER_ROLE).stream()
-                .map(u -> u.getEmail().value())
-                .toList();
-    }
-
-    @Deprecated
-    @Transactional
-    @Override
-    public void deleteUserByEmail(String email) {
-
-        userRepository.deleteByEmail(email);
-        eventPublisher.publishEvent(new UserDeletedEvent(email));
-    }
-
-    @Deprecated
-    @Override
-    public boolean emailExists(String email) {
-        return userRepository.findByEmail(email).isPresent();
-    }
-
-    @Deprecated
-    @Override
-    public boolean usernameExists(String username) {
-        return userRepository.findByUsername(username).isPresent();
-    }
 
     @Override
     public AppUser findUserByEmail(Email email) {

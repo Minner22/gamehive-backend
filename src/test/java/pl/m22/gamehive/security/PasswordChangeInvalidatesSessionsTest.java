@@ -18,7 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
-import pl.m22.gamehive.user.service.UserService;
+import pl.m22.gamehive.user.repository.UserRepository;
 
 import java.util.Objects;
 
@@ -36,7 +36,7 @@ class PasswordChangeInvalidatesSessionsTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired JwtService jwtService;
-    @Autowired UserService userService;
+    @Autowired UserRepository userRepository;
     @Autowired RedisTemplate<String, String> redisTemplate;
     @Autowired CacheManager cacheManager;
     @MockitoBean JavaMailSender mailSender;
@@ -49,7 +49,7 @@ class PasswordChangeInvalidatesSessionsTest {
 
     @AfterEach
     void tearDown() {
-        userService.deleteUserByEmail(EMAIL);
+        userRepository.findByEmail(EMAIL).ifPresent(userRepository::delete);
         flushRedis();
         clearCache();
     }

@@ -12,6 +12,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -24,11 +25,11 @@ import pl.m22.gamehive.user.service.UserService;
 
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -76,13 +77,23 @@ class RefreshTokenRevocationTest {
     }
 
     @Test
-    @DisplayName("Commit 1: deleteUserByEmail czyści refresh tokeny z Redis")
-    void deleteUserByEmailRevokesRefreshTokens() {
+    @DisplayName("deleteUser() czyści refresh tokeny z Redis (AFTER_COMMIT)")
+    void deleteUserRevokesRefreshTokens() throws Exception {
         String email = "throwaway_revoke@test.com";
+        // realnie zapisany user (register -> enabled=false, ale deleteUser nie sprawdza enabled)
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                    {"username":"throwaway_rev","email":"%s","password":"password123"}
+                                    """.formatted(email)))
+                .andExpect(status().isOk());
+        UUID userId = userService.findUserByEmail(new Email(email)).getId();
+
         jwtService.generateToken(email, JwtTokenType.REFRESH, null); // zapis w Redis
         assertEquals(Boolean.TRUE, redisTemplate.hasKey("user_refresh_tokens:" + email));
 
-        userService.deleteUserByEmail(email); // @Transactional -> commit -> AFTER_COMMIT -> rewokacja
+        // aktywna ścieżka: @Transactional -> commit -> UserDeletedEvent -> AFTER_COMMIT -> rewokacja
+        userService.deleteUser(userId, new Email("john.doe@example.com"));
 
         assertNotEquals(Boolean.TRUE, redisTemplate.hasKey("user_refresh_tokens:" + email));
     }
