@@ -29,7 +29,6 @@ import pl.m22.gamehive.user.model.UserProfile;
 import pl.m22.gamehive.user.model.UserRole;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -68,53 +67,6 @@ class UserServiceImplTest {
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("emailExists() -> true dla istniejącego emaila")
-    void emailExists_true() {
-        assertTrue(userService.emailExists("jane.smith@example.com"));
-    }
-
-    @Test
-    @DisplayName("emailExists() -> false dla nieistniejącego emaila")
-    void emailExists_false() {
-        assertFalse(userService.emailExists("ghost@test.com"));
-    }
-
-    @Test
-    @DisplayName("usernameExists() -> true dla istniejącej nazwy")
-    void usernameExists_true() {
-        assertTrue(userService.usernameExists("john_doe"));
-    }
-
-    @Test
-    @DisplayName("usernameExists() -> false dla nieistniejącej nazwy")
-    void usernameExists_false() {
-        assertFalse(userService.usernameExists("ghost_user"));
-    }
-
-    @Test
-    @DisplayName("findAllUserEmails() -> zwraca emaile userów z rolą ROLE_USER")
-    void findAllUserEmails_returns_role_user_emails() {
-
-        List<String> emails = userService.findAllUserEmails();
-        assertTrue(emails.contains("john.doe@example.com"));
-        assertTrue(emails.contains("jane.smith@example.com"));
-    }
-
-    @Test
-    @DisplayName("findCredentialsByEmail() -> znaleziony")
-    void findCredentialsByEmail_found() {
-
-        assertTrue(userService.findCredentialsByEmail("john.doe@example.com").isPresent());
-    }
-
-    @Test
-    @DisplayName("findCredentialsByEmail() -> nieznaleziony")
-    void findCredentialsByEmail_not_found() {
-
-        assertFalse(userService.findCredentialsByEmail("nobody@test.com").isPresent());
     }
 
     // --- findUserById ---

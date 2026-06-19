@@ -5,9 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
+import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.user.model.AppUser;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,15 +30,7 @@ class UserRepositoryTest {
     @Test
     @DisplayName("existsByUsername -> true/false")
     void existsByUsername() {
-        assertThat(userRepository.existsByUsername("john_doe")).isTrue();
-        assertThat(userRepository.existsByUsername("nope")).isFalse();
-    }
-
-    @Test
-    @DisplayName("findAllUsersByRoles_Name('ROLE_ADMIN') -> zwraca adminów")
-    void findAllByRole() {
-        List<AppUser> admins = userRepository.findAllUsersByRoles_Name("ROLE_ADMIN");
-        assertThat(admins).extracting(x -> x.getEmail().value()).contains("john.doe@example.com");
-        assertThat(admins).extracting(x -> x.getEmail().value()).doesNotContain("jane.smith@example.com");
+        assertThat(userRepository.existsByUsername(new Username("john_doe"))).isTrue();
+        assertThat(userRepository.existsByUsername(new Username("nope"))).isFalse();
     }
 }

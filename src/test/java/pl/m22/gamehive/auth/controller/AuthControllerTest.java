@@ -20,7 +20,7 @@ import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
-import pl.m22.gamehive.user.service.UserService;
+import pl.m22.gamehive.user.repository.UserRepository;
 
 import java.util.Set;
 
@@ -38,21 +38,21 @@ class AuthControllerTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired JwtService jwtService;
-    @Autowired UserService userService;
+    @Autowired UserRepository userRepository;
     @Autowired TokenBlacklistService tokenBlacklistService;
     @Autowired RedisSessionEpochStore sessionEpochStore;
     @MockitoBean JavaMailSender mailSender;
 
     @AfterEach
     void cleanup() {
-        userService.deleteUserByEmail("ctrl_register@test.com");
-        userService.deleteUserByEmail("ctrl_activate@test.com");
-        userService.deleteUserByEmail("ctrl_notactivated@test.com");
-        userService.deleteUserByEmail("ctrl_pwreset@test.com");
-        userService.deleteUserByEmail("ctrl_actepoch@test.com");
-        userService.deleteUserByEmail("ctrl_resend@test.com");
-        userService.deleteUserByEmail("ctrl_resend_active@test.com");
-        userService.deleteUserByEmail("ctrl_resend_stale@test.com");
+        userRepository.findByEmail("ctrl_register@test.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("ctrl_activate@test.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("ctrl_notactivated@test.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("ctrl_pwreset@test.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("ctrl_actepoch@test.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("ctrl_resend@test.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("ctrl_resend_active@test.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("ctrl_resend_stale@test.com").ifPresent(userRepository::delete);
     }
 
     @Test
