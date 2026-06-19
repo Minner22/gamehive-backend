@@ -20,7 +20,15 @@ public class UserProfile extends LongEntity {
 
     private String firstName;
     private String lastName;
-    private String address;
+
+    @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "street",     column = @Column(name = "street")),
+            @AttributeOverride(name = "city",       column = @Column(name = "city")),
+            @AttributeOverride(name = "postalCode", column = @Column(name = "postal_code")),
+            @AttributeOverride(name = "country",    column = @Column(name = "country"))
+    })
+    private Address address;
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "phone_number"))
@@ -35,7 +43,10 @@ public class UserProfile extends LongEntity {
         if (dto.firstName() != null) this.firstName = dto.firstName();
         if (dto.lastName() != null) this.lastName = dto.lastName();
         if (dto.phoneNumber() != null) this.phoneNumber = new PhoneNumber(dto.phoneNumber());
-        if (dto.address() != null) this.address = dto.address();
+        if (dto.address() != null) this.address = Address.ofNullable(dto.address().street(),
+                dto.address().city(),
+                dto.address().postalCode(),
+                dto.address().country());
         if (dto.dateOfBirth() != null) this.dateOfBirth = dto.dateOfBirth();
         if (dto.profilePictureUrl() != null) this.profilePictureUrl = new ProfilePictureUrl(dto.profilePictureUrl());
     }

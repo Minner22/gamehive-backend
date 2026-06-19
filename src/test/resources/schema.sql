@@ -5,7 +5,10 @@ CREATE TABLE user_profiles (
                                updated_at TIMESTAMP WITH TIME ZONE,
                                first_name VARCHAR(255),
                                last_name VARCHAR(255),
-                               address VARCHAR(255),
+                               street VARCHAR(255),
+                               city VARCHAR(255),
+                               postal_code VARCHAR(20),
+                               country VARCHAR(100),
                                phone_number VARCHAR(15),
                                date_of_birth DATE,
                                profile_picture_url VARCHAR(255)

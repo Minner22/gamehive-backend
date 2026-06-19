@@ -69,13 +69,14 @@ class UserControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"firstName":"Johnny","lastName":"Updated","phoneNumber":"+48111222333","address":"Nowy adres"}
-                                """))
+                                  {"firstName":"Johnny","lastName":"Updated","phoneNumber":"+48111222333","address":{"street":"ul. Nowa 1","city":"Warszawa","postalCode":"00-001","country":"Polska"}}
+                                  """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("Johnny"))
                 .andExpect(jsonPath("$.lastName").value("Updated"))
                 .andExpect(jsonPath("$.phoneNumber").value("+48111222333"))
-                .andExpect(jsonPath("$.address").value("Nowy adres"));
+                .andExpect(jsonPath("$.address.street").value("ul. Nowa 1"))
+                .andExpect(jsonPath("$.address.city").value("Warszawa"));
     }
 
     @Test
