@@ -20,6 +20,15 @@ spring:
     config:
         import: optional:file:./secret.properties
 
+springdoc:
+    swagger-ui:
+        path: /swagger-ui.html
+        operations-sorter: alpha
+        tags-sorter: alpha
+        display-request-duration: true
+    api-docs:
+        path: /v3/api-docs
+
 jwt:
     activation:
         validityInSeconds: 86400
