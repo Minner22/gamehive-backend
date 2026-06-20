@@ -31,12 +31,14 @@ public class TokenBlacklistServiceImpl implements TokenBlacklistService {
                 return;
             }
 
-            Date expirationTime = signedJWT.getJWTClaimsSet().getExpirationTime();
-            if (expirationTime == null) {
+            Date expirationDate = signedJWT.getJWTClaimsSet().getExpirationTime();
+            if (expirationDate == null) {
                 return;
             }
 
-            Duration remainingTtl = Duration.between(Instant.now(), expirationTime.toInstant());
+            Instant expiration = expirationDate.toInstant();
+
+            Duration remainingTtl = Duration.between(Instant.now(), expiration);
             if (remainingTtl.isPositive()) {
                 redisTemplate.opsForValue().set(BLACKLIST_PREFIX + jti, "1", remainingTtl);
             }

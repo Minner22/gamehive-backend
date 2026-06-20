@@ -35,6 +35,8 @@ import java.util.Optional;
 public class AuthServiceImpl implements AuthService{
 
     private static final String USER_ROLE = "ROLE_USER";
+    private static final String EMAIL_NOT_FOUND_MSG = "Email not found: ";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserRoleRepository userRoleRepository;
@@ -56,7 +58,7 @@ public class AuthServiceImpl implements AuthService{
         Email email = new Email(loginDto.email());
 
         AppUser appUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email.obfuscated()));
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, EMAIL_NOT_FOUND_MSG + email.obfuscated()));
 
         if (!appUser.isEnabled()) {
             throw new ApplicationException(ErrorCode.USER_NOT_ACTIVATED, "User not activated: " + appUser.getEmail().obfuscated());
@@ -74,7 +76,7 @@ public class AuthServiceImpl implements AuthService{
     public void activateUser(Email email) {
 
         AppUser appUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email.obfuscated()));
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, EMAIL_NOT_FOUND_MSG + email.obfuscated()));
 
         appUser.activate();
 
@@ -97,7 +99,7 @@ public class AuthServiceImpl implements AuthService{
     public void confirmPasswordReset(Email email, String newPassword) {
 
         AppUser appUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, "Email not found: " + email.obfuscated()));
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, EMAIL_NOT_FOUND_MSG + email.obfuscated()));
 
         appUser.changePassword(HashedPassword.fromRaw(newPassword, passwordEncoder));
 

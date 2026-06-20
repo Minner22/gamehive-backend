@@ -18,7 +18,7 @@ public record ProfilePictureUrl(String value) {
         URI uri;
         try {
             uri = new URI(value);
-        } catch (URISyntaxException e) {
+        } catch (URISyntaxException _) {
             throw new DomainException(ErrorCode.INVALID_PROFILE_PICTURE_URL, "Profile picture URL is not a valid URL");
         }
 

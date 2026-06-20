@@ -20,6 +20,6 @@ public class AuditLogEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void onUserAudit(UserAuditEvent event) {
 
-        auditLogService.record(event);
+        auditLogService.recordAudit(event);
     }
 }

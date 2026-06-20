@@ -50,7 +50,7 @@ public class JwtServiceImpl implements JwtService {
             }
 
             JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
-            if (claims.getExpirationTime() == null || claims.getExpirationTime().before(new Date())) {
+            if (claims.getExpirationTime() == null || claims.getExpirationTime().toInstant().isBefore(Instant.now())) {
                 throw new ApplicationException(ErrorCode.JWT_EXPIRED);
             }
 

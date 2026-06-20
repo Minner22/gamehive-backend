@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static pl.m22.gamehive.common.exception.ErrorCode.ROLE_ALREADY_ASSIGNED;
 import static pl.m22.gamehive.common.exception.ErrorCode.USER_ALREADY_ACTIVATED;
 
-public class AppUserTest {
+class AppUserTest {
 
     private static final PasswordEncoder ENCODER =
             PasswordEncoderFactories.createDelegatingPasswordEncoder();

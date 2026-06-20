@@ -78,11 +78,8 @@ class AppUserUuidGenerationTest {
         em.clear(); // wyczyść kontekst, by getReference zwrócił nieinicjalizowane proxy
 
         AppUser proxy = em.getEntityManager().getReference(AppUser.class, id);
-        assertThat(proxy).isInstanceOf(HibernateProxy.class);
-
-        // 'user' jest teraz odłączoną, zwykłą instancją o tym samym ID
-        assertThat(proxy).isEqualTo(user);                       // proxy.equals(real): gałąź proxy po stronie this
-        assertThat(user).isEqualTo(proxy);                       // real.equals(proxy): gałąź proxy po stronie o
-        assertThat(proxy.hashCode()).isEqualTo(user.hashCode()); // gałąź proxy w hashCode
+        assertThat(proxy).isInstanceOf(HibernateProxy.class).isEqualTo(user);       // proxy.equals(real): gałąź proxy po stronie this
+        assertThat(user).isEqualTo(proxy);                                          // real.equals(proxy): gałąź proxy po stronie o
+        assertThat(proxy).hasSameHashCodeAs(user);                                  // gałąź proxy w hashCode
     }
 }

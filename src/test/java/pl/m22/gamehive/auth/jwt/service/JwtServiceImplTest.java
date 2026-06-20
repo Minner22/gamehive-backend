@@ -180,4 +180,31 @@ class JwtServiceImplTest {
                 .isEqualTo(ErrorCode.JWT_EXPIRED);
 
     }
+
+    @Test
+    @DisplayName("token bez expirationTime -> JWT_EXPIRED (gałąź getExpirationTime() == null)")
+    void missing_expiration_token() {
+
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .subject("john.doe@example.com")
+                .issueTime(new Date())
+                .claim("type", "ACCESS")
+                .claim("roles", Set.of("ROLE_ADMIN"))
+                .build();                          // brak expirationTime
+
+        SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
+        try {
+            jwt.sign(new MACSigner(ACCESS_SECRET.getBytes(StandardCharsets.UTF_8)));
+        } catch (JOSEException e) {
+            throw new RuntimeException(e);
+        }
+
+        String token = jwt.serialize();
+
+        assertThatThrownBy(() -> jwtService.validateToken(token, JwtTokenType.ACCESS))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.JWT_EXPIRED);
+
+    }
 }

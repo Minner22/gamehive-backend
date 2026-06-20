@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
-public class RedisSessionEpochStoreTest {
+class RedisSessionEpochStoreTest {
 
     private static final String EMAIL = "epoch_store@test.com";
 

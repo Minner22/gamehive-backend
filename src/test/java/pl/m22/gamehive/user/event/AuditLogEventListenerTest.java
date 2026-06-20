@@ -20,7 +20,7 @@ class AuditLogEventListenerTest {
     @InjectMocks AuditLogEventListener listener;
 
     @Test
-    @DisplayName("onUserAudit() -> deleguje zdarzenie do AuditLogService.record()")
+    @DisplayName("onUserAudit() -> deleguje zdarzenie do AuditLogService.recordAudit()")
     void onUserAudit_delegatesToService() {
 
         UserAuditEvent event = new UserAuditEvent(
@@ -33,6 +33,6 @@ class AuditLogEventListenerTest {
 
         listener.onUserAudit(event);
 
-        verify(auditLogService).record(event);
+        verify(auditLogService).recordAudit(event);
     }
 }

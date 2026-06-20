@@ -1,5 +1,11 @@
 package pl.m22.gamehive.auth.jwt.service;
 
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,14 +15,18 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
 class TokenBlacklistServiceImplTest {
+
+    private static final String BLACKLIST_TEST_SECRET = "test-blacklist-secret-abcdefghijklmnopqrstuvwxyz123456";
 
     @Autowired TokenBlacklistService tokenBlacklistService;
     @Autowired JwtService jwtService;
@@ -57,5 +67,21 @@ class TokenBlacklistServiceImplTest {
         String jti = jwtService.extractJtiFromToken(token);
         assertNotNull(jti);
         assertFalse(jti.isEmpty());
+    }
+
+    @Test
+    @DisplayName("blacklistToken() dla tokenu bez expirationTime -> brak wpisu (gałąź exp == null)")
+    void blacklist_token_without_expiration_noop() throws JOSEException {
+        String jti = UUID.randomUUID().toString();
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .subject("test@test.com")
+                .jwtID(jti)
+                .build();                          // ma JTI, ale brak expirationTime
+        SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
+        jwt.sign(new MACSigner(BLACKLIST_TEST_SECRET.getBytes(StandardCharsets.UTF_8)));
+
+        tokenBlacklistService.blacklistToken(jwt.serialize());
+
+        assertFalse(tokenBlacklistService.isBlacklisted(jti));
     }
 }
