@@ -1,124 +1,259 @@
-# GameHive
+# GameHive — Backend
 
-## MVP:
-1. Rejestracja użytkowników ✅
-2. Logowanie użytkowników ✅
-3. zarządzanie użytkownikami ⏺️
-4. dodawanie gier ❌
-5. zarządzanie grami❌
-6. dodawanie grup ❌
-7. dołączanie do grup ❌
-8. zarządzanie grupami ❌
+Backend platformy do zarządzania kolekcjami gier planszowych, grupami graczy oraz
+wypożyczeniami. Aktualnie zrealizowany jest moduł **użytkowników i autoryzacji**;
+pozostałe moduły (gry, grupy, wypożyczenia, oceny, statystyki) są w planach.
 
-## TODO:
-
-1. ***Użytkownicy i autoryzacja***
-    - **Rejestracja użytkowników** – formularz rejestracyjny, walidacja danych, zapis w bazie.
-    - **Logowanie** – autoryzacja użytkowników, hashowanie haseł, JWT (JSON Web Token) do zarządzania sesjami.
-    - **Profil użytkownika** – możliwość przeglądania i edytowania danych profilowych.
-2. ***Gry planszowe***
-    - **Dodawanie gier** – funkcjonalność pozwalająca użytkownikom na dodawanie gier do własnej biblioteki.
-    - **Przeglądanie gier** – wyświetlanie listy gier użytkownika oraz innych osób w grupie.
-    - **Kategorie gier i mechaniki** – przypisywanie gier do kategorii, dodanie mechanik.
-3. ***Grupy***
-    - **Tworzenie i zarządzanie grupami** – możliwość tworzenia grup, zapraszania członków, edycja grupy.
-    - **Przeglądanie gier w grupach** – podgląd gier posiadanych przez członków grupy.
-4. ***Wypożyczanie gier***
-    - **System wypożyczania** – mechanizm do wypożyczania gier od innych użytkowników w grupie.
-    - **Śledzenie historii wypożyczeń** – informacje o datach wypożyczenia i zwrotu.
-5. ***Oceny i recenzje***
-    - **Dodawanie ocen i recenzji** – użytkownicy mogą oceniać gry oraz pisać recenzje.
-    - **Wyświetlanie recenzji** – system wyświetlający oceny i opinie o grach.
-6. ***Multiplayer i statystyki***
-    - **Rejestrowanie sesji multiplayer** – zapisywanie wyników sesji multiplayer i śledzenie wyników.
-    - **Statystyki gracza** – wyświetlanie statystyk na podstawie sesji.
+Modularny monolit oparty o **Spring Boot 4** i **Java 25**.
 
 ---
 
-## Uwagi o migracjach (dev/test)
+## Stos technologiczny
 
-- `V3__migrate_app_user_to_uuid.sql` zmienia PK `application_users` z `BIGINT` na `uuid`
-  (UUID v7) metodą **drop & recreate**: usuwa FK, robi `TRUNCATE` na `application_users`
-  i `user_roles`, zmienia typy kolumn, odtwarza FK. **Migracja jest destrukcyjna** —
-  czyści użytkowników (w dev odtwarza ich `DevDataInitializer`). Dozwolona tylko dlatego,
-  że nie ma danych produkcyjnych. Na bazie z realnymi danymi należałoby zamiast tego użyć
-  kolumny `id_new uuid` + backfill + przepięcie FK + drop starej kolumny.
-- Flyway pod **Spring Boot 4** wymaga zależności `spring-boot-starter-flyway` — sam
-  `flyway-core` nie aktywuje już autokonfiguracji (migracje po cichu się nie wykonują).
+| Obszar            | Technologia |
+|-------------------|-------------|
+| Język / runtime   | Java 25 |
+| Framework         | Spring Boot 4.0.5 (Web, Security, Data JPA, Cache, Validation, Mail, AOP) |
+| Baza danych       | PostgreSQL 16 (prod/dev) · H2 w trybie zgodności PostgreSQL (testy) |
+| Migracje          | Flyway (`spring-boot-starter-flyway`) |
+| Cache / sesje     | Redis (refresh tokeny, blacklista, session epoch) + Caffeine (cache in-memory) |
+| JWT               | Nimbus JOSE + JWT (HS256) |
+| Mapowanie DTO     | MapStruct (+ Lombok) |
+| Dokumentacja API  | springdoc-openapi (Swagger UI) |
+| Logowanie         | Logback + JSON encoder, correlation-id (MDC) |
+| Build / testy     | Maven, JaCoCo, SonarCloud |
 
-## Plan działania: Użytkownicy i autoryzacja
+---
 
-1. ***Projektowanie bazy danych***
-    - **Tabela Users** – zawiera dane użytkowników, takie jak username, email, password (hashed), role, oraz znaczniki czasowe (np. created_at).
-    - **Tabela UserDetails** – szczegóły dotyczące użytkownika: first_name, last_name, address, itp.
-    - **JWT (JSON Web Tokens)** – tokeny autoryzacyjne, które będą służyć do zarządzania sesjami po stronie klienta.
-2. ***Rejestracja użytkownika***
-    - Endpoint: POST /api/auth/register
-    - Walidacja danych użytkownika (email, hasło itp.).
-    - Hashowanie hasła (np. za pomocą BCrypt).
-    - Sprawdzanie unikalności emaila/username.
-    - Wysłanie linka aktywacyjnego.
-    - Odblokowanie użytkownika po wejściu w link aktywacyjny.
-    - Zapis danych w bazie.
-3. ***Logowanie użytkownika***
-    - Endpoint: POST /api/auth/login
-    - Walidacja emaila i hasła.
-    - Weryfikacja hasła w bazie (hash).
-    - Generowanie tokena JWT po poprawnym zalogowaniu.
-4. ***Middleware do autoryzacji***
-    - Implementacja middleware do ochrony endpointów, które wymagają zalogowania użytkownika.
-    - Sprawdzanie tokena JWT przy requestach.
-5. ***Edycja profilu użytkownika***
-    - Endpoint: PUT /api/users/{id}
-    - Umożliwienie użytkownikowi aktualizacji swoich danych (np. imię, nazwisko, bio, itp.).
-    - Zabezpieczenie edycji tylko dla właściciela profilu.
-6. ***Resetowanie hasła (opcjonalnie)***
-    - Endpoint: POST /api/auth/reset-password
-    - Generowanie linku resetującego hasło, który jest wysyłany na email użytkownika.
-    - Nowe hasło zapisane po weryfikacji.
+## Wymagania
 
-### Kolejność działania:
+- **JDK 25**
+- **Maven**
+- **Docker** + Docker Compose (profil `dev` automatycznie startuje PostgreSQL i Redis)
 
-1. **Stwórz strukturę backendu (model, repository, service) dla użytkowników.**
-2. **Zaimplementuj rejestrację użytkowników** – to podstawa.
-3. **Zaimplementuj logowanie i autoryzację** – JWT jako ochrona API.
-4. **Dodaj middleware do ochrony zasobów.**
-5. **Rozszerz możliwości na edycję profilu.**
-6. **Jeśli chcesz, zajmij się resetowaniem hasła.**
+---
 
-## Plan działania: Gry planszowe
+## Szybki start (profil `dev`)
 
-1. ***Projektowanie bazy danych***
-    - **Tabela BoardGames** – dane o grach, takie jak title, description, publisher, category, min_players, max_players, itp.
-    - **Tabela Category** – kategorie gier (np. przygodowe, strategiczne).
-    - **Tabela UsersBoardGames** – łącznik między użytkownikami a ich grami.
-    - **Tabela GameLoans** – system wypożyczania gier, który będzie śledził kto wypożycza daną grę, na jaki okres.
-2. ***Dodawanie gry przez użytkownika***
-    - Endpoint: POST /api/boardgames
-    - Umożliwienie użytkownikowi dodania gry do swojej kolekcji.
-    - Sprawdzanie, czy gra już istnieje w bazie.
-    - Jeśli gra nie istnieje, możliwość dodania nowej pozycji do globalnej bazy gier.
-3. ***Przeglądanie dostępnych gier***
-    - Endpoint: GET /api/boardgames
-    - Zwracanie listy dostępnych gier dla użytkowników (z możliwością filtrowania po kategorii, liczbie graczy, itp.).
-    - Endpoint: GET /api/boardgames/{id} – szczegóły wybranej gry.
-4. ***Kategorie gier***
-    - Endpoint: GET /api/categories
-    - Umożliwienie przeglądania kategorii gier oraz przypisanie gier do kategorii podczas ich dodawania.
-5. ***Wypożyczanie gier***
-    - Endpoint: POST /api/gameloans
-    - Pozwolenie użytkownikom na wypożyczanie gier od innych członków grupy.
-    - Endpoint: PUT /api/gameloans/{id} – aktualizacja statusu wypożyczenia (np. oznaczenie gry jako zwróconej).
-6. ***Edycja i usuwanie gier***
-    - Endpoint: PUT /api/boardgames/{id}
-    - Umożliwienie użytkownikowi aktualizacji danych o grze (np. opis, liczba graczy).
-    - Endpoint: DELETE /api/boardgames/{id} – usunięcie gry z kolekcji użytkownika.
+Profil `dev` jest domyślny. Wykorzystuje `spring-boot-docker-compose`, który
+**automatycznie uruchamia i zatrzymuje** kontenery z `docker-compose.yml`
+(PostgreSQL + Redis) wraz ze startem/zatrzymaniem aplikacji.
 
-### Kolejność działania:
+### 1. Pliki konfiguracyjne (gitignored)
 
-1. **Stwórz backendową strukturę dla zarządzania grami planszowymi** - Modele, repozytoria, serwisy.
-2. **Zaimplementuj dodawanie i przeglądanie gier** - Podstawowe CRUD operacje.
-3. **Zaimplementuj system kategorii** - Przypisywanie gier do kategorii.
-4. **Dodaj funkcjonalność wypożyczania** - Użytkownicy będą mogli wypożyczać gry od innych.
-5. **Dodaj edycję i usuwanie gier.**
-6. **Przejdź do implementacji frontendu** - Stwórz widoki do zarządzania grami oraz wypożyczaniem.
+W katalogu obok `pom.xml` utwórz dwa pliki:
+
+**`.env`** — zmienne dla `docker-compose.yml`:
+
+```properties
+REDIS_PASSWORD=<haslo_redis>
+POSTGRES_PASSWORD=<haslo_postgres>
+POSTGRES_USER=gamehive
+```
+
+**`secret.properties`** — sekrety aplikacji (importowane przez `application.yml`):
+
+```properties
+# Sekrety JWT (HS256) — osobny sekret na każdy typ tokenu
+jwt.activation.secret=<sekret>
+jwt.refresh.secret=<sekret>
+jwt.access.secret=<sekret>
+jwt.passwordreset.secret=<sekret>
+
+# Konto SMTP (np. Gmail z hasłem aplikacyjnym) do wysyłki maili
+spring.mail.username=<email>
+spring.mail.password=<haslo_aplikacyjne>
+
+# Te same wartości co w .env (używane przez aplikację do połączenia)
+REDIS_PASSWORD=<haslo_redis>
+POSTGRES_PASSWORD=<haslo_postgres>
+```
+
+> Sekrety JWT najlepiej wygenerować jako losowe ciągi hex (sekret tokenu
+> `access` jest dłuższy — patrz przykład w repozytorium).
+
+### 2. Uruchomienie
+
+```bash
+mvn spring-boot:run
+```
+
+- API: `http://localhost:8080`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+
+### Konta deweloperskie
+
+Pod profilem `dev` `DevDataInitializer` zakłada dwóch aktywnych użytkowników
+(hasło: `password123`):
+
+| E-mail                   | Role                   |
+|--------------------------|------------------------|
+| `john.doe@example.com`   | `ROLE_ADMIN`, `ROLE_USER` |
+| `jane.smith@example.com` | `ROLE_USER`            |
+
+---
+
+## Build i testy
+
+```bash
+mvn clean install                         # pełny build + testy
+mvn test                                  # wszystkie testy
+mvn -Dtest=ClassName test                 # jedna klasa testowa
+mvn -Dtest=ClassName#methodName test      # jedna metoda testowa
+mvn spring-boot:run                        # uruchom (profil dev)
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+Profil `test` nie wymaga `secret.properties` ani `.env` — używa **H2** oraz
+**wbudowanego Redisa** (port 16379), a wszystkie sekrety JWT są nadpisane
+w `application-test.yml`.
+
+---
+
+## Profile
+
+| Profil | Baza danych                | Migracje        | Redis             | Swagger | Uwagi |
+|--------|----------------------------|-----------------|-------------------|---------|-------|
+| `dev`  | PostgreSQL (docker-compose)| Flyway          | Redis (docker)    | tak     | seeduje konta dev, auto-start kontenerów |
+| `test` | H2 (in-memory)             | wyłączone, `data.sql` | embedded (16379) | tak | sekrety nadpisane inline |
+| `prod` | PostgreSQL (zmienne env)   | Flyway          | Redis (zmienne env) | **nie** | `ddl-auto: validate`, dokumentacja API wyłączona |
+
+W profilu `prod` konfiguracja pochodzi w całości ze zmiennych środowiskowych:
+`DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`,
+`ACTIVATION_ADDRESS`, `PASSWORD_RESET_ADDRESS` oraz sekrety JWT i poświadczenia SMTP.
+
+---
+
+## Architektura
+
+Pakiet bazowy: `pl.m22.gamehive`. DTO jako rekordy Javy, Lombok, MapStruct.
+
+- **`auth/`** — rejestracja, aktywacja konta, logowanie, odświeżanie i wylogowanie,
+  reset hasła oraz wydawanie/walidacja JWT. Jedyny punkt wejścia: `/api/v1/auth/**`.
+- **`user/`** — `UserController` (self-service `/api/v1/users/me*`),
+  `AdminUserController` (`/api/v1/admin/users/**`, `ROLE_ADMIN`),
+  `AdminAuditController` (`/api/v1/admin/audit`, `ROLE_ADMIN`).
+- **`common/`** — warstwa współdzielona: hierarchia encji (`AbstractEntity`,
+  `LongEntity`, `UuidEntity`), value objects (`Email`, `Username`, …), serwis e-mail,
+  logowanie (`LoggingAspect`, `CorrelationIdFilter`) oraz infrastruktura wyjątków.
+- **`config/`** — konfiguracja OpenAPI, cache, async oraz `DevDataInitializer`.
+
+### Bezpieczeństwo i JWT
+
+- Stateless (`SessionCreationPolicy.STATELESS`), CSRF wyłączone. `permitAll` tylko dla
+  `/api/v1/auth/**`, `/swagger-ui/**`, `/v3/api-docs/**`, `/h2-console/**`.
+- Niezautoryzowane żądania otrzymują **HTTP 401** z ciałem
+  `{"errorCode":"ACCESS_DENIED","message":"Authentication required"}`.
+- Cztery typy tokenów (każdy z własnym sekretem HS256): `ACCESS` (15 min),
+  `REFRESH` (7 dni, ciasteczko HttpOnly o ścieżce `/api/v1/auth/refresh`),
+  `ACTIVATION` (24 h), `PASSWORD_RESET` (15 min).
+- Refresh tokeny przechowywane w Redis (limit 5 aktywnych na użytkownika).
+  Zużyte tokeny aktywacyjne/resetu/access trafiają na blacklistę (po JTI).
+- **Natychmiastowe unieważnienie tokenów** przy dezaktywacji / usunięciu / zmianie
+  hasła — przez zdarzenia domenowe (`@TransactionalEventListener(AFTER_COMMIT)`),
+  session epoch w Redis oraz eksmisję cache `userAuthState` (Caffeine, 60 s TTL).
+
+### Dziennik audytu
+
+Mutacje kont (`ROLE_CHANGE`, `DEACTIVATE`, `ACTIVATE`, `DELETE`, `FORCE_LOGOUT`,
+`PASSWORD_CHANGE`) są trwale audytowane w tabeli `user_audit_log` (kto / kogo / co /
+kiedy). Wpisy nie mają FK do `application_users`, więc przeżywają usunięcie konta.
+Zapis audytu działa w osobnej transakcji (`REQUIRES_NEW`) i nigdy nie blokuje
+operacji biznesowej.
+
+### Obsługa błędów
+
+Wszystkie wyjątki dziedziczą po `BaseException(ErrorCode)`. Trzy podklasy wyznaczają
+poziom logowania (status HTTP zależy wyłącznie od `ErrorCode`):
+`DomainException` (INFO — naruszenie reguły biznesowej), `ApplicationException`
+(WARN — problem przepływu / brak rekordu), `InfrastructureException`
+(ERROR — awaria systemu zewnętrznego). Odpowiedź zawsze ma postać
+`ApiError(errorCode, message)` (lub `ApiValidationError` dla błędów walidacji 400).
+
+### Persystencja
+
+- `AppUser` używa klucza głównego **UUID v7** (`@UuidGenerator(style = VERSION_7)`);
+  pozostałe encje — `Long` IDENTITY.
+- Zmiany schematu wyłącznie przez nowe pliki `V*__*.sql` (`ddl-auto: none`/`validate`).
+- `V3__migrate_app_user_to_uuid.sql` zmienia PK z `BIGINT` na `uuid` metodą
+  **drop & recreate** (czyści `application_users`/`user_roles`) — operacja
+  destrukcyjna, dopuszczalna tylko z uwagi na brak danych produkcyjnych.
+
+> **Uwaga (Spring Boot 4):** autokonfiguracja została rozbita na moduły per-technologia.
+> Flyway działa tylko z zależnością `spring-boot-starter-flyway` — samo `flyway-core`
+> nie aktywuje migracji (wykonają się po cichu „nie-wykonają”).
+
+---
+
+## API
+
+Bazowy prefiks: `/api/v1`. Endpointy poza `/auth/**` wymagają nagłówka
+`Authorization: Bearer <access_token>`.
+
+### Authentication (`/api/v1/auth`) — publiczne
+
+| Metoda | Ścieżka                     | Opis |
+|--------|-----------------------------|------|
+| POST   | `/register`                 | Rejestracja (wysyła link aktywacyjny) |
+| GET    | `/activate?token=...`       | Aktywacja konta |
+| POST   | `/login`                    | Logowanie (access token w body, refresh w ciasteczku) |
+| GET    | `/refresh`                  | Odświeżenie access tokenu (z ciasteczka refresh) |
+| POST   | `/logout`                   | Wylogowanie (unieważnia tokeny) |
+| POST   | `/password-reset/request`   | Żądanie resetu hasła |
+| POST   | `/password-reset/confirm`   | Ustawienie nowego hasła |
+| POST   | `/activation/resend`        | Ponowne wysłanie maila aktywacyjnego |
+
+### User (`/api/v1/users`) — zalogowany użytkownik
+
+| Metoda | Ścieżka         | Opis |
+|--------|-----------------|------|
+| GET    | `/me`           | Dane i profil zalogowanego użytkownika |
+| PATCH  | `/me/profile`   | Częściowa aktualizacja własnego profilu |
+
+### Admin – Users (`/api/v1/admin/users`) — `ROLE_ADMIN`
+
+| Metoda | Ścieżka                   | Opis |
+|--------|---------------------------|------|
+| GET    | `/`                       | Stronicowana lista użytkowników |
+| GET    | `/{id}`                   | Użytkownik po UUID |
+| GET    | `/by-username/{username}` | Użytkownik po nazwie |
+| GET    | `/by-email/{email}`       | Użytkownik po e-mailu |
+| PUT    | `/{id}/roles`             | Zmiana ról (audyt: `ROLE_CHANGE`) |
+| PATCH  | `/{id}/deactivate`        | Dezaktywacja konta (audyt: `DEACTIVATE`) |
+| PATCH  | `/{id}/activate`          | Reaktywacja konta (audyt: `ACTIVATE`) |
+| DELETE | `/{id}`                   | Usunięcie konta (audyt: `DELETE`) |
+| POST   | `/{id}/force-logout`      | Wymuszenie wylogowania (audyt: `FORCE_LOGOUT`) |
+
+### Admin – Audit (`/api/v1/admin/audit`) — `ROLE_ADMIN`
+
+| Metoda | Ścieżka | Opis |
+|--------|---------|------|
+| GET    | `/`     | Przeszukiwanie dziennika audytu (filtry: `targetId`, `actor`, `action`, `from`, `to`; stronicowanie) |
+
+Pełna specyfikacja dostępna w Swagger UI (`/swagger-ui.html`).
+
+---
+
+## Roadmap (MVP)
+
+- [x] Rejestracja użytkowników
+- [x] Logowanie i autoryzacja (JWT)
+- [x] Zarządzanie użytkownikami (self-service + panel admina + audyt)
+- [ ] Dodawanie gier
+- [ ] Zarządzanie grami
+- [ ] Dodawanie grup
+- [ ] Dołączanie do grup
+- [ ] Zarządzanie grupami
+- [ ] Oceny i recenzje
+- [ ] Multiplayer i statystyki
+
+---
+
+## CI
+
+GitHub Actions (`.github/workflows/build.yml`) uruchamia `mvn -B verify sonar:sonar`
+na każdym PR. **PR budowany jest na commicie scalającym (branch + master)** — jeśli
+master się przesunął, lokalny `mvn test` może przejść mimo czerwonego CI; przed
+debugowaniem warto zrobić rebase/pull mastera. Pokrycie SonarCloud wyklucza pakiety
+`dto`, `model`, `config`, `mapper`, `exception`, `logging` oraz `GameHiveApplication`.
