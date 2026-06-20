@@ -39,6 +39,13 @@ class OpenApiDocumentationTest {
     }
 
     @Test
+    @DisplayName("GET /swagger-ui.html jest publiczny (przekierowanie, nie 401)")
+    void swaggerUi_isPubliclyAccessible() throws Exception {
+        mockMvc.perform(get("/swagger-ui.html"))
+                .andExpect(status().is3xxRedirection());
+    }
+
+    @Test
     @DisplayName("Dokument zawiera kluczowe ścieżki API")
     void apiDocs_containsKeyPaths() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
