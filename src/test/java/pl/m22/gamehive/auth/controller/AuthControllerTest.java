@@ -56,14 +56,15 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("POST /register happy path -> 200, mail wysłany")
+    @DisplayName("POST /register happy path -> 200, JSON {message}, mail wysłany")
     void register_happy_path_200() throws Exception {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"username":"ctrl_reg","email":"ctrl_register@test.com","password":"password123"}
                                 """))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").exists());
 
         verify(mailSender).send(any(SimpleMailMessage.class));
     }
