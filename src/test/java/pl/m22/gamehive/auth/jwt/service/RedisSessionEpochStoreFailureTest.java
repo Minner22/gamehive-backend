@@ -1,14 +1,16 @@
 package pl.m22.gamehive.auth.jwt.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import pl.m22.gamehive.auth.jwt.config.AccessTokenProperties;
+import pl.m22.gamehive.auth.jwt.config.ActivationTokenProperties;
 import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 
@@ -26,8 +28,17 @@ class RedisSessionEpochStoreFailureTest {
 
     @Mock RedisTemplate<String, String> redisTemplate;
     @Mock ValueOperations<String, String> valueOps;
+    @Mock AccessTokenProperties accessProps;
+    @Mock ActivationTokenProperties activationProps;
 
-    @InjectMocks RedisSessionEpochStore store;
+    private RedisSessionEpochStore store;
+
+    @BeforeEach
+    void setUp() {
+        // konstrukcja ręczna zamiast @InjectMocks: dzięki temu accessProps/activationProps są
+        // jawnie odczytane jako argumenty konstruktora (inaczej analiza widzi je jako nieużywane)
+        store = new RedisSessionEpochStore(redisTemplate, accessProps, activationProps);
+    }
 
     @Test
     @DisplayName("setEpoch przy awarii Redis -> InfrastructureException REDIS_UNAVAILABLE")
