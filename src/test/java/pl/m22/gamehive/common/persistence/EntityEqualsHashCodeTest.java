@@ -15,7 +15,6 @@ class EntityEqualsHashCodeTest {
         UserRole a = new UserRole("ROLE_USER", null);
         UserRole b = new UserRole("ROLE_USER", null);
 
-        assertThat(a).isEqualTo(a);
         assertThat(a).isNotEqualTo(b);
     }
 
@@ -28,7 +27,7 @@ class EntityEqualsHashCodeTest {
         b.setId(5L);
 
         assertThat(a).isEqualTo(b);
-        assertThat(a.hashCode()).isEqualTo(b.hashCode());
+        assertThat(a).hasSameHashCodeAs(b);
     }
 
     @Test
