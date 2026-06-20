@@ -48,7 +48,9 @@ class UsernameTest {
 
     @Test
     void rejects_too_long() {
-        assertThatThrownBy(() -> new Username("a".repeat(31)))
+        String tooLong = "a".repeat(31);
+
+        assertThatThrownBy(() -> new Username(tooLong))
                 .isInstanceOf(DomainException.class)
                 .extracting("errorCode").isEqualTo(INVALID_USERNAME);
     }
