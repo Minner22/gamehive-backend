@@ -115,9 +115,11 @@ public class AuthController {
             @ApiResponse(responseCode = "200", description = "Zalogowano; access token w body, refresh token w ciasteczku"),
             @ApiResponse(responseCode = "400", description = "Błąd walidacji danych wejściowych",
                     content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "401", description = "Nieprawidłowy e-mail lub hasło (INVALID_PASSWORD)",
+            @ApiResponse(responseCode = "401",
+                    description = "Nieprawidłowy e-mail lub hasło (INVALID_CREDENTIALS) — jednolita odpowiedź, bez rozróżniania istnienia konta",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Konto nieaktywne (wymaga aktywacji)",
+            @ApiResponse(responseCode = "403",
+                    description = "Konto nieaktywne — zwracane dopiero po poprawnym uwierzytelnieniu (USER_NOT_ACTIVATED)",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
