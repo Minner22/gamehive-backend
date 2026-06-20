@@ -1,5 +1,6 @@
 package pl.m22.gamehive.auth.service;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
@@ -43,6 +44,16 @@ public class AuthServiceImpl implements AuthService{
     private final UserMapper userMapper;
     private final ApplicationEventPublisher eventPublisher;
 
+    // Atrapa hasha do wyrównania czasu odpowiedzi dla nieistniejących kont (anty-timing).
+    // Generowana tym samym encoderem => ten sam algorytm i koszt (bcrypt/10) co realne hasła.
+    private String dummyHash;
+
+    @PostConstruct
+    void initDummyHash() {
+        this.dummyHash = passwordEncoder.encode("invalid-credentials-timing-placeholder");
+    }
+
+
     @Transactional
     @Override
     public void register(RegistrationDto registrationDto) {
@@ -56,16 +67,28 @@ public class AuthServiceImpl implements AuthService{
     public CredentialsDto login(LoginDto loginDto) {
 
         Email email = new Email(loginDto.email());
+        Optional<AppUser> appUserOpt = userRepository.findByEmail(email);
 
-        AppUser appUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ApplicationException(ErrorCode.EMAIL_NOT_FOUND, EMAIL_NOT_FOUND_MSG + email.obfuscated()));
+        // Hasło sprawdzane ZAWSZE i jako pierwsze — także dla nieistniejącego konta (stały czas).
+        boolean passwordMatches = appUserOpt
+                .map(user -> user.getPassword().matches(loginDto.password(), passwordEncoder))
+                .orElseGet(() -> {
+                    passwordEncoder.matches(loginDto.password(), dummyHash); // atrapa, wynik ignorowany
+                    return false;
+                });
 
-        if (!appUser.isEnabled()) {
-            throw new ApplicationException(ErrorCode.USER_NOT_ACTIVATED, "User not activated: " + appUser.getEmail().obfuscated());
+        if (!passwordMatches) {
+            // Jednolicie: "brak konta" == "złe hasło" — brak enumeracji.
+            throw new ApplicationException(ErrorCode.INVALID_CREDENTIALS,
+                    "Invalid credentials for: " + email.obfuscated());
         }
 
-        if (!appUser.getPassword().matches(loginDto.password(), passwordEncoder)) {
-            throw new DomainException(ErrorCode.INVALID_PASSWORD);
+        AppUser appUser = appUserOpt.orElseThrow(); // gwarantowanie obecny, skoro hasło pasuje
+
+        // Stan aktywacji ujawniany dopiero PO poprawnym haśle (tylko właściciel konta).
+        if (!appUser.isEnabled()) {
+            throw new ApplicationException(ErrorCode.USER_NOT_ACTIVATED,
+                    "User not activated: " + appUser.getEmail().obfuscated());
         }
 
         return userMapper.toCredentialsDto(appUser);

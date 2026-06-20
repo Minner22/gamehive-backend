@@ -12,6 +12,7 @@ public enum ErrorCode {
     CANNOT_MODIFY_OWN_ACCOUNT(HttpStatus.FORBIDDEN, "Cannot modify your own account"),
     CANNOT_REMOVE_LAST_ADMIN(HttpStatus.CONFLICT, "Cannot remove last administrator"),
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid email or password"),
     INVALID_EMAIL_FORMAT(HttpStatus.BAD_REQUEST, "Invalid email format"),
     INVALID_HASHED_PASSWORD(HttpStatus.BAD_REQUEST, "Invalid password hash"),
     INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "Invalid password"),
