@@ -17,6 +17,7 @@ import pl.m22.gamehive.user.model.UserProfile;
 import pl.m22.gamehive.user.model.UserRole;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -38,7 +39,7 @@ class UserMapperTest {
                 "Jan", "Kowalski",
                 new Address("ul. Testowa 1", "Warszawa", "00-001", "Polska"),
                 new PhoneNumber("+48123456789"),
-                LocalDate.of(1990, 1, 15), new ProfilePictureUrl("https://example.com/avatar.png")
+                LocalDate.of(1990, Month.JANUARY, 15), new ProfilePictureUrl("https://example.com/avatar.png")
         );
 
         AppUser user = AppUser.register(new Username("jan_kowalski"), new Email("jan@example.com"), HashedPassword.fromHash("{noop}secret123"));
@@ -85,7 +86,7 @@ class UserMapperTest {
                 "Anna", "Nowak",
                 new Address("ul. Rynek 5", "Krakow", "30-001", "Polska"),
                 new PhoneNumber("+48987654321"),
-                LocalDate.of(1985, 6, 20), new ProfilePictureUrl("https://example.com/photo.jpg")
+                LocalDate.of(1985, Month.JUNE, 20), new ProfilePictureUrl("https://example.com/photo.jpg")
         );
 
         UserProfileResponseDto result = userMapper.toUserProfileResponseDto(profile);
@@ -98,7 +99,7 @@ class UserMapperTest {
         assertEquals("Krakow", result.address().city());
         assertEquals("30-001", result.address().postalCode());
         assertEquals("Polska", result.address().country());
-        assertEquals(LocalDate.of(1985, 6, 20), result.dateOfBirth());
+        assertEquals(LocalDate.of(1985, Month.JUNE, 20), result.dateOfBirth());
         assertEquals("https://example.com/photo.jpg", result.profilePictureUrl());
     }
 
@@ -125,7 +126,7 @@ class UserMapperTest {
         UserProfile profile = new UserProfile(
                 "Jan", "Kowalski", new Address(null, null, null, null),
                 new PhoneNumber("+48123456789"),
-                LocalDate.of(1990, 1, 15), new ProfilePictureUrl("https://example.com/a.png"));
+                LocalDate.of(1990, Month.JANUARY, 15), new ProfilePictureUrl("https://example.com/a.png"));
 
         assertNull(userMapper.toUserProfileResponseDto(profile).address());
     }
@@ -137,7 +138,7 @@ class UserMapperTest {
         UserProfile profile = new UserProfile(
                 "Jan", "Kowalski", null,
                 new PhoneNumber("+48123456789"),
-                LocalDate.of(1990, 1, 15), new ProfilePictureUrl("https://example.com/a.png"));
+                LocalDate.of(1990, Month.JANUARY, 15), new ProfilePictureUrl("https://example.com/a.png"));
 
         assertNull(userMapper.toUserProfileResponseDto(profile).address());
     }

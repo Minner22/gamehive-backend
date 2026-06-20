@@ -29,6 +29,7 @@ import pl.m22.gamehive.user.model.UserProfile;
 import pl.m22.gamehive.user.model.UserRole;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -172,7 +173,7 @@ class UserServiceImplTest {
         UserProfileUpdateDto dto = new UserProfileUpdateDto(
                 "New", "Profile", "+48111222333",
                 new AddressDto("ul. Nowa 2", "Warszawa", "00-002", "Polska"),
-                LocalDate.of(1990, 1, 1), "https://example.com/new.png"
+                LocalDate.of(1990, Month.JANUARY, 1), "https://example.com/new.png"
         );
 
         UserProfile result = userService.updateCurrentUserProfile(JOHN_EMAIL, dto);
@@ -200,7 +201,7 @@ class UserServiceImplTest {
         assertEquals("Doe", result.getLastName());
         assertEquals("123456789", result.getPhoneNumber().value());
         assertEquals("Nowy Sącz", result.getAddress().getCity());
-        assertEquals(LocalDate.of(1990, 5, 15), result.getDateOfBirth());
+        assertEquals(LocalDate.of(1990, Month.MAY, 15), result.getDateOfBirth());
         assertEquals("https://example.com/johndoe.jpg", result.getProfilePictureUrl().value());
     }
 
