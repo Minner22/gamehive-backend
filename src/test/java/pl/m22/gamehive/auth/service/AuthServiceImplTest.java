@@ -8,8 +8,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import pl.m22.gamehive.auth.dto.CredentialsDto;
+import pl.m22.gamehive.auth.dto.LoginDto;
 import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.BaseException;
@@ -45,6 +49,7 @@ class AuthServiceImplTest {
     @Autowired UserRepository userRepository;
     @Autowired UserAuditLogRepository auditLogRepository;
     @MockitoBean JavaMailSender mailSender;
+    @MockitoSpyBean PasswordEncoder passwordEncoder;
 
     @AfterEach
     void deleteNewUsers() {
@@ -181,5 +186,54 @@ class AuthServiceImplTest {
         assertThat(entry.getAction()).isEqualTo(AuditAction.PASSWORD_CHANGE);
         assertThat(entry.getActor()).isEqualTo(NEW_USER_EMAIL);
         assertThat(entry.getTargetEmail()).isEqualTo(NEW_USER_EMAIL);
+    }
+
+    @Test
+    @DisplayName("login() poprawne dane (aktywne konto) -> zwraca CredentialsDto")
+    void login_happyPath_returnsCredentials() {
+
+        CredentialsDto credentials =
+                authService.login(new LoginDto("john.doe@example.com", "password123"));
+
+        assertThat(credentials.email()).isEqualTo("john.doe@example.com");
+    }
+
+    @Test
+    @DisplayName("login() złe hasło (aktywne konto) -> INVALID_CREDENTIALS")
+    void login_wrongPassword_invalidCredentials() {
+
+        assertThatThrownBy(() ->
+                authService.login(new LoginDto("john.doe@example.com", "wrongpassword")))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_CREDENTIALS);
+    }
+
+    @Test
+    @DisplayName("login() nieistniejący e-mail -> IDENTYCZNIE INVALID_CREDENTIALS + atrapa hasha (anty-timing)")
+    void login_nonExistingEmail_sameInvalidCredentials() {
+
+        assertThatThrownBy(() ->
+                authService.login(new LoginDto("nobody@test.com", "whatever123")))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_CREDENTIALS);
+
+        // mitygacja timingu: porównanie hasła wykonane MIMO braku konta
+        verify(passwordEncoder).matches(eq("whatever123"), anyString());
+    }
+
+    @Test
+    @DisplayName("login() poprawne hasło, konto nieaktywne -> USER_NOT_ACTIVATED dopiero po haśle")
+    void login_correctPasswordNotActivated_userNotActivated() {
+
+        authService.register(new RegistrationDto("notact", NEW_USER_EMAIL, "password123"));
+        clearInvocations(mailSender);
+
+        assertThatThrownBy(() ->
+                authService.login(new LoginDto(NEW_USER_EMAIL, "password123")))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.USER_NOT_ACTIVATED);
     }
 }

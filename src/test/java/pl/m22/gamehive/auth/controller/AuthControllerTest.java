@@ -112,7 +112,20 @@ class AuthControllerTest {
                         .content("""
                                 {"email":"john.doe@example.com","password":"wrongpassword"}
                                 """))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_CREDENTIALS"));
+    }
+
+    @Test
+    @DisplayName("POST /login nieistniejący e-mail -> 401 INVALID_CREDENTIALS (identycznie jak złe hasło)")
+    void login_nonExisting_email_401() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                  {"email":"nobody-enum@test.com","password":"password123"}
+                                  """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_CREDENTIALS"));
     }
 
     @Test
