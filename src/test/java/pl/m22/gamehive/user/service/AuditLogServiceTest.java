@@ -30,8 +30,8 @@ class AuditLogServiceTest {
     }
 
     @Test
-    @DisplayName("record() -> zapisuje wpis audytu z kompletem pól (REQUIRES_NEW commituje)")
-    void record_persistsEntry() {
+    @DisplayName("recordAudit() -> zapisuje wpis audytu z kompletem pól (REQUIRES_NEW commituje)")
+    void record_Audit_persistsEntry() {
 
         UserAuditEvent event = new UserAuditEvent(
                 AuditAction.ROLE_CHANGE,
@@ -41,7 +41,7 @@ class AuditLogServiceTest {
                 "{\"before\":[\"ROLE_USER\"],\"after\":[\"ROLE_MODERATOR\"]}",
                 "corr-xyz");
 
-        auditLogService.record(event);
+        auditLogService.recordAudit(event);
 
         List<UserAuditLogEntry> entries = auditLogRepository.findByTargetId(SeededUsers.JANE_ID);
         assertThat(entries).hasSize(1);

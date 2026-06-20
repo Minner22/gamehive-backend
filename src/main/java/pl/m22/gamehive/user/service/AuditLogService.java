@@ -15,7 +15,7 @@ public class AuditLogService {
     private final UserAuditLogRepository userAuditLogRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void record(UserAuditEvent event) {
+    public void recordAudit(UserAuditEvent event) {
 
         userAuditLogRepository.save(UserAuditLogEntry.of(
                 event.action(),
