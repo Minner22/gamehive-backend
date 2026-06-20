@@ -65,7 +65,7 @@ public class RedisSessionEpochStore {
                     String.valueOf(epochMillis),
                     Duration.ofSeconds(ttlSeconds)
             );
-        } catch (RedisConnectionFailureException e) {
+        } catch (RedisConnectionFailureException _) {
             log.error("Redis unavailable while setting epoch [{}] for user: {}", prefix, LoggingUtils.obfuscateEmail(email));
             throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot set epoch - Redis unavailable");
         }
@@ -81,7 +81,7 @@ public class RedisSessionEpochStore {
             String value = redisTemplate.opsForValue().get(prefix + email);
 
             return value == null ? null : Long.valueOf(value);
-        } catch (RedisConnectionFailureException e) {
+        } catch (RedisConnectionFailureException _) {
             log.error("Redis unavailable while setting epoch [{}] for user: {}", prefix, LoggingUtils.obfuscateEmail(email));
 
             return null;

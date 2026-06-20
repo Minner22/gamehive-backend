@@ -22,12 +22,10 @@ public class UserProfile extends LongEntity {
     private String lastName;
 
     @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "street",     column = @Column(name = "street")),
-            @AttributeOverride(name = "city",       column = @Column(name = "city")),
-            @AttributeOverride(name = "postalCode", column = @Column(name = "postal_code")),
-            @AttributeOverride(name = "country",    column = @Column(name = "country"))
-    })
+    @AttributeOverride(name = "street",     column = @Column(name = "street"))
+    @AttributeOverride(name = "city",       column = @Column(name = "city"))
+    @AttributeOverride(name = "postalCode", column = @Column(name = "postal_code"))
+    @AttributeOverride(name = "country",    column = @Column(name = "country"))
     private Address address;
 
     @Embedded

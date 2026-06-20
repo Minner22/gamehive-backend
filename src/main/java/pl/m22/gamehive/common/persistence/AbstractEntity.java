@@ -16,13 +16,13 @@ import java.time.Instant;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
-public abstract class AbstractEntity<ID extends Serializable> {
+public abstract class AbstractEntity<I extends Serializable> {
 
     @Column(updatable = false)
     private Instant createdAt;
     private Instant updatedAt;
 
-    public abstract ID getId();
+    public abstract I getId();
 
     @PrePersist
     protected void onCreate() {
