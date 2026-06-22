@@ -193,6 +193,15 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("GET /refresh bez cookie refreshToken -> 401 REFRESH_TOKEN_MISSING")
+    void refresh_missing_cookie_401() throws Exception {
+
+        mockMvc.perform(get("/api/v1/auth/refresh"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("REFRESH_TOKEN_MISSING"));
+    }
+
+    @Test
     @DisplayName("POST /logout poprawny Bearer -> 200, cookie wyczyszczone (Max-Age=0)")
     void logout_valid_bearer_200() throws Exception {
         String token = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN", "ROLE_USER"));
