@@ -99,7 +99,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingRequestCookieException.class)
     public ResponseEntity<ApiError> handleMissingCookie(MissingRequestCookieException ex) {
 
-        log.warn("Required cookie missing: {}", ex.getMessage());
+        log.warn("Required cookie missing: {}", ex.getCookieName());
 
         ApiError apiError = new ApiError(
                 ErrorCode.REFRESH_TOKEN_MISSING.name(),
