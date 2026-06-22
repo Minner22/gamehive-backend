@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 public record DeleteAccountDto(
 
         @Schema(description = "Hasło użytkownika, wymagane do potwierdzenia usunięcia konta.",
-                example = "P@ssw0rd123", requiredMode = Schema.RequiredMode.REQUIRED)
+                example = "password123", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "Password must not be blank")
         String password
 ) {
