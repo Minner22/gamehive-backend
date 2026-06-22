@@ -5,6 +5,7 @@ import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.common.domain.Email;
@@ -34,6 +35,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserRoleRepository userRoleRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public AppUser findUserByEmail(Email email) {
@@ -152,6 +154,26 @@ public class UserServiceImpl implements UserService {
         UUID targetId = user.getId();
 
         userRepository.delete(user);
+        eventPublisher.publishEvent(new UserDeletedEvent(email));
+        publishAudit(AuditAction.DELETE, targetId, email, requesterEmail, null);
+    }
+
+    @Override
+    public void deleteOwnAccount(Email requesterEmail, String rawPassword) {
+
+        AppUser user = findUserByEmail(requesterEmail);
+
+        if (!user.getPassword().matches(rawPassword, passwordEncoder)) {
+            throw new DomainException(ErrorCode.INVALID_PASSWORD);
+        }
+
+        guardLastAdmin(user);
+
+        String email = user.getEmail().value();
+        UUID targetId = user.getId();
+
+        userRepository.delete(user);
+
         eventPublisher.publishEvent(new UserDeletedEvent(email));
         publishAudit(AuditAction.DELETE, targetId, email, requesterEmail, null);
     }
