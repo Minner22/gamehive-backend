@@ -138,7 +138,8 @@ public class AuthController {
             description = "Na podstawie ważnego tokenu odświeżającego (ciasteczko refreshToken) wydaje nowy token dostępowy oraz rotuje token odświeżający.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Wydano nowy access token; nowy refresh token w ciasteczku"),
-            @ApiResponse(responseCode = "401", description = "Token odświeżający nieprawidłowy, wygasły lub odwołany",
+            @ApiResponse(responseCode = "401",
+                    description = "Brak ciasteczka refreshToken (REFRESH_TOKEN_MISSING) albo token odświeżający nieprawidłowy, wygasły lub odwołany",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
