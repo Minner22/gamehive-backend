@@ -3,6 +3,7 @@ package pl.m22.gamehive.common.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestCookieException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -93,6 +94,19 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus()).body(apiError);
+    }
+
+    @ExceptionHandler(MissingRequestCookieException.class)
+    public ResponseEntity<ApiError> handleMissingCookie(MissingRequestCookieException ex) {
+
+        log.warn("Required cookie missing: {}", ex.getCookieName());
+
+        ApiError apiError = new ApiError(
+                ErrorCode.REFRESH_TOKEN_MISSING.name(),
+                ErrorCode.REFRESH_TOKEN_MISSING.getDefaultMessage()
+        );
+
+        return ResponseEntity.status(ErrorCode.REFRESH_TOKEN_MISSING.getHttpStatus()).body(apiError);
     }
 
     private ResponseEntity<ApiError> buildResponse(BaseException ex) {
