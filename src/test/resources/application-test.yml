@@ -18,6 +18,9 @@ spring:
       host: localhost
       port: 16379
       password: ""
+  mail:
+    activationAddress: http://localhost:5173/activate
+    passwordResetAddress: http://localhost:5173/password-reset/confirm
 
 # override secrets for tests (so you don't need secret.properties)
 jwt:
