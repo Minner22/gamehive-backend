@@ -20,6 +20,7 @@ import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.ApiError;
 import pl.m22.gamehive.common.exception.ApiValidationError;
+import pl.m22.gamehive.user.dto.PageUserResponseDto;
 import pl.m22.gamehive.user.dto.UpdateUserRolesDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
 import pl.m22.gamehive.user.mapper.UserMapper;
@@ -49,7 +50,8 @@ public class AdminUserController {
     @Operation(
             summary = "Lista użytkowników (stronicowana)",
             description = "Zwraca stronicowaną listę wszystkich użytkowników. Parametry stronicowania: page, size, sort.")
-    @ApiResponse(responseCode = "200", description = "Strona wyników z użytkownikami")
+    @ApiResponse(responseCode = "200", description = "Strona wyników z użytkownikami",
+            content = @Content(schema = @Schema(implementation = PageUserResponseDto.class)))
     @GetMapping("/")
     public ResponseEntity<Page<UserResponseDto>> getAllUsers(Pageable pageable) {
 
