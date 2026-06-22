@@ -35,6 +35,7 @@ public enum ErrorCode {
     JWT_INVALID_SUBJECT(HttpStatus.UNAUTHORIZED, "JWT token does not contain a valid subject"),
     JWT_INVALID_ROLES(HttpStatus.UNAUTHORIZED, "JWT token does not contain valid roles"),
     JWT_PARSE_ERROR(HttpStatus.BAD_REQUEST, "Failed to parse JWT"),
+    REFRESH_TOKEN_MISSING(HttpStatus.UNAUTHORIZED, "Refresh token is missing"),
     ROLE_NOT_FOUND(HttpStatus.NOT_FOUND, "Role not found"),
     TOKEN_REVOKED(HttpStatus.UNAUTHORIZED, "Token has been revoked"),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
