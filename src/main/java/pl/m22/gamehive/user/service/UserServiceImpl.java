@@ -158,6 +158,7 @@ public class UserServiceImpl implements UserService {
         publishAudit(AuditAction.DELETE, targetId, email, requesterEmail, null);
     }
 
+    @Transactional
     @Override
     public void deleteOwnAccount(Email requesterEmail, String rawPassword) {
 
