@@ -123,6 +123,11 @@ W profilu `prod` konfiguracja pochodzi w całości ze zmiennych środowiskowych:
 `DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`,
 `ACTIVATION_ADDRESS`, `PASSWORD_RESET_ADDRESS` oraz sekrety JWT i poświadczenia SMTP.
 
+`ACTIVATION_ADDRESS` i `PASSWORD_RESET_ADDRESS` to **adresy stron frontu** (np.
+`https://gamehive.example/activate`, `https://gamehive.example/password-reset/confirm`),
+na które prowadzą linki w mailach — backend dokleja do nich `?token=<JWT>`. Strona frontu
+odczytuje parametr `token` i sama woła odpowiedni endpoint API.
+
 ---
 
 ## Architektura
