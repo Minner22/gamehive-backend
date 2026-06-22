@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import pl.m22.gamehive.common.exception.ApiError;
 import pl.m22.gamehive.user.dto.AuditLogFilter;
 import pl.m22.gamehive.user.dto.AuditLogResponseDto;
+import pl.m22.gamehive.user.dto.PageAuditLogResponseDto;
 import pl.m22.gamehive.user.mapper.AuditLogMapper;
 import pl.m22.gamehive.user.model.AuditAction;
 import pl.m22.gamehive.user.service.AuditLogQueryService;
@@ -44,7 +45,8 @@ public class AdminAuditController {
             summary = "Przeszukiwanie dziennika audytu",
             description = "Zwraca stronicowaną listę wpisów audytu z opcjonalnym filtrowaniem po użytkowniku, administratorze, rodzaju operacji i zakresie czasu. Domyślne sortowanie: createdAt malejąco.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Strona wyników z wpisami audytu"),
+            @ApiResponse(responseCode = "200", description = "Strona wyników z wpisami audytu",
+                    content = @Content(schema = @Schema(implementation = PageAuditLogResponseDto.class))),
             @ApiResponse(responseCode = "400", description = "Nieprawidłowy parametr zapytania (np. zły UUID lub format daty)",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
