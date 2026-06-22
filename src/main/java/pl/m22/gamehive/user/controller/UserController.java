@@ -9,12 +9,15 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.ApiError;
 import pl.m22.gamehive.common.exception.ApiValidationError;
+import pl.m22.gamehive.user.dto.DeleteAccountDto;
 import pl.m22.gamehive.user.dto.UserProfileResponseDto;
 import pl.m22.gamehive.user.dto.UserProfileUpdateDto;
 import pl.m22.gamehive.user.dto.UserResponseDto;
@@ -71,5 +74,42 @@ public class UserController {
         UserProfile updatedUserProfile = userService.updateCurrentUserProfile(email, userProfileUpdateDto);
 
         return ResponseEntity.ok(userMapper.toUserProfileResponseDto(updatedUserProfile));
+    }
+
+    @Operation(
+            summary = "Usunięcie własnego konta",
+            description = "Trwale (hard delete) usuwa konto zalogowanego użytkownika po potwierdzeniu hasłem. "
+                    + "Operacja jest nieodwracalna: unieważnia wszystkie tokeny odświeżające i bieżący token dostępowy "
+                    + "oraz czyści ciasteczko refreshToken. Ostatni administrator nie może usunąć własnego konta.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Konto usunięte; tokeny unieważnione, ciasteczko wyczyszczone"),
+            @ApiResponse(responseCode = "400", description = "Błąd walidacji danych wejściowych (brak hasła)",
+                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
+            @ApiResponse(responseCode = "401",
+                    description = "Brak lub nieprawidłowy token dostępowy albo błędne hasło potwierdzenia (INVALID_PASSWORD)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409",
+                    description = "Ostatni administrator nie może usunąć własnego konta (CANNOT_REMOVE_LAST_ADMIN)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteOwnAccount(Authentication authentication,
+                                                 @Valid @RequestBody DeleteAccountDto dto) {
+
+        Email email = new Email(authentication.getName());
+
+        userService.deleteOwnAccount(email, dto.password());
+
+        ResponseCookie cleared = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .secure(true)
+                .path("/api/v1/auth/refresh")
+                .maxAge(0)
+                .sameSite("Strict")
+                .build();
+
+        return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, cleared.toString()).build();
     }
 }

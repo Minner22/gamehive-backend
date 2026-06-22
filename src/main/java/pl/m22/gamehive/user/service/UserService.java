@@ -26,6 +26,8 @@ public interface UserService {
 
     void forceLogoutUser(UUID userId, Email requesterEmail);
 
+    void deleteOwnAccount(Email requesterEmail, String rawPassword);
+
     UserProfile updateCurrentUserProfile(Email email, UserProfileUpdateDto userProfileUpdateDto);
 
 }

@@ -44,6 +44,7 @@ class UserServiceImplTest {
 
     private static final Email JOHN_EMAIL = new Email("john.doe@example.com");
     private static final Email JANE_EMAIL = new Email("jane.smith@example.com");
+    private static final String SEED_PASSWORD = "password123";
 
     @Autowired UserService userService;
     @Autowired RedisTemplate<String, String> redisTemplate;
@@ -527,6 +528,101 @@ class UserServiceImplTest {
         assertEquals(SeededUsers.JANE_ID, event.targetId());
         assertEquals("jane.smith@example.com", event.targetEmail());
         assertEquals("john.doe@example.com", event.actor());
+    }
+
+    // --- deleteOwnAccount (self-service) ---
+    // Znamy plaintext tylko seedowego Johna (password123); Jane ma w data.sql inny hash.
+    // Dla ścieżek "sukcesu" usuwamy Johna, wcześniej promując Jane na admina (John nie jest już ostatnim adminem).
+
+    @Test
+    @Transactional
+    @DisplayName("deleteOwnAccount() -> poprawne hasło usuwa własne konto (gdy nie jest ostatnim adminem)")
+    void deleteOwnAccount_removes_own_account() {
+
+        userService.updateUserRoles(SeededUsers.JANE_ID, Set.of("ROLE_USER", "ROLE_ADMIN"), JOHN_EMAIL);
+
+        userService.deleteOwnAccount(JOHN_EMAIL, SEED_PASSWORD);
+
+        assertThatThrownBy(() -> userService.findUserById(SeededUsers.JOHN_ID))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("deleteOwnAccount() -> błędne hasło -> DomainException INVALID_PASSWORD, konto nietknięte")
+    void deleteOwnAccount_wrong_password_blocked() {
+
+        assertThatThrownBy(() -> userService.deleteOwnAccount(JOHN_EMAIL, "wrong-password"))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_PASSWORD);
+
+        assertEquals("john_doe", userService.findUserByEmail(JOHN_EMAIL).getUsername().value());
+    }
+
+    @Test
+    @DisplayName("deleteOwnAccount() -> nieistniejący email -> ApplicationException USER_NOT_FOUND")
+    void deleteOwnAccount_user_not_found() {
+
+        Email email = new Email("nobody@test.com");
+
+        assertThatThrownBy(() -> userService.deleteOwnAccount(email, SEED_PASSWORD))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("deleteOwnAccount() -> ostatni admin -> CANNOT_REMOVE_LAST_ADMIN (hasło sprawdzane wcześniej)")
+    void deleteOwnAccount_last_admin_blocked() {
+
+        assertThatThrownBy(() -> userService.deleteOwnAccount(JOHN_EMAIL, SEED_PASSWORD))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CANNOT_REMOVE_LAST_ADMIN);
+    }
+
+    @Test
+    @DisplayName("deleteOwnAccount() -> błędne hasło u ostatniego admina -> INVALID_PASSWORD (przed guardLastAdmin)")
+    void deleteOwnAccount_wrong_password_precedes_last_admin_guard() {
+
+        assertThatThrownBy(() -> userService.deleteOwnAccount(JOHN_EMAIL, "wrong-password"))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_PASSWORD);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("deleteOwnAccount() -> publikuje UserDeletedEvent (rewokacja Redis dzieje się AFTER_COMMIT)")
+    void deleteOwnAccount_publishes_event() {
+
+        userService.updateUserRoles(SeededUsers.JANE_ID, Set.of("ROLE_USER", "ROLE_ADMIN"), JOHN_EMAIL);
+
+        userService.deleteOwnAccount(JOHN_EMAIL, SEED_PASSWORD);
+
+        long count = applicationEvents.stream(UserDeletedEvent.class)
+                .filter(e -> e.email().equals("john.doe@example.com"))
+                .count();
+        assertEquals(1, count);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("deleteOwnAccount() -> publikuje UserAuditEvent DELETE z actor == target (self-service)")
+    void deleteOwnAccount_publishesAuditEvent_actorEqualsTarget() {
+
+        userService.updateUserRoles(SeededUsers.JANE_ID, Set.of("ROLE_USER", "ROLE_ADMIN"), JOHN_EMAIL);
+
+        userService.deleteOwnAccount(JOHN_EMAIL, SEED_PASSWORD);
+
+        UserAuditEvent event = applicationEvents.stream(UserAuditEvent.class)
+                .filter(e -> e.action() == AuditAction.DELETE)
+                .findFirst().orElseThrow();
+        assertEquals(SeededUsers.JOHN_ID, event.targetId());
+        assertEquals("john.doe@example.com", event.targetEmail());
+        assertEquals("john.doe@example.com", event.actor()); // self-service: actor == target
     }
 
     // --- forceLogout ---
