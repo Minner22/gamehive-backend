@@ -2,6 +2,7 @@ package pl.m22.gamehive.common.email.service;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mail.MailSendException;
@@ -9,12 +10,15 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import pl.m22.gamehive.common.email.config.MailProperties;
 import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -22,6 +26,9 @@ class MailServiceImplTest {
 
     @Autowired
     MailService mailService;
+
+    @Autowired
+    MailProperties mailProperties;
 
     @MockitoBean
     JavaMailSender mailSender;
@@ -38,5 +45,31 @@ class MailServiceImplTest {
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.EMAIL_SEND_FAILED);
 
+    }
+
+    @Test
+    @DisplayName("sendActivationEmail buduje link na front z parametrem ?token= (małe litery)")
+    void sendActivationEmail_buildsFrontendLinkWithLowercaseTokenParam() {
+
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+
+        mailService.sendActivationEmail("user@example.com", "tok123");
+
+        verify(mailSender).send(captor.capture());
+        String body = captor.getValue().getText();
+        assertThat(body).contains(mailProperties.getActivationAddress() + "?token=tok123");
+    }
+
+    @Test
+    @DisplayName("sendPasswordResetEmail buduje link na front z parametrem ?token= (małe litery)")
+    void sendPasswordResetEmail_buildsFrontendLinkWithLowercaseTokenParam() {
+
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+
+        mailService.sendPasswordResetEmail("user@example.com", "tok456");
+
+        verify(mailSender).send(captor.capture());
+        String body = captor.getValue().getText();
+        assertThat(body).contains(mailProperties.getPasswordResetAddress() + "?token=tok456");
     }
 }
