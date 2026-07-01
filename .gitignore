@@ -91,3 +91,4 @@ nb-configuration.xml
 secret.properties
 .scannerwork/
 .env
+docs/
