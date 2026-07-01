@@ -16,16 +16,16 @@ public class Publisher extends LongEntity {
     private String name;
 
     @Enumerated(EnumType.STRING)
-    private PublisherStatus publisherStatus;
+    private PublisherStatus status;
 
-    private Publisher(String name, PublisherStatus publisherStatus) {
+    private Publisher(String name, PublisherStatus status) {
 
         this.name = name;
-        this.publisherStatus = publisherStatus;
+        this.status = status;
     }
 
-    public static Publisher of(String name, PublisherStatus publisherStatus) {
+    public static Publisher of(String name, PublisherStatus status) {
 
-        return new Publisher(name, publisherStatus);
+        return new Publisher(name, status);
     }
 }
