@@ -22,3 +22,18 @@ VALUES
     ('0192a1b2-0000-7000-8000-000000000001', 1),  -- John: ADMIN
     ('0192a1b2-0000-7000-8000-000000000001', 2),  -- John: USER
     ('0192a1b2-0000-7000-8000-000000000002', 2);  -- Jane: USER
+
+-- game dictionaries (GH-114 / G1)
+INSERT INTO categories (name) VALUES
+                                  ('Strategy'), ('Family'), ('Party'), ('Cooperative');
+
+INSERT INTO mechanics (name) VALUES
+                                 ('Worker Placement'), ('Deck-building'), ('Area Control'), ('Dice Rolling');
+
+INSERT INTO publishers (name, status) VALUES
+                                          ('Rio Grande Games', 'APPROVED'),
+                                          ('Z-Man Games', 'APPROVED');
+
+INSERT INTO authors (first_name, last_name) VALUES
+                                                ('Uwe', 'Rosenberg'),
+                                                ('Reiner', 'Knizia');

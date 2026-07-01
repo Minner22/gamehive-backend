@@ -45,3 +45,36 @@ CREATE TABLE user_roles (
                             CONSTRAINT fk_user_roles_user FOREIGN KEY (user_id) REFERENCES application_users(id) ON DELETE CASCADE,
                             CONSTRAINT fk_user_roles_role FOREIGN KEY (role_id) REFERENCES user_role(id) ON DELETE CASCADE
 );
+
+--gry
+CREATE TABLE IF NOT EXISTS publishers (
+                                          id BIGSERIAL PRIMARY KEY,
+                                          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                                          updated_at TIMESTAMP WITH TIME ZONE,
+                                          name VARCHAR(255) NOT NULL UNIQUE,
+                                          status VARCHAR(20) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS categories (
+                                          id BIGSERIAL PRIMARY KEY,
+                                          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                                          updated_at TIMESTAMP WITH TIME ZONE,
+                                          name VARCHAR(255) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS mechanics (
+                                         id BIGSERIAL PRIMARY KEY,
+                                         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                                         updated_at TIMESTAMP WITH TIME ZONE,
+                                         name VARCHAR(255) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS authors (
+                                       id BIGSERIAL PRIMARY KEY,
+                                       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                                       updated_at TIMESTAMP WITH TIME ZONE,
+                                       first_name VARCHAR(255) NOT NULL,
+                                       last_name VARCHAR(255) NOT NULL,
+                                       CONSTRAINT uq_authors_name UNIQUE (first_name, last_name)
+);
+
