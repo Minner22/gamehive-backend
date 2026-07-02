@@ -9,8 +9,12 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     // ===== Domain — naruszenia reguł biznesowych (handler loguje INFO) =====
+    AUTHOR_IN_USE(HttpStatus.CONFLICT, "Author is in use"),
+    AUTHOR_NAME_EXISTS(HttpStatus.CONFLICT, "Author already exists"),
     CANNOT_MODIFY_OWN_ACCOUNT(HttpStatus.FORBIDDEN, "Cannot modify your own account"),
     CANNOT_REMOVE_LAST_ADMIN(HttpStatus.CONFLICT, "Cannot remove last administrator"),
+    CATEGORY_IN_USE(HttpStatus.CONFLICT, "Category is in use"),
+    CATEGORY_NAME_EXISTS(HttpStatus.CONFLICT, "Category name already exists"),
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid email or password"),
     INVALID_EMAIL_FORMAT(HttpStatus.BAD_REQUEST, "Invalid email format"),
@@ -19,12 +23,18 @@ public enum ErrorCode {
     INVALID_PHONE_NUMBER(HttpStatus.BAD_REQUEST, "Invalid phone number"),
     INVALID_PROFILE_PICTURE_URL(HttpStatus.BAD_REQUEST, "Invalid profile picture URL"),
     INVALID_USERNAME(HttpStatus.BAD_REQUEST, "Invalid username"),
+    MECHANIC_IN_USE(HttpStatus.CONFLICT, "Mechanic is in use"),
+    MECHANIC_NAME_EXISTS(HttpStatus.CONFLICT, "Mechanic name already exists"),
+    PUBLISHER_IN_USE(HttpStatus.CONFLICT, "Publisher is in use"),
+    PUBLISHER_NAME_EXISTS(HttpStatus.CONFLICT, "Publisher name already exists"),
     ROLE_ALREADY_ASSIGNED(HttpStatus.CONFLICT, "Role already assigned to user"),
     USER_ALREADY_ACTIVATED(HttpStatus.CONFLICT, "User is already activated"),
     USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "Username already exists"),
 
     // ===== Application — problemy w przepływie use-case (handler loguje WARN) =====
     ACCOUNT_DISABLED(HttpStatus.UNAUTHORIZED, "Account is disabled"),
+    AUTHOR_NOT_FOUND(HttpStatus.NOT_FOUND, "Author not found"),
+    CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "Category not found"),
     EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "Email not found"),
     JWT_BLACKLISTED(HttpStatus.UNAUTHORIZED, "JWT token already used"),
     JWT_EXPIRED(HttpStatus.UNAUTHORIZED, "JWT token has expired"),
@@ -35,6 +45,8 @@ public enum ErrorCode {
     JWT_INVALID_SUBJECT(HttpStatus.UNAUTHORIZED, "JWT token does not contain a valid subject"),
     JWT_INVALID_ROLES(HttpStatus.UNAUTHORIZED, "JWT token does not contain valid roles"),
     JWT_PARSE_ERROR(HttpStatus.BAD_REQUEST, "Failed to parse JWT"),
+    MECHANIC_NOT_FOUND(HttpStatus.NOT_FOUND, "Mechanic not found"),
+    PUBLISHER_NOT_FOUND(HttpStatus.NOT_FOUND, "Publisher not found"),
     REFRESH_TOKEN_MISSING(HttpStatus.UNAUTHORIZED, "Refresh token is missing"),
     ROLE_NOT_FOUND(HttpStatus.NOT_FOUND, "Role not found"),
     TOKEN_REVOKED(HttpStatus.UNAUTHORIZED, "Token has been revoked"),
