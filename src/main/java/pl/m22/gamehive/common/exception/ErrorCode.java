@@ -25,6 +25,7 @@ public enum ErrorCode {
     INVALID_USERNAME(HttpStatus.BAD_REQUEST, "Invalid username"),
     MECHANIC_IN_USE(HttpStatus.CONFLICT, "Mechanic is in use"),
     MECHANIC_NAME_EXISTS(HttpStatus.CONFLICT, "Mechanic name already exists"),
+    PUBLISHER_IN_USE(HttpStatus.CONFLICT, "Publisher is in use"),
     PUBLISHER_NAME_EXISTS(HttpStatus.CONFLICT, "Publisher name already exists"),
     ROLE_ALREADY_ASSIGNED(HttpStatus.CONFLICT, "Role already assigned to user"),
     USER_ALREADY_ACTIVATED(HttpStatus.CONFLICT, "User is already activated"),

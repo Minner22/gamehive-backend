@@ -56,7 +56,6 @@ public class TaxonomyServiceImpl implements TaxonomyService {
         }
 
         category.rename(name);
-        categoryRepository.save(category);
 
         return category;
     }
@@ -106,7 +105,6 @@ public class TaxonomyServiceImpl implements TaxonomyService {
         }
 
         mechanic.rename(name);
-        mechanicRepository.save(mechanic);
 
         return mechanic;
     }
@@ -155,7 +153,6 @@ public class TaxonomyServiceImpl implements TaxonomyService {
 
         if (publisher.getStatus() != PublisherStatus.APPROVED) {
             publisher.approve();
-            publisherRepository.save(publisher);
         }
 
         return publisher;
@@ -207,7 +204,6 @@ public class TaxonomyServiceImpl implements TaxonomyService {
         }
 
         author.rename(firstName, lastName);
-        authorRepository.save(author);
 
         return author;
     }

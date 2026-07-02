@@ -165,6 +165,36 @@ class TaxonomyAdminControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("CATEGORY_NOT_FOUND"));
     }
 
+    // ---------- CATEGORIES: autoryzacja endpointów mutujących ----------
+
+    @Test
+    @DisplayName("POST /categories jako USER -> 403")
+    void createCategory_asUser_403() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/taxonomy/categories")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Eurogame\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PUT /categories/{id} jako USER -> 403")
+    void renameCategory_asUser_403() throws Exception {
+        mockMvc.perform(put("/api/v1/admin/taxonomy/categories/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Eurogame\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("DELETE /categories/{id} jako USER -> 403")
+    void deleteCategory_asUser_403() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/taxonomy/categories/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
     // ---------- MECHANICS: reprezentatywny zestaw (analogicznie do kategorii) ----------
 
     @Test
@@ -206,6 +236,34 @@ class TaxonomyAdminControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("MECHANIC_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("POST /mechanics jako USER -> 403")
+    void createMechanic_asUser_403() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/taxonomy/mechanics")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Tile Placement\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PUT /mechanics/{id} jako USER -> 403")
+    void renameMechanic_asUser_403() throws Exception {
+        mockMvc.perform(put("/api/v1/admin/taxonomy/mechanics/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Tile Placement\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("DELETE /mechanics/{id} jako USER -> 403")
+    void deleteMechanic_asUser_403() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/taxonomy/mechanics/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
+                .andExpect(status().isForbidden());
     }
 
     // ---------- PUBLISHERS: lista + filtr + create + approve + delete ----------
