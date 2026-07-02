@@ -28,4 +28,9 @@ public class Publisher extends LongEntity {
 
         return new Publisher(name, status);
     }
+
+    public void approve() {
+
+        this.status = PublisherStatus.APPROVED;
+    }
 }

@@ -30,4 +30,10 @@ public class Author extends LongEntity {
 
         return new Author(firstName, lastName);
     }
+
+    public void rename(String firstName, String lastName) {
+
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
 }

@@ -25,4 +25,9 @@ public class Category extends LongEntity {
 
         return new Category(name);
     }
+
+    public void rename(String name) {
+
+        this.name = name;
+    }
 }

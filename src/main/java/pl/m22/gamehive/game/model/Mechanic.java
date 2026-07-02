@@ -25,4 +25,9 @@ public class Mechanic extends LongEntity {
 
         return new Mechanic(name);
     }
+
+    public void rename(String name) {
+
+        this.name = name;
+    }
 }
