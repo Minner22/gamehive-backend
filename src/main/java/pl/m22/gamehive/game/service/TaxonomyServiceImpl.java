@@ -161,6 +161,18 @@ public class TaxonomyServiceImpl implements TaxonomyService {
         return publisher;
     }
 
+    @Transactional
+    @Override
+    public void deletePublisher(Long id) {
+
+        if (!publisherRepository.existsById(id)) {
+            throw new ApplicationException(ErrorCode.PUBLISHER_NOT_FOUND);
+        }
+
+        // TODO(#116): guard *_IN_USE gdy Game będzie miał relacje do słownika
+        publisherRepository.deleteById(id);
+    }
+
     @Transactional(readOnly = true)
     @Override
     public List<Author> findAllAuthors() {

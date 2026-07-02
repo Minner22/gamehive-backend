@@ -19,6 +19,7 @@ public interface TaxonomyService {
     List<Publisher> findPublishers(PublisherStatus status); // status == null -> wszyscy
     Publisher createPublisher(String name);
     Publisher approvePublisher(Long id);
+    void deletePublisher(Long id);
 
     List<Author> findAllAuthors();
     Author createAuthor(String firstName, String lastName);
