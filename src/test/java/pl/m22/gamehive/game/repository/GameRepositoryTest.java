@@ -1,0 +1,152 @@
+package pl.m22.gamehive.game.repository;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
+import org.springframework.test.context.ActiveProfiles;
+import pl.m22.gamehive.common.persistence.ModerationStatus;
+import pl.m22.gamehive.game.model.*;
+import pl.m22.gamehive.support.SeededUsers;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DataJpaTest
+@ActiveProfiles("test")
+class GameRepositoryTest {
+
+    @Autowired
+    private GameRepository gameRepository;
+
+    @Autowired
+    private PublisherRepository publisherRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
+    private MechanicRepository mechanicRepository;
+
+    @Autowired
+    private AuthorRepository authorRepository;
+
+    @Autowired
+    private TestEntityManager em;
+
+    @Test
+    @DisplayName("findByTitle -> zasiana gra APPROVED z pełnymi relacjami i danymi recenzji")
+    void findSeededApproved_withRelations() {
+        Game game = gameRepository.findByTitle("Agricola").orElseThrow();
+
+        assertThat(game.getModerationStatus()).isEqualTo(ModerationStatus.APPROVED);
+        assertThat(game.getSubmittedBy()).isEqualTo(SeededUsers.JANE_ID);
+        assertThat(game.getReviewedBy()).isEqualTo(SeededUsers.MARK_ID);
+        assertThat(game.getReviewedAt()).isNotNull();
+        assertThat(game.getPublishers()).extracting(Publisher::getName)
+                .containsExactlyInAnyOrder("Rio Grande Games", "Z-Man Games");
+        assertThat(game.getCategories()).extracting(Category::getName).containsExactly("Strategy");
+        assertThat(game.getMechanics()).extracting(Mechanic::getName).containsExactly("Worker Placement");
+        assertThat(game.getAuthors()).extracting(Author::getLastName).containsExactly("Rosenberg");
+    }
+
+    @Test
+    @DisplayName("findByModerationStatus(PENDING) -> gra oczekująca, bez danych recenzji, puste kolekcje opcjonalne")
+    void findByModerationStatus_pending() {
+        List<Game> pending = gameRepository.findByModerationStatus(ModerationStatus.PENDING);
+
+        assertThat(pending).extracting(Game::getTitle).containsExactly("Pandemic");
+
+        Game pandemic = pending.getFirst();
+        assertThat(pandemic.getReviewedBy()).isNull();
+        assertThat(pandemic.getReviewedAt()).isNull();
+        assertThat(pandemic.getRejectionReason()).isNull();
+        assertThat(pandemic.getMechanics()).isEmpty();
+        assertThat(pandemic.getAuthors()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("gra REJECTED -> zachowuje rejectionReason i resubmissionCount")
+    void rejectedGame_workflowFields() {
+        Game rejected = gameRepository.findByTitle("Odrzucona Gra").orElseThrow();
+
+        assertThat(rejected.getModerationStatus()).isEqualTo(ModerationStatus.REJECTED);
+        assertThat(rejected.getRejectionReason()).isEqualTo("Duplikat istniejącej gry");
+        assertThat(rejected.getResubmissionCount()).isEqualTo(1);
+        assertThat(rejected.getReviewedBy()).isEqualTo(SeededUsers.MARK_ID);
+    }
+
+    @Test
+    @DisplayName("findBySubmittedBy -> gry danego użytkownika; pusto dla nieznanego UUID")
+    void findBySubmittedBy() {
+        assertThat(gameRepository.findBySubmittedBy(SeededUsers.JANE_ID))
+                .extracting(Game::getTitle)
+                .containsExactlyInAnyOrder("Agricola", "Pandemic");
+
+        assertThat(gameRepository.findBySubmittedBy(SeededUsers.UNKNOWN_ID)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("zapis nowej gry z relacjami -> odczyt zachowuje pola, relacje i domyślne wartości workflow")
+    void saveAndRead_withRelations() {
+        Publisher publisher = publisherRepository.findByName("Rio Grande Games").orElseThrow();
+        Category category = categoryRepository.findByName("Party").orElseThrow();
+        Mechanic mechanic = mechanicRepository.findByName("Dice Rolling").orElseThrow();
+        Author author = authorRepository.findByFirstNameAndLastName("Reiner", "Knizia").orElseThrow();
+
+        Game game = Game.builder()
+                .title("Nowa Gra")
+                .description("Opis nowej gry.")
+                .submittedBy(SeededUsers.JANE_ID)
+                .minPlayers(2)
+                .maxPlayers(5)
+                .playingTimeMinutes(60)
+                .yearPublished(2024)
+                .minAge(10)
+                .coverImageUrl("https://example.com/nowa-gra.jpg")
+                .build();
+        game.addPublisher(publisher);
+        game.addCategory(category);
+        game.addMechanic(mechanic);
+        game.addAuthor(author);
+
+        Long id = gameRepository.saveAndFlush(game).getId();
+        em.clear();
+
+        Game reloaded = gameRepository.findById(id).orElseThrow();
+        assertThat(reloaded.getTitle()).isEqualTo("Nowa Gra");
+        assertThat(reloaded.getMinPlayers()).isEqualTo(2);
+        assertThat(reloaded.getMaxPlayers()).isEqualTo(5);
+        assertThat(reloaded.getCreatedAt()).isNotNull();
+        assertThat(reloaded.getModerationStatus()).isEqualTo(ModerationStatus.PENDING);
+        assertThat(reloaded.getSubmittedBy()).isEqualTo(SeededUsers.JANE_ID);
+        assertThat(reloaded.getResubmissionCount()).isZero();
+        assertThat(reloaded.getReviewedBy()).isNull();
+        assertThat(reloaded.getReviewedAt()).isNull();
+        assertThat(reloaded.getPublishers()).extracting(Publisher::getName).containsExactly("Rio Grande Games");
+        assertThat(reloaded.getCategories()).extracting(Category::getName).containsExactly("Party");
+        assertThat(reloaded.getMechanics()).extracting(Mechanic::getName).containsExactly("Dice Rolling");
+        assertThat(reloaded.getAuthors()).extracting(Author::getLastName).containsExactly("Knizia");
+    }
+
+    @Test
+    @DisplayName("usunięcie gry -> znikają wpisy w tabeli łączącej, słowniki zostają")
+    void deleteGame_removesJoinRows_keepsDictionaries() {
+        Game game = gameRepository.findByTitle("Agricola").orElseThrow();
+        Long id = game.getId();
+        long publishersBefore = publisherRepository.count();
+
+        gameRepository.delete(game);
+        em.flush();
+
+        Number joinRows = (Number) em.getEntityManager()
+                .createNativeQuery("SELECT COUNT(*) FROM game_publisher WHERE game_id = :id")
+                .setParameter("id", id)
+                .getSingleResult();
+        assertThat(joinRows.longValue()).isZero();
+        assertThat(gameRepository.findByTitle("Agricola")).isEmpty();
+        assertThat(publisherRepository.count()).isEqualTo(publishersBefore);
+    }
+}

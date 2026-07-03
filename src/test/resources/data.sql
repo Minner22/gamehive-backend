@@ -41,3 +41,23 @@ INSERT INTO publishers (name, status) VALUES
 INSERT INTO authors (first_name, last_name) VALUES
                                                 ('Uwe', 'Rosenberg'),
                                                 ('Reiner', 'Knizia');
+
+
+-- games (GH-116 / G3) — ids 1..3 z kolejności insertów (BIGSERIAL), jak w słownikach powyżej
+INSERT INTO games (title, description, min_players, max_players, playing_time_minutes, year_published, min_age, cover_image_url,
+                   moderation_status, submitted_by, reviewed_by, reviewed_at, rejection_reason, resubmission_count)
+VALUES
+    ('Agricola', 'Klasyczna gra o rozwoju farmy.', 1, 4, 120, 2007, 12, 'https://example.com/agricola.jpg',
+     'APPROVED', '0192a1b2-0000-7000-8000-000000000002', '0192a1b2-0000-7000-8000-000000000003', CURRENT_TIMESTAMP, NULL, 0),
+    ('Pandemic', 'Kooperacyjna walka z epidemiami.', 2, 4, 45, 2008, 8, NULL,
+     'PENDING', '0192a1b2-0000-7000-8000-000000000002', NULL, NULL, NULL, 0),
+    ('Odrzucona Gra', 'Zgłoszenie odrzucone przez moderatora.', 2, 6, 30, 2020, 10, NULL,
+     'REJECTED', '0192a1b2-0000-7000-8000-000000000001', '0192a1b2-0000-7000-8000-000000000003', CURRENT_TIMESTAMP, 'Duplikat istniejącej gry', 1);
+
+-- relacje: publishers (1=Rio Grande, 2=Z-Man, 3=Pending Games), categories (1=Strategy, 2=Family, 4=Cooperative),
+--          mechanics (1=Worker Placement), authors (1=Uwe Rosenberg)
+INSERT INTO game_publisher (game_id, publisher_id) VALUES (1, 1), (1, 2), (2, 2), (3, 3);
+INSERT INTO game_category (game_id, category_id) VALUES (1, 1), (2, 4), (3, 2);
+INSERT INTO game_mechanic (game_id, mechanic_id) VALUES (1, 1);
+INSERT INTO game_author (game_id, author_id) VALUES (1, 1);
+
