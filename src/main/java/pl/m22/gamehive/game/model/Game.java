@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import pl.m22.gamehive.common.persistence.ModeratedLongEntity;
+import pl.m22.gamehive.common.persistence.ModerationStatus;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -74,11 +75,11 @@ public class Game extends ModeratedLongEntity {
     private Set<Author> authors = new HashSet<>();
 
     @Builder
-    private Game(String title, String description, UUID submittedBy,
+    private Game(String title, String description, UUID submittedBy, ModerationStatus moderationStatus,
                  int minPlayers, int maxPlayers, int playingTimeMinutes,
                  int yearPublished, int minAge, String coverImageUrl) {
 
-        super(submittedBy);
+        super(submittedBy, moderationStatus != null ? moderationStatus : ModerationStatus.PENDING);
         this.title = title;
         this.description = description;
         this.minPlayers = minPlayers;

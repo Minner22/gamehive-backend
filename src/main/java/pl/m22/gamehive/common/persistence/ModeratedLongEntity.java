@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 @MappedSuperclass
@@ -33,10 +34,14 @@ public abstract class ModeratedLongEntity extends LongEntity {
     @Column(nullable = false)
     private int resubmissionCount;
 
-    protected ModeratedLongEntity(UUID submittedBy) {
+    protected ModeratedLongEntity(UUID submittedBy, ModerationStatus initialStatus) {
 
-        this.moderationStatus = ModerationStatus.PENDING;
-        this.submittedBy = submittedBy;
+        if (initialStatus != ModerationStatus.DRAFT && initialStatus != ModerationStatus.PENDING) {
+            throw new IllegalArgumentException("Initial moderation status must be DRAFT or PENDING, got: " + initialStatus);
+        }
+
+        this.moderationStatus = initialStatus;
+        this.submittedBy = Objects.requireNonNull(submittedBy, "submittedBy must not be null");
         this.resubmissionCount = 0;
     }
 }

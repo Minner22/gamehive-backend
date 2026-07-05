@@ -48,3 +48,11 @@ CREATE TABLE IF NOT EXISTS game_author (
                                            author_id BIGINT NOT NULL REFERENCES authors (id),
                                            PRIMARY KEY (game_id, author_id)
 );
+
+-- Indeksy po stronie słownika (PK złożony pokrywa tylko lookupy od strony game_id).
+-- Postgres nie indeksuje kolumn FK automatycznie: bez nich check RESTRICT przy DELETE słownika,
+-- guard *_IN_USE (#117) i zapytania "gry wg słownika" robią sequential scan tabeli łączącej.
+CREATE INDEX IF NOT EXISTS idx_game_publisher_publisher_id ON game_publisher (publisher_id);
+CREATE INDEX IF NOT EXISTS idx_game_category_category_id ON game_category (category_id);
+CREATE INDEX IF NOT EXISTS idx_game_mechanic_mechanic_id ON game_mechanic (mechanic_id);
+CREATE INDEX IF NOT EXISTS idx_game_author_author_id ON game_author (author_id);

@@ -1,5 +1,6 @@
 package pl.m22.gamehive.game.controller;
 
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -149,9 +150,10 @@ class TaxonomyAdminControllerTest {
 
     @Test
     @Transactional
-    @DisplayName("DELETE /categories/{id} jako ADMIN -> 204")
+    @DisplayName("DELETE /categories/{id} jako ADMIN -> 204 (kategoria nieużywana przez żadną grę)")
     void deleteCategory_asAdmin_204() throws Exception {
-        mockMvc.perform(delete("/api/v1/admin/taxonomy/categories/4")
+        // id 3 (Party) — jedyna zasiana kategoria bez wpisu w game_category (GH-116)
+        mockMvc.perform(delete("/api/v1/admin/taxonomy/categories/3")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
     }
@@ -360,9 +362,18 @@ class TaxonomyAdminControllerTest {
 
     @Test
     @Transactional
-    @DisplayName("DELETE /publishers/{id} jako ADMIN -> 204")
+    @DisplayName("DELETE /publishers/{id} jako ADMIN -> 204 (świeżo utworzony, nieużywany przez żadną grę)")
     void deletePublisher_asAdmin_204() throws Exception {
-        mockMvc.perform(delete("/api/v1/admin/taxonomy/publishers/2")
+        // wszyscy zasiani wydawcy są powiązani z grami (GH-116) — usuwamy świeżo utworzonego
+        String body = mockMvc.perform(post("/api/v1/admin/taxonomy/publishers")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Do Usuniecia\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long id = ((Number) JsonPath.read(body, "$.id")).longValue();
+
+        mockMvc.perform(delete("/api/v1/admin/taxonomy/publishers/" + id)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
     }

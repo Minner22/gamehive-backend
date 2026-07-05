@@ -5,14 +5,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 import pl.m22.gamehive.common.persistence.ModerationStatus;
 import pl.m22.gamehive.game.model.*;
 import pl.m22.gamehive.support.SeededUsers;
 
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -39,7 +40,7 @@ class GameRepositoryTest {
     @Test
     @DisplayName("findByTitle -> zasiana gra APPROVED z pełnymi relacjami i danymi recenzji")
     void findSeededApproved_withRelations() {
-        Game game = gameRepository.findByTitle("Agricola").orElseThrow();
+        Game game = gameRepository.findByTitle("Agricola").getFirst();
 
         assertThat(game.getModerationStatus()).isEqualTo(ModerationStatus.APPROVED);
         assertThat(game.getSubmittedBy()).isEqualTo(SeededUsers.JANE_ID);
@@ -55,11 +56,11 @@ class GameRepositoryTest {
     @Test
     @DisplayName("findByModerationStatus(PENDING) -> gra oczekująca, bez danych recenzji, puste kolekcje opcjonalne")
     void findByModerationStatus_pending() {
-        List<Game> pending = gameRepository.findByModerationStatus(ModerationStatus.PENDING);
+        Page<Game> pending = gameRepository.findByModerationStatus(ModerationStatus.PENDING, Pageable.unpaged());
 
         assertThat(pending).extracting(Game::getTitle).containsExactly("Pandemic");
 
-        Game pandemic = pending.getFirst();
+        Game pandemic = pending.getContent().getFirst();
         assertThat(pandemic.getReviewedBy()).isNull();
         assertThat(pandemic.getReviewedAt()).isNull();
         assertThat(pandemic.getRejectionReason()).isNull();
@@ -70,7 +71,7 @@ class GameRepositoryTest {
     @Test
     @DisplayName("gra REJECTED -> zachowuje rejectionReason i resubmissionCount")
     void rejectedGame_workflowFields() {
-        Game rejected = gameRepository.findByTitle("Odrzucona Gra").orElseThrow();
+        Game rejected = gameRepository.findByTitle("Odrzucona Gra").getFirst();
 
         assertThat(rejected.getModerationStatus()).isEqualTo(ModerationStatus.REJECTED);
         assertThat(rejected.getRejectionReason()).isEqualTo("Duplikat istniejącej gry");
@@ -132,9 +133,42 @@ class GameRepositoryTest {
     }
 
     @Test
+    @DisplayName("builder z moderationStatus(DRAFT) -> zapis i odczyt zachowują status DRAFT")
+    void saveDraft_keepsDraftStatus() {
+        Game draft = Game.builder()
+                .title("Szkic Gry")
+                .description("Niedokończone zgłoszenie.")
+                .submittedBy(SeededUsers.JANE_ID)
+                .moderationStatus(ModerationStatus.DRAFT)
+                .minPlayers(1)
+                .maxPlayers(2)
+                .playingTimeMinutes(30)
+                .yearPublished(2025)
+                .minAge(8)
+                .build();
+
+        Long id = gameRepository.saveAndFlush(draft).getId();
+        em.clear();
+
+        assertThat(gameRepository.findById(id).orElseThrow().getModerationStatus())
+                .isEqualTo(ModerationStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("builder z moderationStatus(APPROVED) -> IllegalArgumentException (stan początkowy tylko DRAFT/PENDING)")
+    void builder_approvedInitialStatus_rejected() {
+        assertThatIllegalArgumentException().isThrownBy(() -> Game.builder()
+                .title("Nielegalna Gra")
+                .description("Próba utworzenia od razu jako APPROVED.")
+                .submittedBy(SeededUsers.JANE_ID)
+                .moderationStatus(ModerationStatus.APPROVED)
+                .build());
+    }
+
+    @Test
     @DisplayName("usunięcie gry -> znikają wpisy w tabeli łączącej, słowniki zostają")
     void deleteGame_removesJoinRows_keepsDictionaries() {
-        Game game = gameRepository.findByTitle("Agricola").orElseThrow();
+        Game game = gameRepository.findByTitle("Agricola").getFirst();
         Long id = game.getId();
         long publishersBefore = publisherRepository.count();
 
