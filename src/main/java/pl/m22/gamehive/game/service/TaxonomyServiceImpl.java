@@ -68,7 +68,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
             throw new ApplicationException(ErrorCode.CATEGORY_NOT_FOUND);
         }
 
-        // TODO(#116): guard *_IN_USE gdy Game będzie miał relacje do słownika
+        // TODO(#117): guard *_IN_USE — relacje Game->słownik istnieją od #116, bez guarda DELETE używanego wpisu = 500 z FK
         categoryRepository.deleteById(id);
     }
 
@@ -117,7 +117,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
             throw new ApplicationException(ErrorCode.MECHANIC_NOT_FOUND);
         }
 
-        // TODO(#116): guard *_IN_USE gdy Game będzie miał relacje do słownika
+        // TODO(#117): guard *_IN_USE — relacje Game->słownik istnieją od #116, bez guarda DELETE używanego wpisu = 500 z FK
         mechanicRepository.deleteById(id);
     }
 
@@ -166,7 +166,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
             throw new ApplicationException(ErrorCode.PUBLISHER_NOT_FOUND);
         }
 
-        // TODO(#116): guard *_IN_USE gdy Game będzie miał relacje do słownika
+        // TODO(#117): guard *_IN_USE — relacje Game->słownik istnieją od #116, bez guarda DELETE używanego wpisu = 500 z FK
         publisherRepository.deleteById(id);
     }
 
@@ -216,7 +216,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
             throw new ApplicationException(ErrorCode.AUTHOR_NOT_FOUND);
         }
 
-        // TODO(#116): guard *_IN_USE gdy Game będzie miał relacje do słownika
+        // TODO(#117): guard *_IN_USE — relacje Game->słownik istnieją od #116, bez guarda DELETE używanego wpisu = 500 z FK
         authorRepository.deleteById(id);
     }
 }
