@@ -16,13 +16,14 @@ public interface TaxonomyService {
     Mechanic renameMechanic(Long id, String name);
     void deleteMechanic(Long id);
 
-    List<Publisher> findPublishers(PublisherStatus status); // status == null -> wszyscy
+    List<Publisher> findPublishers(TaxonomyStatus status); // status == null -> wszyscy
     Publisher createPublisher(String name);
     Publisher approvePublisher(Long id);
     void deletePublisher(Long id);
 
-    List<Author> findAllAuthors();
+    List<Author> findAuthors(TaxonomyStatus status);
     Author createAuthor(String firstName, String lastName);
+    Author approveAuthor(Long id);
     Author updateAuthor(Long id, String firstName, String lastName);
     void deleteAuthor(Long id);
 }

@@ -127,7 +127,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<Publisher> findPublishers(PublisherStatus status) {
+    public List<Publisher> findPublishers(TaxonomyStatus status) {
 
         return status == null
                 ? publisherRepository.findAll()
@@ -142,7 +142,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
             throw new DomainException(ErrorCode.PUBLISHER_NAME_EXISTS);
         }
 
-        Publisher publisher = Publisher.of(name, PublisherStatus.APPROVED);
+        Publisher publisher = Publisher.of(name, TaxonomyStatus.APPROVED);
         publisherRepository.save(publisher);
 
         return publisher;
@@ -155,7 +155,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
         Publisher publisher = publisherRepository.findById(id)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.PUBLISHER_NOT_FOUND));
 
-        if (publisher.getStatus() != PublisherStatus.APPROVED) {
+        if (publisher.getStatus() != TaxonomyStatus.APPROVED) {
             publisher.approve();
         }
 
@@ -179,9 +179,11 @@ public class TaxonomyServiceImpl implements TaxonomyService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<Author> findAllAuthors() {
+    public List<Author> findAuthors(TaxonomyStatus status) {
 
-        return authorRepository.findAll();
+        return status == null
+                ? authorRepository.findAll()
+                : authorRepository.findByStatus(status);
     }
 
     @Transactional
@@ -192,8 +194,22 @@ public class TaxonomyServiceImpl implements TaxonomyService {
             throw new DomainException(ErrorCode.AUTHOR_NAME_EXISTS);
         }
 
-        Author author = Author.of(firstName, lastName);
+        Author author = Author.of(firstName, lastName,  TaxonomyStatus.APPROVED);
         authorRepository.save(author);
+
+        return author;
+    }
+
+    @Transactional
+    @Override
+    public Author approveAuthor(Long id) {
+
+        Author author = authorRepository.findById(id)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.AUTHOR_NOT_FOUND));
+
+        if (author.getStatus() != TaxonomyStatus.APPROVED) {
+            author.approve();
+        }
 
         return author;
     }

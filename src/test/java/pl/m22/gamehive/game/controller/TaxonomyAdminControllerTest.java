@@ -427,7 +427,8 @@ class TaxonomyAdminControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.firstName").value("Vital"))
-                .andExpect(jsonPath("$.lastName").value("Lacerda"));
+                .andExpect(jsonPath("$.lastName").value("Lacerda"))
+                .andExpect(jsonPath("$.status").value("APPROVED"));
     }
 
     @Test
@@ -449,6 +450,57 @@ class TaxonomyAdminControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firstName\":\"Vital\",\"lastName\":\"Lacerda\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("POST /authors/{id}/approve PENDING -> 200 + APPROVED")
+    void approveAuthor_pending_200() throws Exception {
+        // autor 3 (Oczekujacy Autor) zasiany jako PENDING
+        mockMvc.perform(post("/api/v1/admin/taxonomy/authors/3/approve")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(3))
+                .andExpect(jsonPath("$.status").value("APPROVED"));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("POST /authors/{id}/approve już APPROVED -> 200 (idempotentne)")
+    void approveAuthor_alreadyApproved_200() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/taxonomy/authors/1/approve")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.status").value("APPROVED"));
+    }
+
+    @Test
+    @DisplayName("POST /authors/{id}/approve nieistniejący -> 404 (AUTHOR_NOT_FOUND)")
+    void approveAuthor_notFound_404() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/taxonomy/authors/99999/approve")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("AUTHOR_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("POST /authors/{id}/approve jako USER -> 403")
+    void approveAuthor_asUser_403() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/taxonomy/authors/3/approve")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /authors?status=PENDING -> 200 + tylko PENDING")
+    void listAuthors_filterPending_200() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/taxonomy/authors")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .param("status", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$[*].status", everyItem(is("PENDING"))));
     }
 
     @Test

@@ -7,7 +7,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 import pl.m22.gamehive.game.model.Publisher;
-import pl.m22.gamehive.game.model.PublisherStatus;
+import pl.m22.gamehive.game.model.TaxonomyStatus;
 
 import java.util.Optional;
 
@@ -26,7 +26,7 @@ class PublisherRepositoryTest {
     void findByName_ok() {
         Optional<Publisher> p = publisherRepository.findByName("Rio Grande Games");
         assertThat(p).isPresent();
-        assertThat(p.get().getStatus()).isEqualTo(PublisherStatus.APPROVED);
+        assertThat(p.get().getStatus()).isEqualTo(TaxonomyStatus.APPROVED);
     }
 
     @Test
@@ -39,11 +39,11 @@ class PublisherRepositoryTest {
     @Test
     @DisplayName("zapis wydawcy PENDING -> odczyt zachowuje status i ustawia createdAt")
     void saveAndRead_pending() {
-        Publisher saved = publisherRepository.save(Publisher.of("Nowy Wydawca", PublisherStatus.PENDING));
+        Publisher saved = publisherRepository.save(Publisher.of("Nowy Wydawca", TaxonomyStatus.PENDING));
 
         Publisher reloaded = publisherRepository.findById(saved.getId()).orElseThrow();
         assertThat(reloaded.getName()).isEqualTo("Nowy Wydawca");
-        assertThat(reloaded.getStatus()).isEqualTo(PublisherStatus.PENDING);
+        assertThat(reloaded.getStatus()).isEqualTo(TaxonomyStatus.PENDING);
         assertThat(reloaded.getCreatedAt()).isNotNull();
     }
 
@@ -51,7 +51,7 @@ class PublisherRepositoryTest {
     @DisplayName("duplikat name -> naruszenie unikalności")
     void duplicateName_violatesUnique() {
         assertThatThrownBy(() ->
-                publisherRepository.saveAndFlush(Publisher.of("Rio Grande Games", PublisherStatus.APPROVED)))
+                publisherRepository.saveAndFlush(Publisher.of("Rio Grande Games", TaxonomyStatus.APPROVED)))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

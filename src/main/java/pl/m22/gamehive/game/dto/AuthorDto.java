@@ -1,4 +1,6 @@
 package pl.m22.gamehive.game.dto;
 
-public record AuthorDto(Long id, String firstName, String lastName) {
+import pl.m22.gamehive.game.model.TaxonomyStatus;
+
+public record AuthorDto(Long id, String firstName, String lastName, TaxonomyStatus status) {
 }

@@ -1,6 +1,6 @@
 package pl.m22.gamehive.game.model;
 
-public enum PublisherStatus {
+public enum TaxonomyStatus {
 
     APPROVED,
     PENDING

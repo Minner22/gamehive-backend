@@ -38,9 +38,10 @@ INSERT INTO publishers (name, status) VALUES
                                           ('Z-Man Games', 'APPROVED'),
                                           ('Pending Games', 'PENDING');
 
-INSERT INTO authors (first_name, last_name) VALUES
-                                                ('Uwe', 'Rosenberg'),
-                                                ('Reiner', 'Knizia');
+INSERT INTO authors (first_name, last_name, status) VALUES
+                                                        ('Uwe', 'Rosenberg', 'APPROVED'),
+                                                        ('Reiner', 'Knizia', 'APPROVED'),
+                                                        ('Oczekujacy', 'Autor', 'PENDING');
 
 
 -- games (GH-116 / G3) — ids 1..3 z kolejności insertów (BIGSERIAL), jak w słownikach powyżej
@@ -60,4 +61,5 @@ INSERT INTO game_publisher (game_id, publisher_id) VALUES (1, 1), (1, 2), (2, 2)
 INSERT INTO game_category (game_id, category_id) VALUES (1, 1), (2, 4), (3, 2);
 INSERT INTO game_mechanic (game_id, mechanic_id) VALUES (1, 1);
 INSERT INTO game_author (game_id, author_id) VALUES (1, 1);
+
 

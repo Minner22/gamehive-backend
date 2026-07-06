@@ -7,6 +7,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 import pl.m22.gamehive.game.model.Author;
+import pl.m22.gamehive.game.model.TaxonomyStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,7 +35,7 @@ class AuthorRepositoryTest {
     @Test
     @DisplayName("ten sam firstName, inny lastName -> dozwolone (unikat dotyczy pary)")
     void sameFirst_differentLast_allowed() {
-        authorRepository.saveAndFlush(Author.of("Uwe", "Nowak"));
+        authorRepository.saveAndFlush(Author.of("Uwe", "Nowak", TaxonomyStatus.APPROVED));
         assertThat(authorRepository.existsByFirstNameAndLastName("Uwe", "Nowak")).isTrue();
     }
 
@@ -42,7 +43,15 @@ class AuthorRepositoryTest {
     @DisplayName("duplikat pary firstName+lastName -> naruszenie unikalności")
     void duplicatePair_violatesUnique() {
         assertThatThrownBy(() ->
-                authorRepository.saveAndFlush(Author.of("Uwe", "Rosenberg")))
+                authorRepository.saveAndFlush(Author.of("Uwe", "Rosenberg", TaxonomyStatus.APPROVED)))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("findByStatus(PENDING) -> tylko autorzy oczekujący")
+    void findByStatus_pending() {
+        assertThat(authorRepository.findByStatus(TaxonomyStatus.PENDING))
+                .extracting(Author::getLastName)
+                .containsExactly("Autor");
     }
 }

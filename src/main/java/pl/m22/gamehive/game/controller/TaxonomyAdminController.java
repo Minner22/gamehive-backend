@@ -22,7 +22,7 @@ import pl.m22.gamehive.game.mapper.AuthorMapper;
 import pl.m22.gamehive.game.mapper.CategoryMapper;
 import pl.m22.gamehive.game.mapper.MechanicMapper;
 import pl.m22.gamehive.game.mapper.PublisherMapper;
-import pl.m22.gamehive.game.model.PublisherStatus;
+import pl.m22.gamehive.game.model.TaxonomyStatus;
 import pl.m22.gamehive.game.service.TaxonomyService;
 
 import java.util.List;
@@ -180,7 +180,7 @@ public class TaxonomyAdminController {
     @GetMapping("/publishers")
     public ResponseEntity<List<PublisherDto>> listPublishers(
             @Parameter(description = "Filtr po statusie (PENDING/APPROVED); brak = wszyscy")
-            @RequestParam(required = false) PublisherStatus status) {
+            @RequestParam(required = false) TaxonomyStatus status) {
         return ResponseEntity.ok(publisherMapper.toDtoList(taxonomyService.findPublishers(status)));
     }
 
@@ -231,16 +231,18 @@ public class TaxonomyAdminController {
 
     // author
 
-    @Operation(summary = "Lista autorów")
+    @Operation(summary = "Lista autorów (opcjonalny filtr statusu)")
     @ApiResponse(responseCode = "200", description = "Lista autorów",
             content = @Content(array = @ArraySchema(schema = @Schema(implementation = AuthorDto.class))))
     @GetMapping("/authors")
-    public ResponseEntity<List<AuthorDto>> listAuthors() {
+    public ResponseEntity<List<AuthorDto>> listAuthors(
+            @Parameter(description = "Filtr po statusie (PENDING/APPROVED); brak = wszyscy")
+            @RequestParam(required = false) TaxonomyStatus status) {
 
-        return ResponseEntity.ok(authorMapper.toDtoList(taxonomyService.findAllAuthors()));
+        return ResponseEntity.ok(authorMapper.toDtoList(taxonomyService.findAuthors(status)));
     }
 
-    @Operation(summary = "Utwórz autora")
+    @Operation(summary = "Utwórz autora", description = "Tworzy autora od razu ze statusem APPROVED.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Autor utworzony"),
             @ApiResponse(responseCode = "400", description = "Błąd walidacji",
@@ -254,6 +256,19 @@ public class TaxonomyAdminController {
         AuthorDto dto = authorMapper.toDto(taxonomyService.createAuthor(request.firstName(), request.lastName()));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+    }
+
+    @Operation(summary = "Zatwierdź autora",
+            description = "Zmienia status PENDING → APPROVED. Idempotentne: autor już APPROVED zwraca 200 bez zmian.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Autor zatwierdzony (lub już był APPROVED)"),
+            @ApiResponse(responseCode = "404", description = "Autor nie istnieje (AUTHOR_NOT_FOUND)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @PostMapping("/authors/{id}/approve")
+    public ResponseEntity<AuthorDto> approveAuthor(@PathVariable Long id) {
+
+        return ResponseEntity.ok(authorMapper.toDto(taxonomyService.approveAuthor(id)));
     }
 
     @Operation(summary = "Edytuj autora")
