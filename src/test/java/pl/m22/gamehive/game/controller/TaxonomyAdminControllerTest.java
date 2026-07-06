@@ -427,7 +427,8 @@ class TaxonomyAdminControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.firstName").value("Vital"))
-                .andExpect(jsonPath("$.lastName").value("Lacerda"));
+                .andExpect(jsonPath("$.lastName").value("Lacerda"))
+                .andExpect(jsonPath("$.status").value("APPROVED"));
     }
 
     @Test
@@ -449,6 +450,57 @@ class TaxonomyAdminControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firstName\":\"Vital\",\"lastName\":\"Lacerda\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("POST /authors/{id}/approve PENDING -> 200 + APPROVED")
+    void approveAuthor_pending_200() throws Exception {
+        // autor 3 (Oczekujacy Autor) zasiany jako PENDING
+        mockMvc.perform(post("/api/v1/admin/taxonomy/authors/3/approve")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(3))
+                .andExpect(jsonPath("$.status").value("APPROVED"));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("POST /authors/{id}/approve już APPROVED -> 200 (idempotentne)")
+    void approveAuthor_alreadyApproved_200() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/taxonomy/authors/1/approve")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.status").value("APPROVED"));
+    }
+
+    @Test
+    @DisplayName("POST /authors/{id}/approve nieistniejący -> 404 (AUTHOR_NOT_FOUND)")
+    void approveAuthor_notFound_404() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/taxonomy/authors/99999/approve")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("AUTHOR_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("POST /authors/{id}/approve jako USER -> 403")
+    void approveAuthor_asUser_403() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/taxonomy/authors/3/approve")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /authors?status=PENDING -> 200 + tylko PENDING")
+    void listAuthors_filterPending_200() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/taxonomy/authors")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .param("status", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$[*].status", everyItem(is("PENDING"))));
     }
 
     @Test
@@ -521,5 +573,47 @@ class TaxonomyAdminControllerTest {
     void deleteAuthor_unauthenticated_401() throws Exception {
         mockMvc.perform(delete("/api/v1/admin/taxonomy/authors/2"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ---------- *_IN_USE: usuwanie wpisów powiązanych z grami (GH-117) ----------
+
+    @Test
+    @DisplayName("DELETE /categories/{id} używana przez grę -> 409 (CATEGORY_IN_USE)")
+    void deleteCategory_inUse_409() throws Exception {
+        // kategoria 1 (Strategy) powiązana z grą 1 (Agricola) w game_category
+        mockMvc.perform(delete("/api/v1/admin/taxonomy/categories/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("CATEGORY_IN_USE"));
+    }
+
+    @Test
+    @DisplayName("DELETE /mechanics/{id} używana przez grę -> 409 (MECHANIC_IN_USE)")
+    void deleteMechanic_inUse_409() throws Exception {
+        // mechanika 1 (Worker Placement) powiązana z grą 1 w game_mechanic
+        mockMvc.perform(delete("/api/v1/admin/taxonomy/mechanics/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("MECHANIC_IN_USE"));
+    }
+
+    @Test
+    @DisplayName("DELETE /publishers/{id} używany przez grę -> 409 (PUBLISHER_IN_USE)")
+    void deletePublisher_inUse_409() throws Exception {
+        // wydawca 1 (Rio Grande Games) powiązany z grą 1 w game_publisher
+        mockMvc.perform(delete("/api/v1/admin/taxonomy/publishers/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("PUBLISHER_IN_USE"));
+    }
+
+    @Test
+    @DisplayName("DELETE /authors/{id} używany przez grę -> 409 (AUTHOR_IN_USE)")
+    void deleteAuthor_inUse_409() throws Exception {
+        // autor 1 (Uwe Rosenberg) powiązany z grą 1 w game_author
+        mockMvc.perform(delete("/api/v1/admin/taxonomy/authors/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("AUTHOR_IN_USE"));
     }
 }

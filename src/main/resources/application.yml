@@ -19,6 +19,10 @@ spring:
                         enable: true
     config:
         import: optional:file:./secret.properties
+    jpa:
+        properties:
+          hibernate:
+              default_batch_fetch_size: 20
 
 springdoc:
     swagger-ui:
@@ -39,3 +43,6 @@ jwt:
         validityInSeconds: 900
     passwordreset:
         validityInSeconds: 900
+gamehive:
+  moderation:
+      max-resubmissions: 5

@@ -38,9 +38,10 @@ INSERT INTO publishers (name, status) VALUES
                                           ('Z-Man Games', 'APPROVED'),
                                           ('Pending Games', 'PENDING');
 
-INSERT INTO authors (first_name, last_name) VALUES
-                                                ('Uwe', 'Rosenberg'),
-                                                ('Reiner', 'Knizia');
+INSERT INTO authors (first_name, last_name, status) VALUES
+                                                        ('Uwe', 'Rosenberg', 'APPROVED'),
+                                                        ('Reiner', 'Knizia', 'APPROVED'),
+                                                        ('Oczekujacy', 'Autor', 'PENDING');
 
 
 -- games (GH-116 / G3) — ids 1..3 z kolejności insertów (BIGSERIAL), jak w słownikach powyżej
@@ -60,4 +61,21 @@ INSERT INTO game_publisher (game_id, publisher_id) VALUES (1, 1), (1, 2), (2, 2)
 INSERT INTO game_category (game_id, category_id) VALUES (1, 1), (2, 4), (3, 2);
 INSERT INTO game_mechanic (game_id, mechanic_id) VALUES (1, 1);
 INSERT INTO game_author (game_id, author_id) VALUES (1, 1);
+
+-- games 4..6 (GH-117 / G4) — fixtury pod „moje zgłoszenia", edycję i resubmit
+-- UWAGA: limit resubmisji w testach = 2 (application-test.yml), więc gra 6 (count = 2) jest na limicie
+INSERT INTO games (title, description, min_players, max_players, playing_time_minutes, year_published, min_age, cover_image_url,
+                   moderation_status, submitted_by, reviewed_by, reviewed_at, rejection_reason, resubmission_count)
+VALUES
+    ('Szkic Jane', 'Roboczy szkic zgłoszenia Jane.', 1, 4, 30, 2025, 8, NULL,
+     'DRAFT', '0192a1b2-0000-7000-8000-000000000002', NULL, NULL, NULL, 0),
+    ('Odrzucona Jane', 'Zgłoszenie Jane po pierwszym odrzuceniu.', 2, 4, 60, 2023, 10, NULL,
+     'REJECTED', '0192a1b2-0000-7000-8000-000000000002', '0192a1b2-0000-7000-8000-000000000003', CURRENT_TIMESTAMP, 'Zbyt krótki opis', 1),
+    ('Limit Jane', 'Zgłoszenie Jane z wyczerpanym limitem poprawek.', 2, 4, 60, 2022, 10, NULL,
+     'REJECTED', '0192a1b2-0000-7000-8000-000000000002', '0192a1b2-0000-7000-8000-000000000003', CURRENT_TIMESTAMP, 'Wielokrotnie odrzucane', 2);
+
+INSERT INTO game_publisher (game_id, publisher_id) VALUES (4, 1), (5, 1), (6, 2);
+INSERT INTO game_category (game_id, category_id) VALUES (4, 2), (5, 2), (6, 1);
+
+
 

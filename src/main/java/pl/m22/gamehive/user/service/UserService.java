@@ -16,6 +16,7 @@ public interface UserService {
     AppUser findUserByEmail(Email email);
     AppUser findUserById(UUID id);
     AppUser findUserByUsername(Username username);
+    UUID findUserIdByEmail(Email email);
 
     Page<AppUser> findAllUsers(Pageable pageable);
 

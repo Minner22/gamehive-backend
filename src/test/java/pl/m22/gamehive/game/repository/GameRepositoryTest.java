@@ -12,6 +12,8 @@ import pl.m22.gamehive.common.persistence.ModerationStatus;
 import pl.m22.gamehive.game.model.*;
 import pl.m22.gamehive.support.SeededUsers;
 
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
@@ -84,7 +86,7 @@ class GameRepositoryTest {
     void findBySubmittedBy() {
         assertThat(gameRepository.findBySubmittedBy(SeededUsers.JANE_ID))
                 .extracting(Game::getTitle)
-                .containsExactlyInAnyOrder("Agricola", "Pandemic");
+                .containsExactlyInAnyOrder("Agricola", "Pandemic", "Szkic Jane", "Odrzucona Jane", "Limit Jane");
 
         assertThat(gameRepository.findBySubmittedBy(SeededUsers.UNKNOWN_ID)).isEmpty();
     }
@@ -163,6 +165,73 @@ class GameRepositoryTest {
                 .submittedBy(SeededUsers.JANE_ID)
                 .moderationStatus(ModerationStatus.APPROVED)
                 .build());
+    }
+
+    @Test
+    @DisplayName("findBySubmittedByAndModerationStatusIn -> zgłoszenia użytkownika bez APPROVED")
+    void findMySubmissions_excludesApproved() {
+        Page<Game> mine = gameRepository.findBySubmittedByAndModerationStatusIn(
+                SeededUsers.JANE_ID,
+                Set.of(ModerationStatus.DRAFT, ModerationStatus.PENDING, ModerationStatus.REJECTED),
+                Pageable.unpaged());
+
+        assertThat(mine).extracting(Game::getTitle)
+                .containsExactlyInAnyOrder("Pandemic", "Szkic Jane", "Odrzucona Jane", "Limit Jane");
+    }
+
+    @Test
+    @DisplayName("submitForModeration() na DRAFT -> PENDING, resubmissionCount bez zmian")
+    void submitForModeration_draftToPending() {
+        Game draft = gameRepository.findByTitle("Szkic Jane").getFirst();
+
+        draft.submitForModeration();
+        em.flush();
+        em.clear();
+
+        Game reloaded = gameRepository.findByTitle("Szkic Jane").getFirst();
+        assertThat(reloaded.getModerationStatus()).isEqualTo(ModerationStatus.PENDING);
+        assertThat(reloaded.getResubmissionCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("resubmit() na REJECTED -> PENDING, count+1, wyczyszczone dane recenzji")
+    void resubmit_rejectedToPending() {
+        Game rejected = gameRepository.findByTitle("Odrzucona Jane").getFirst();
+
+        rejected.resubmit();
+        em.flush();
+        em.clear();
+
+        Game reloaded = gameRepository.findByTitle("Odrzucona Jane").getFirst();
+        assertThat(reloaded.getModerationStatus()).isEqualTo(ModerationStatus.PENDING);
+        assertThat(reloaded.getResubmissionCount()).isEqualTo(2);
+        assertThat(reloaded.getReviewedBy()).isNull();
+        assertThat(reloaded.getReviewedAt()).isNull();
+        assertThat(reloaded.getRejectionReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("updateDetails + clearAssociations -> edycja pól i pełna wymiana relacji")
+    void updateDetails_replacesFieldsAndAssociations() {
+        Game draft = gameRepository.findByTitle("Szkic Jane").getFirst();
+        Publisher zMan = publisherRepository.findByName("Z-Man Games").orElseThrow();
+        Category coop = categoryRepository.findByName("Cooperative").orElseThrow();
+
+        draft.updateDetails("Szkic Jane v2", "Poprawiony opis.", 2, 6, 45, 2025, 10, null);
+        draft.clearAssociations();
+        draft.addPublisher(zMan);
+        draft.addCategory(coop);
+        em.flush();
+        em.clear();
+
+        Game reloaded = gameRepository.findByTitle("Szkic Jane v2").getFirst();
+        assertThat(reloaded.getDescription()).isEqualTo("Poprawiony opis.");
+        assertThat(reloaded.getMaxPlayers()).isEqualTo(6);
+        assertThat(reloaded.getModerationStatus()).isEqualTo(ModerationStatus.DRAFT);
+        assertThat(reloaded.getPublishers()).extracting(Publisher::getName).containsExactly("Z-Man Games");
+        assertThat(reloaded.getCategories()).extracting(Category::getName).containsExactly("Cooperative");
+        assertThat(reloaded.getMechanics()).isEmpty();
+        assertThat(reloaded.getAuthors()).isEmpty();
     }
 
     @Test

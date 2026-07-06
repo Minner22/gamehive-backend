@@ -16,21 +16,22 @@ public class Publisher extends LongEntity {
     private String name;
 
     @Enumerated(EnumType.STRING)
-    private PublisherStatus status;
+    @Column(nullable = false, length = 20)
+    private TaxonomyStatus status;
 
-    private Publisher(String name, PublisherStatus status) {
+    private Publisher(String name, TaxonomyStatus status) {
 
         this.name = name;
         this.status = status;
     }
 
-    public static Publisher of(String name, PublisherStatus status) {
+    public static Publisher of(String name, TaxonomyStatus status) {
 
         return new Publisher(name, status);
     }
 
     public void approve() {
 
-        this.status = PublisherStatus.APPROVED;
+        this.status = TaxonomyStatus.APPROVED;
     }
 }

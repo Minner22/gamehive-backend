@@ -1,6 +1,7 @@
 package pl.m22.gamehive.common.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestCookieException;
@@ -47,6 +48,17 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(ErrorCode.ACCESS_DENIED.getHttpStatus())
                 .body(apiError);
+    }
+
+    // backstop dla wyścigów: find-or-create wydawcy/autora (UNIQUE) i TOCTOU guardów *_IN_USE (FK RESTRICT)
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+
+        log.warn("Data integrity conflict: {}", ex.getMessage());
+
+        ApiError apiError = new ApiError(ErrorCode.DATA_CONFLICT.name(), ErrorCode.DATA_CONFLICT.getDefaultMessage());
+
+        return ResponseEntity.status(ErrorCode.DATA_CONFLICT.getHttpStatus()).body(apiError);
     }
 
     @ExceptionHandler(Exception.class)
