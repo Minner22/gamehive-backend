@@ -44,4 +44,18 @@ public abstract class ModeratedLongEntity extends LongEntity {
         this.submittedBy = Objects.requireNonNull(submittedBy, "submittedBy must not be null");
         this.resubmissionCount = 0;
     }
+
+    public void submitForModeration() {
+
+        this.moderationStatus = ModerationStatus.PENDING;
+    }
+
+    public void resubmit() {
+
+        this.moderationStatus = ModerationStatus.PENDING;
+        this.resubmissionCount++;
+        this.reviewedBy = null;
+        this.reviewedAt = null;
+        this.rejectionReason = null;
+    }
 }

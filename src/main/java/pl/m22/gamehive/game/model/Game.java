@@ -109,4 +109,25 @@ public class Game extends ModeratedLongEntity {
 
         this.authors.add(author);
     }
+
+    public void updateDetails(String title, String description, int minPlayers, int maxPlayers,
+                              int playingTimeMinutes, int yearPublished, int minAge, String coverImageUrl) {
+
+        this.title = title;
+        this.description = description;
+        this.minPlayers = minPlayers;
+        this.maxPlayers = maxPlayers;
+        this.playingTimeMinutes = playingTimeMinutes;
+        this.yearPublished = yearPublished;
+        this.minAge = minAge;
+        this.coverImageUrl = coverImageUrl;
+    }
+
+    public void clearAssociations() {
+
+        this.publishers.clear();
+        this.categories.clear();
+        this.mechanics.clear();
+        this.authors.clear();
+    }
 }

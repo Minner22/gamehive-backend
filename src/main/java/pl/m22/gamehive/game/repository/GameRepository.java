@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import pl.m22.gamehive.common.persistence.ModerationStatus;
 import pl.m22.gamehive.game.model.Game;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,4 +29,10 @@ public interface GameRepository extends JpaRepository<Game, Long> {
     boolean existsByMechanicsId(Long mechanicsId);
 
     boolean existsByAuthorsId(Long authorsId);
+
+    // „moje zgłoszenia": statusy DRAFT/PENDING/REJECTED danego użytkownika (GET /api/v1/games/mine)
+    Page<Game> findBySubmittedByAndModerationStatusIn(UUID submittedBy,
+                                                      Collection<ModerationStatus> statuses,
+                                                      Pageable pageable);
+
 }
