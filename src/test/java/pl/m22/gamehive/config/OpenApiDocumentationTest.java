@@ -52,6 +52,7 @@ class OpenApiDocumentationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['/api/v1/auth/login']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/users/me']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/games']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/admin/users/']").exists());
     }
 }
