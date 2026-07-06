@@ -63,7 +63,7 @@ INSERT INTO game_mechanic (game_id, mechanic_id) VALUES (1, 1);
 INSERT INTO game_author (game_id, author_id) VALUES (1, 1);
 
 -- games 4..6 (GH-117 / G4) — fixtury pod „moje zgłoszenia", edycję i resubmit
--- UWAGA: limit resubmisji w testach = 2 (application-test.yml), więc gra 6 (count=2) jest na limicie
+-- UWAGA: limit resubmisji w testach = 2 (application-test.yml), więc gra 6 (count = 2) jest na limicie
 INSERT INTO games (title, description, min_players, max_players, playing_time_minutes, year_published, min_age, cover_image_url,
                    moderation_status, submitted_by, reviewed_by, reviewed_at, rejection_reason, resubmission_count)
 VALUES
