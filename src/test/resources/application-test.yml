@@ -37,3 +37,6 @@ jwt:
   passwordreset:
     secret: "test-passwordreset-secret-abcdefghijklmnopqrstuvwxyz"
     validityInSeconds: 900
+gamehive:
+  moderation:
+    max-resubmissions: 2

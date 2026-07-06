@@ -39,3 +39,6 @@ jwt:
         validityInSeconds: 900
     passwordreset:
         validityInSeconds: 900
+gamehive:
+  moderation:
+      max-resubmissions: 5
