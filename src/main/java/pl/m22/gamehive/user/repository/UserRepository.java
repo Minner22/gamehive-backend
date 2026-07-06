@@ -1,6 +1,7 @@
 package pl.m22.gamehive.user.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.domain.Username;
@@ -17,6 +18,10 @@ public interface UserRepository extends JpaRepository<AppUser, UUID> {
     }
 
     Optional<AppUser> findByEmail(Email email);
+
+    // lekka projekcja dla ścieżek, które potrzebują wyłącznie id (bez ról EAGER i profilu)
+    @Query("select u.id from AppUser u where u.email = ?1")
+    Optional<UUID> findIdByEmail(Email email);
 
     Optional<AppUser> findByUsername(Username username);
 

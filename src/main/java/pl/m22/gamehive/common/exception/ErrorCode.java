@@ -68,6 +68,7 @@ public enum ErrorCode {
 
     // ===== Handler-only — nierzucane bezpośrednio, używane przez GlobalExceptionHandler =====
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "Access denied"),
+    DATA_CONFLICT(HttpStatus.CONFLICT, "Concurrent data modification conflict"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred"),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Validation failed");
 

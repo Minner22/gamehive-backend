@@ -1,5 +1,6 @@
 package pl.m22.gamehive.game.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,8 +22,7 @@ import pl.m22.gamehive.game.model.Game;
 import pl.m22.gamehive.game.repository.GameRepository;
 import pl.m22.gamehive.support.SeededUsers;
 
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -41,6 +41,10 @@ class GameControllerTest {
     @Autowired RedisTemplate<String, String> redisTemplate;
     @MockitoBean JavaMailSender mailSender;
 
+    // lokalna instancja — w Spring Boot 4 bean ObjectMapper wymaga osobnego modułu autokonfiguracji,
+    // a do serializacji map w testach w zupełności wystarcza goły mapper
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     // Jane: gry 1 (APPROVED), 2 (PENDING), 4 (DRAFT), 5 (REJECTED, count=1), 6 (REJECTED, count=2 = limit testowy);
     // gra 3 należy do Johna — „cudze zgłoszenie" z perspektywy Jane
     private String janeToken;
@@ -51,24 +55,28 @@ class GameControllerTest {
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
     }
 
-    private static String validBody(boolean submit) {
-        return """
-                {
-                  "title": "Terraforming Mars",
-                  "description": "Kolonizacja Marsa w rywalizacji korporacji.",
-                  "minPlayers": 1,
-                  "maxPlayers": 5,
-                  "playingTimeMinutes": 120,
-                  "yearPublished": 2016,
-                  "minAge": 12,
-                  "publisherIds": [1],
-                  "newPublisherNames": [],
-                  "categoryIds": [1],
-                  "mechanicIds": [2],
-                  "authorIds": [2],
-                  "newAuthors": [],
-                  "submit": %s
-                }""".formatted(submit);
+    // mutowalna mapa zamiast szablonu String + replace(): literówka w kluczu = zły JSON = czerwony test
+    private static Map<String, Object> validRequest(boolean submit) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("title", "Terraforming Mars");
+        body.put("description", "Kolonizacja Marsa w rywalizacji korporacji.");
+        body.put("minPlayers", 1);
+        body.put("maxPlayers", 5);
+        body.put("playingTimeMinutes", 120);
+        body.put("yearPublished", 2016);
+        body.put("minAge", 12);
+        body.put("publisherIds", List.of(1));
+        body.put("newPublisherNames", List.of());
+        body.put("categoryIds", List.of(1));
+        body.put("mechanicIds", List.of(2));
+        body.put("authorIds", List.of(2));
+        body.put("newAuthors", List.of());
+        body.put("submit", submit);
+        return body;
+    }
+
+    private String json(Map<String, Object> body) throws Exception {
+        return objectMapper.writeValueAsString(body);
     }
 
     // ---------- POST /api/v1/games: happy path ----------
@@ -80,7 +88,7 @@ class GameControllerTest {
         mockMvc.perform(post("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false)))
+                        .content(json(validRequest(false))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.title").value("Terraforming Mars"))
@@ -103,7 +111,7 @@ class GameControllerTest {
         mockMvc.perform(post("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(true)))
+                        .content(json(validRequest(true))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.moderationStatus").value("PENDING"));
     }
@@ -113,7 +121,7 @@ class GameControllerTest {
     void createGame_unauthenticated_401() throws Exception {
         mockMvc.perform(post("/api/v1/games")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false)))
+                        .content(json(validRequest(false))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -122,21 +130,26 @@ class GameControllerTest {
     @Test
     @DisplayName("POST /games pusty tytuł -> 400 (Bean Validation)")
     void createGame_blankTitle_400() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("title", "  ");
+
         mockMvc.perform(post("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false).replace("\"Terraforming Mars\"", "\"  \"")))
+                        .content(json(body)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     @DisplayName("POST /games minPlayers > maxPlayers -> 400 (INVALID_PLAYER_COUNT)")
     void createGame_minGreaterThanMax_400() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("minPlayers", 6);
+
         mockMvc.perform(post("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false)
-                                .replace("\"minPlayers\": 1", "\"minPlayers\": 6")))
+                        .content(json(body)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_PLAYER_COUNT"));
     }
@@ -144,10 +157,13 @@ class GameControllerTest {
     @Test
     @DisplayName("POST /games bez żadnego wydawcy -> 400 (PUBLISHER_REQUIRED)")
     void createGame_noPublishers_400() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("publisherIds", List.of());
+
         mockMvc.perform(post("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false).replace("\"publisherIds\": [1]", "\"publisherIds\": []")))
+                        .content(json(body)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("PUBLISHER_REQUIRED"));
     }
@@ -155,10 +171,13 @@ class GameControllerTest {
     @Test
     @DisplayName("POST /games bez kategorii -> 400 (CATEGORY_REQUIRED)")
     void createGame_noCategories_400() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("categoryIds", List.of());
+
         mockMvc.perform(post("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false).replace("\"categoryIds\": [1]", "\"categoryIds\": []")))
+                        .content(json(body)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("CATEGORY_REQUIRED"));
     }
@@ -166,10 +185,13 @@ class GameControllerTest {
     @Test
     @DisplayName("POST /games nieistniejący publisherId -> 404 (PUBLISHER_NOT_FOUND)")
     void createGame_unknownPublisherId_404() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("publisherIds", List.of(99999));
+
         mockMvc.perform(post("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false).replace("\"publisherIds\": [1]", "\"publisherIds\": [99999]")))
+                        .content(json(body)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("PUBLISHER_NOT_FOUND"));
     }
@@ -177,10 +199,13 @@ class GameControllerTest {
     @Test
     @DisplayName("POST /games nieistniejący categoryId -> 404 (CATEGORY_NOT_FOUND)")
     void createGame_unknownCategoryId_404() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("categoryIds", List.of(99999));
+
         mockMvc.perform(post("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false).replace("\"categoryIds\": [1]", "\"categoryIds\": [99999]")))
+                        .content(json(body)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("CATEGORY_NOT_FOUND"));
     }
@@ -188,10 +213,13 @@ class GameControllerTest {
     @Test
     @DisplayName("POST /games nieistniejący authorId -> 404 (AUTHOR_NOT_FOUND)")
     void createGame_unknownAuthorId_404() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("authorIds", List.of(99999));
+
         mockMvc.perform(post("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false).replace("\"authorIds\": [2]", "\"authorIds\": [99999]")))
+                        .content(json(body)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("AUTHOR_NOT_FOUND"));
     }
@@ -202,11 +230,13 @@ class GameControllerTest {
     @Transactional
     @DisplayName("POST /games z nowym wydawcą (mieszany z istniejącym) -> 201, nowy jako PENDING")
     void createGame_newPublisherMixed_201() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("newPublisherNames", List.of("Wydawnictwo Nowe"));
+
         mockMvc.perform(post("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false).replace("\"newPublisherNames\": []",
-                                "\"newPublisherNames\": [\"Wydawnictwo Nowe\"]")))
+                        .content(json(body)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.publishers", hasSize(2)))
                 .andExpect(jsonPath("$.publishers[*].name",
@@ -221,15 +251,15 @@ class GameControllerTest {
     void createGame_newAuthorsFindOrCreate_201() throws Exception {
         // newAuthors: (Uwe, Rosenberg) już istnieje jako autor 1 -> reuse (zostaje APPROVED);
         // (Nowa, Autorka) -> create jako PENDING. authorIds: [2] (Reiner Knizia). Razem dokładnie 3 autorów.
+        Map<String, Object> body = validRequest(false);
+        body.put("newAuthors", List.of(
+                Map.of("firstName", "Uwe", "lastName", "Rosenberg"),
+                Map.of("firstName", "Nowa", "lastName", "Autorka")));
+
         mockMvc.perform(post("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false).replace("\"newAuthors\": []",
-                                """
-                                "newAuthors": [
-                                  {"firstName": "Uwe", "lastName": "Rosenberg"},
-                                  {"firstName": "Nowa", "lastName": "Autorka"}
-                                ]""")))
+                        .content(json(body)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.authors", hasSize(3)))
                 .andExpect(jsonPath("$.authors[*].lastName",
@@ -330,10 +360,13 @@ class GameControllerTest {
     @Transactional
     @DisplayName("PUT /games/{id} własny DRAFT -> 200, pola i relacje podmienione, status bez zmian")
     void updateGame_ownDraft_200() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("title", "Szkic Jane v2");
+
         mockMvc.perform(put("/api/v1/games/4")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false).replace("\"Terraforming Mars\"", "\"Szkic Jane v2\"")))
+                        .content(json(body)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(4))
                 .andExpect(jsonPath("$.title").value("Szkic Jane v2"))
@@ -345,13 +378,64 @@ class GameControllerTest {
     @Transactional
     @DisplayName("PUT /games/{id} własny REJECTED -> 200, status pozostaje REJECTED")
     void updateGame_ownRejected_200() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("title", "Odrzucona Jane v2");
+
         mockMvc.perform(put("/api/v1/games/5")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false).replace("\"Terraforming Mars\"", "\"Odrzucona Jane v2\"")))
+                        .content(json(body)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Odrzucona Jane v2"))
                 .andExpect(jsonPath("$.moderationStatus").value("REJECTED"));
+    }
+
+    @Test
+    @DisplayName("PUT /games/{id} minPlayers > maxPlayers -> 400 (INVALID_PLAYER_COUNT)")
+    void updateGame_minGreaterThanMax_400() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("minPlayers", 6);
+
+        mockMvc.perform(put("/api/v1/games/4")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PLAYER_COUNT"));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("PUT /games/{id} bez żadnego wydawcy -> 400 (PUBLISHER_REQUIRED), stan gry nietknięty")
+    void updateGame_noPublishers_400() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("publisherIds", List.of());
+
+        mockMvc.perform(put("/api/v1/games/4")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("PUBLISHER_REQUIRED"));
+
+        // walidacja odrzuca żądanie zanim cokolwiek zostanie wyczyszczone
+        Game untouched = gameRepository.findById(4L).orElseThrow();
+        assertThat(untouched.getTitle()).isEqualTo("Szkic Jane");
+        assertThat(untouched.getPublishers()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("PUT /games/{id} bez kategorii -> 400 (CATEGORY_REQUIRED)")
+    void updateGame_noCategories_400() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.put("categoryIds", List.of());
+
+        mockMvc.perform(put("/api/v1/games/4")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("CATEGORY_REQUIRED"));
     }
 
     @Test
@@ -360,7 +444,7 @@ class GameControllerTest {
         mockMvc.perform(put("/api/v1/games/2")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false)))
+                        .content(json(validRequest(false))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("GAME_NOT_EDITABLE"));
     }
@@ -371,7 +455,7 @@ class GameControllerTest {
         mockMvc.perform(put("/api/v1/games/3")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false)))
+                        .content(json(validRequest(false))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("GAME_NOT_FOUND"));
     }
@@ -382,7 +466,7 @@ class GameControllerTest {
         mockMvc.perform(put("/api/v1/games/99999")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(false)))
+                        .content(json(validRequest(false))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("GAME_NOT_FOUND"));
     }

@@ -59,6 +59,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public UUID findUserIdByEmail(Email email) {
+
+        return userRepository.findIdByEmail(email)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    @Override
     public Page<AppUser> findAllUsers(Pageable pageable) {
 
         return userRepository.findAll(pageable);

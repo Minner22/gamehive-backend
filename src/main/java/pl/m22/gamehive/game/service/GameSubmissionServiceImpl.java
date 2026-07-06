@@ -3,6 +3,7 @@ package pl.m22.gamehive.game.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.common.domain.Email;
@@ -46,7 +47,7 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
 
         validateDomainRules(request);
 
-        UUID submitterId = userService.findUserByEmail(submitterEmail).getId();
+        UUID submitterId = userService.findUserIdByEmail(submitterEmail);
 
         Game game = Game.builder()
                 .title(request.title())
@@ -76,6 +77,8 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
         if (!EDITABLE_STATUSES.contains(game.getModerationStatus())) {
             throw new DomainException(ErrorCode.GAME_NOT_EDITABLE);
         }
+
+        validateDomainRules(request);
 
         game.updateDetails(request.title(),
                 request.description(),
@@ -123,7 +126,7 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
     @Override
     public Page<GameDto> findMySubmissions(Email submitterEmail, Pageable pageable) {
 
-        UUID submitterId = userService.findUserByEmail(submitterEmail).getId();
+        UUID submitterId = userService.findUserIdByEmail(submitterEmail);
 
         return gameRepository.findBySubmittedByAndModerationStatusIn(submitterId, MY_SUBMISSION_STATUSES, pageable)
                 .map(gameMapper::toDto);
@@ -131,7 +134,7 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
 
     private Game findOwnGame(Email submitterEmail, Long gameId) {
 
-        UUID submitterId = userService.findUserByEmail(submitterEmail).getId();
+        UUID submitterId = userService.findUserIdByEmail(submitterEmail);
 
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.GAME_NOT_FOUND));
@@ -162,18 +165,14 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
 
         resolvePublishers(request).forEach(game::addPublisher);
         resolveCategories(request.categoryIds()).forEach(game::addCategory);
-        resolveMecanics(request.mechanicIds()).forEach(game::addMechanic);
+        resolveMechanics(request.mechanicIds()).forEach(game::addMechanic);
         resolveAuthors(request).forEach(game::addAuthor);
     }
 
     private List<Publisher> resolvePublishers(GameRequestDto request) {
 
-        List<Publisher> publishers = new ArrayList<>();
-
-        for (Long id : nullSafe(request.publisherIds())) {
-            publishers.add(publisherRepository.findById(id)
-                    .orElseThrow(() -> new ApplicationException(ErrorCode.PUBLISHER_NOT_FOUND)));
-        }
+        List<Publisher> publishers = new ArrayList<>(
+                findAllOrThrow(publisherRepository, request.publisherIds(), ErrorCode.PUBLISHER_NOT_FOUND));
 
         for (String rawName : nullSafe(request.newPublisherNames())) {
             String name = rawName.trim();
@@ -186,28 +185,18 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
 
     private List<Category> resolveCategories(List<Long> categoryIds) {
 
-        return nullSafe(categoryIds).stream()
-                .map(id -> categoryRepository.findById(id)
-                        .orElseThrow(() -> new ApplicationException(ErrorCode.CATEGORY_NOT_FOUND)))
-                .toList();
+        return findAllOrThrow(categoryRepository, categoryIds, ErrorCode.CATEGORY_NOT_FOUND);
     }
 
-    private List<Mechanic> resolveMecanics(List<Long> mechanicIds) {
+    private List<Mechanic> resolveMechanics(List<Long> mechanicIds) {
 
-        return nullSafe(mechanicIds).stream()
-                .map(id -> mechanicRepository.findById(id)
-                        .orElseThrow(() -> new ApplicationException(ErrorCode.MECHANIC_NOT_FOUND)))
-                .toList();
+        return findAllOrThrow(mechanicRepository, mechanicIds, ErrorCode.MECHANIC_NOT_FOUND);
     }
 
     private List<Author> resolveAuthors(GameRequestDto request) {
 
-        List<Author> authors = new ArrayList<>();
-
-        for (Long id : nullSafe(request.authorIds())) {
-            authors.add(authorRepository.findById(id)
-                    .orElseThrow(() -> new ApplicationException(ErrorCode.AUTHOR_NOT_FOUND)));
-        }
+        List<Author> authors = new ArrayList<>(
+                findAllOrThrow(authorRepository, request.authorIds(), ErrorCode.AUTHOR_NOT_FOUND));
 
         for (AuthorRequestDto newAuthor : nullSafe(request.newAuthors())) {
             String firstName = newAuthor.firstName().trim();
@@ -218,6 +207,19 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
         }
 
         return authors;
+    }
+
+    // findAllById deduplikuje, stąd porównanie z liczbą UNIKALNYCH id wykrywa brakujące wpisy
+    private static <T> List<T> findAllOrThrow(JpaRepository<T, Long> repository, List<Long> ids, ErrorCode notFound) {
+
+        List<Long> requested = nullSafe(ids);
+        List<T> found = repository.findAllById(requested);
+
+        if (found.size() != Set.copyOf(requested).size()) {
+            throw new ApplicationException(notFound);
+        }
+
+        return found;
     }
 
     private static <T> List<T> nullSafe(List<T> list) {
