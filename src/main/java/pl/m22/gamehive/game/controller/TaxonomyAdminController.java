@@ -99,6 +99,8 @@ public class TaxonomyAdminController {
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Kategoria usunięta (brak treści)"),
             @ApiResponse(responseCode = "404", description = "Kategoria nie istnieje (CATEGORY_NOT_FOUND)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Kategoria używana przez grę (CATEGORY_IN_USE)",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @DeleteMapping("/categories/{id}")
@@ -157,6 +159,8 @@ public class TaxonomyAdminController {
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Mechanika usunięta (brak treści)"),
             @ApiResponse(responseCode = "404", description = "Mechanika nie istnieje (MECHANIC_NOT_FOUND)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Mechanika używana przez grę (MECHANIC_IN_USE)",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @DeleteMapping("/mechanics/{id}")
@@ -213,6 +217,8 @@ public class TaxonomyAdminController {
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Wydawca usunięty (brak treści)"),
             @ApiResponse(responseCode = "404", description = "Wydawca nie istnieje (PUBLISHER_NOT_FOUND)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Wydawca używany przez grę (PUBLISHER_IN_USE)",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @DeleteMapping("/publishers/{id}")
@@ -271,6 +277,8 @@ public class TaxonomyAdminController {
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Autor usunięty (brak treści)"),
             @ApiResponse(responseCode = "404", description = "Autor nie istnieje (AUTHOR_NOT_FOUND)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Autor używany przez grę (AUTHOR_IN_USE)",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @DeleteMapping("/authors/{id}")

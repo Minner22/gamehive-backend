@@ -20,4 +20,12 @@ public interface GameRepository extends JpaRepository<Game, Long> {
     Page<Game> findByModerationStatus(ModerationStatus moderationStatus, Pageable pageable);
 
     List<Game> findBySubmittedBy(UUID submittedBy);
+
+    boolean existsByPublishersId(Long publishersId);
+
+    boolean existsByCategoriesId(Long categoriesId);
+
+    boolean existsByMechanicsId(Long mechanicsId);
+
+    boolean existsByAuthorsId(Long authorsId);
 }

@@ -7,10 +7,7 @@ import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.game.model.*;
-import pl.m22.gamehive.game.repository.AuthorRepository;
-import pl.m22.gamehive.game.repository.CategoryRepository;
-import pl.m22.gamehive.game.repository.MechanicRepository;
-import pl.m22.gamehive.game.repository.PublisherRepository;
+import pl.m22.gamehive.game.repository.*;
 
 import java.util.List;
 
@@ -22,6 +19,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
     private final CategoryRepository categoryRepository;
     private final MechanicRepository mechanicRepository;
     private final PublisherRepository publisherRepository;
+    private final GameRepository gameRepository;
 
     @Transactional(readOnly = true)
     @Override
@@ -68,7 +66,10 @@ public class TaxonomyServiceImpl implements TaxonomyService {
             throw new ApplicationException(ErrorCode.CATEGORY_NOT_FOUND);
         }
 
-        // TODO(#117): guard *_IN_USE — relacje Game->słownik istnieją od #116, bez guarda DELETE używanego wpisu = 500 z FK
+        if (gameRepository.existsByCategoriesId(id)) {
+            throw new DomainException(ErrorCode.CATEGORY_IN_USE);
+        }
+
         categoryRepository.deleteById(id);
     }
 
@@ -117,7 +118,10 @@ public class TaxonomyServiceImpl implements TaxonomyService {
             throw new ApplicationException(ErrorCode.MECHANIC_NOT_FOUND);
         }
 
-        // TODO(#117): guard *_IN_USE — relacje Game->słownik istnieją od #116, bez guarda DELETE używanego wpisu = 500 z FK
+        if (gameRepository.existsByMechanicsId(id)) {
+            throw new DomainException(ErrorCode.MECHANIC_IN_USE);
+        }
+
         mechanicRepository.deleteById(id);
     }
 
@@ -166,7 +170,10 @@ public class TaxonomyServiceImpl implements TaxonomyService {
             throw new ApplicationException(ErrorCode.PUBLISHER_NOT_FOUND);
         }
 
-        // TODO(#117): guard *_IN_USE — relacje Game->słownik istnieją od #116, bez guarda DELETE używanego wpisu = 500 z FK
+        if (gameRepository.existsByPublishersId(id)) {
+            throw new DomainException(ErrorCode.PUBLISHER_IN_USE);
+        }
+
         publisherRepository.deleteById(id);
     }
 
@@ -216,7 +223,10 @@ public class TaxonomyServiceImpl implements TaxonomyService {
             throw new ApplicationException(ErrorCode.AUTHOR_NOT_FOUND);
         }
 
-        // TODO(#117): guard *_IN_USE — relacje Game->słownik istnieją od #116, bez guarda DELETE używanego wpisu = 500 z FK
+        if (gameRepository.existsByAuthorsId(id)) {
+            throw new DomainException(ErrorCode.AUTHOR_IN_USE);
+        }
+
         authorRepository.deleteById(id);
     }
 }
