@@ -98,11 +98,13 @@ class GameModerationControllerTest {
     }
 
     @Test
-    @DisplayName("GET /moderation/games jako ADMIN -> 200")
+    @DisplayName("GET /moderation/games jako ADMIN -> 200, same PENDING (m.in. Pandemic)")
     void queue_asAdmin_200() throws Exception {
         mockMvc.perform(get("/api/v1/moderation/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("PENDING"))))
+                .andExpect(jsonPath("$.content[*].title", hasItem("Pandemic")));
     }
 
     @Test
@@ -121,13 +123,15 @@ class GameModerationControllerTest {
     }
 
     @Test
-    @DisplayName("GET /moderation/games z paginacją -> rozmiar strony respektowany")
+    @DisplayName("GET /moderation/games z paginacją -> pełna strona rozmiaru 1 (Pandemic gwarantuje >=1 PENDING)")
     void queue_pagination_200() throws Exception {
         mockMvc.perform(get("/api/v1/moderation/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
                         .param("page", "0").param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(lessThanOrEqualTo(1))));
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements", greaterThanOrEqualTo(1)));
     }
 
     // ---------- POST /moderation/games/{id}/approve ----------
@@ -221,6 +225,16 @@ class GameModerationControllerTest {
                         .content("{\"reason\":\"  \"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("REJECTION_REASON_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("reject bez ciała żądania -> 400 VALIDATION_ERROR (nie 500)")
+    void reject_missingBody_400() throws Exception {
+        mockMvc.perform(post("/api/v1/moderation/games/2/reject")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
     }
 
     @Test
