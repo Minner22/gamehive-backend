@@ -1,6 +1,8 @@
 package pl.m22.gamehive.game.service;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,11 +12,13 @@ import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.logging.CorrelationIdFilter;
 import pl.m22.gamehive.common.persistence.ModerationStatus;
 import pl.m22.gamehive.game.config.ModerationProperties;
 import pl.m22.gamehive.game.dto.AuthorRequestDto;
 import pl.m22.gamehive.game.dto.GameDto;
 import pl.m22.gamehive.game.dto.GameRequestDto;
+import pl.m22.gamehive.game.event.ContentModerationAuditEvent;
 import pl.m22.gamehive.game.mapper.GameMapper;
 import pl.m22.gamehive.game.model.*;
 import pl.m22.gamehive.game.repository.*;
@@ -40,6 +44,7 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
     private final GameMapper gameMapper;
     private final ModerationProperties moderationProperties;
     private final UserService userService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     @Override
@@ -64,6 +69,11 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
 
         attachAssociations(game, request);
         gameRepository.save(game);
+
+        // audyt tylko dla realnego wejścia do kolejki (PENDING); szkic (DRAFT) nie jest zdarzeniem moderacji
+        if (request.submit()) {
+            publishAudit(ContentModerationAction.SUBMIT, game.getId(), submitterEmail, null);
+        }
 
         return gameMapper.toDto(game);
     }
@@ -92,6 +102,8 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
         game.clearAssociations();
         attachAssociations(game, request);
 
+        publishAudit(ContentModerationAction.EDIT, game.getId(), submitterEmail, null);
+
         return gameMapper.toDto(game);
     }
 
@@ -102,12 +114,16 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
         Game game = findOwnGame(submitterEmail, gameId);
 
         switch (game.getModerationStatus()) {
-            case DRAFT -> game.submitForModeration();
+            case DRAFT -> {
+                game.submitForModeration();
+                publishAudit(ContentModerationAction.SUBMIT, game.getId(), submitterEmail, null);
+            }
             case REJECTED -> {
                 if (game.getResubmissionCount() >= moderationProperties.getMaxResubmissions()) {
                     throw new DomainException(ErrorCode.RESUBMISSION_LIMIT_EXCEEDED);
                 }
                 game.resubmit();
+                publishAudit(ContentModerationAction.RESUBMIT, game.getId(), submitterEmail, null);
             }
             default -> throw new DomainException(ErrorCode.GAME_NOT_EDITABLE);
         }
@@ -230,5 +246,16 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
     private static boolean isEmpty(List<?> list) {
 
         return list == null || list.isEmpty();
+    }
+
+    private void publishAudit(ContentModerationAction action, Long targetId, Email actor, String details) {
+
+        eventPublisher.publishEvent(new ContentModerationAuditEvent(
+                action, ContentModerationTargetType.GAME, targetId, actor.value(), details, currentCorrelationId()));
+    }
+
+    private String currentCorrelationId() {
+
+        return MDC.get(CorrelationIdFilter.CORRELATION_ID);
     }
 }
