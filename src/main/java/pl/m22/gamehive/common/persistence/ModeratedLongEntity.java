@@ -58,4 +58,30 @@ public abstract class ModeratedLongEntity extends LongEntity {
         this.reviewedAt = null;
         this.rejectionReason = null;
     }
+
+    public void approve(UUID reviewedBy) {
+
+        this.moderationStatus = ModerationStatus.APPROVED;
+        this.reviewedBy = reviewedBy;
+        this.reviewedAt = Instant.now();
+    }
+
+    public void reject(String reason, UUID reviewedBy) {
+
+        this.moderationStatus = ModerationStatus.REJECTED;
+        this.rejectionReason = reason;
+        this.reviewedBy = reviewedBy;
+        this.reviewedAt = Instant.now();
+    }
+
+    // ręczne odblokowanie przez moderatora po wyczerpaniu limitu resubmisji: REJECTED -> DRAFT,
+    // zeruje licznik i czyści dane recenzji (użytkownik może edytować i wysłać ponownie)
+    public void unlockForResubmission() {
+
+        this.moderationStatus = ModerationStatus.DRAFT;
+        this.resubmissionCount = 0;
+        this.reviewedBy = null;
+        this.reviewedAt = null;
+        this.rejectionReason = null;
+    }
 }

@@ -3,6 +3,7 @@ package pl.m22.gamehive.common.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestCookieException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -99,6 +100,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError>  handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
 
         log.warn("Path/param type mismatch: {}", ex.getMessage());
+
+        ApiError apiError = new ApiError(
+                ErrorCode.VALIDATION_ERROR.name(),
+                ErrorCode.VALIDATION_ERROR.getDefaultMessage()
+        );
+
+        return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus()).body(apiError);
+    }
+
+    // brakujące / nieczytelne ciało żądania (pusty body, zły JSON) — bez tego wpada w handleOtherExceptions -> 500
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleUnreadableBody(HttpMessageNotReadableException ex) {
+
+        log.warn("Unreadable request body: {}", ex.getMessage());
 
         ApiError apiError = new ApiError(
                 ErrorCode.VALIDATION_ERROR.name(),
