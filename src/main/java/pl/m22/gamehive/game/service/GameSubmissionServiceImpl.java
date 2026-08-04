@@ -133,13 +133,6 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
 
     @Transactional(readOnly = true)
     @Override
-    public GameDto findMySubmission(Long gameId, Email submitterEmail) {
-
-        return gameMapper.toDto(findOwnGame(submitterEmail, gameId));
-    }
-
-    @Transactional(readOnly = true)
-    @Override
     public Page<GameDto> findMySubmissions(Email submitterEmail, Pageable pageable) {
 
         UUID submitterId = userService.findUserIdByEmail(submitterEmail);

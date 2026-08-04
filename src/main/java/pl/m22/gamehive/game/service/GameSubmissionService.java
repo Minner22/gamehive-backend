@@ -14,7 +14,5 @@ public interface GameSubmissionService {
 
     GameDto submitGame(Long gameId, Email submitterEmail);
 
-    GameDto findMySubmission(Long gameId, Email submitterEmail);
-
     Page<GameDto> findMySubmissions(Email submitterEmail, Pageable pageable);
 }

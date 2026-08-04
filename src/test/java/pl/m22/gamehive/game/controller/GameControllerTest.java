@@ -48,10 +48,12 @@ class GameControllerTest {
     // Jane: gry 1 (APPROVED), 2 (PENDING), 4 (DRAFT), 5 (REJECTED, count=1), 6 (REJECTED, count=2 = limit testowy);
     // gra 3 należy do Johna — „cudze zgłoszenie" z perspektywy Jane
     private String janeToken;
+    private String johnToken;   // inny użytkownik — do testu „cudza gra APPROVED widoczna dla każdego"
 
     @BeforeEach
     void setUp() {
         janeToken = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
+        johnToken = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN", "ROLE_USER"));
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
     }
 
@@ -270,6 +272,102 @@ class GameControllerTest {
                 .andExpect(jsonPath("$.authors[?(@.lastName=='Autorka')].status", contains("PENDING")));
     }
 
+    // ---------- GET /api/v1/games : biblioteka (tylko APPROVED) ----------
+
+    @Test
+    @DisplayName("GET /games -> 200, tylko gry APPROVED (Pandemic/REJECTED/DRAFT pominięte)")
+    void library_returnsOnlyApproved_200() throws Exception {
+        mockMvc.perform(get("/api/v1/games")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[*].title", contains("Agricola")))
+                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("APPROVED"))));
+    }
+
+    @Test
+    @DisplayName("GET /games bez tokena -> 401")
+    void library_unauthenticated_401() throws Exception {
+        mockMvc.perform(get("/api/v1/games"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("GET /games?publisherId=1 -> Agricola; ?publisherId=3 -> pusto (wydawca tylko na REJECTED)")
+    void library_filterByPublisher() throws Exception {
+        mockMvc.perform(get("/api/v1/games")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("publisherId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].title", contains("Agricola")));
+
+        mockMvc.perform(get("/api/v1/games")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("publisherId", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /games?categoryId=1 -> Agricola; ?categoryId=4 -> pusto (Cooperative tylko na PENDING)")
+    void library_filterByCategory() throws Exception {
+        mockMvc.perform(get("/api/v1/games")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("categoryId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].title", contains("Agricola")));
+
+        mockMvc.perform(get("/api/v1/games")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("categoryId", "4"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /games?players=3 -> Agricola (1..4); ?players=5 -> pusto")
+    void library_filterByPlayers() throws Exception {
+        mockMvc.perform(get("/api/v1/games")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("players", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].title", contains("Agricola")));
+
+        mockMvc.perform(get("/api/v1/games")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("players", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /games?yearPublished=2007 -> Agricola; ?yearPublished=1999 -> pusto")
+    void library_filterByYear() throws Exception {
+        mockMvc.perform(get("/api/v1/games")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("yearPublished", "2007"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].title", contains("Agricola")));
+
+        mockMvc.perform(get("/api/v1/games")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("yearPublished", "1999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /games z wieloma filtrami łącznie -> Agricola pasuje do wszystkich")
+    void library_multipleFilters_match() throws Exception {
+        mockMvc.perform(get("/api/v1/games")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("mechanicId", "1")     // Worker Placement
+                        .param("age", "12")           // minAge (12) <= 12
+                        .param("maxPlayingTime", "120"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].title", contains("Agricola")));
+    }
+
     // ---------- GET /api/v1/games/my ----------
 
     @Test
@@ -323,6 +421,17 @@ class GameControllerTest {
     void getGame_ownApproved_200() throws Exception {
         mockMvc.perform(get("/api/v1/games/1")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Agricola"))
+                .andExpect(jsonPath("$.moderationStatus").value("APPROVED"));
+    }
+
+    @Test
+    @DisplayName("GET /games/{id} cudza gra APPROVED -> 200 (biblioteka widoczna dla każdego zalogowanego)")
+    void getGame_othersApproved_200() throws Exception {
+        // Agricola (gra 1) należy do Jane; John (inny użytkownik) widzi ją, bo jest APPROVED
+        mockMvc.perform(get("/api/v1/games/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + johnToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Agricola"))
                 .andExpect(jsonPath("$.moderationStatus").value("APPROVED"));

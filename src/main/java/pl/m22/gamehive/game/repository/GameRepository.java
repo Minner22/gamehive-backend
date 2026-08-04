@@ -3,6 +3,7 @@ package pl.m22.gamehive.game.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 import pl.m22.gamehive.common.persistence.ModerationStatus;
 import pl.m22.gamehive.game.model.Game;
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface GameRepository extends JpaRepository<Game, Long> {
+public interface GameRepository extends JpaRepository<Game, Long>, JpaSpecificationExecutor<Game> {
 
     // tytuł nie jest unikalny (model moderacji dopuszcza duplikaty), stąd List, nie Optional
     List<Game> findByTitle(String title);
