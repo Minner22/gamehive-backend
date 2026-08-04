@@ -17,6 +17,7 @@ public enum ErrorCode {
     CATEGORY_NAME_EXISTS(HttpStatus.CONFLICT, "Category name already exists"),
     CATEGORY_REQUIRED(HttpStatus.BAD_REQUEST, "At least one category is required"),
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
+    GAME_NOT_APPROVED(HttpStatus.CONFLICT, "Game is not approved"),
     GAME_NOT_EDITABLE(HttpStatus.CONFLICT, "Game cannot be modified in its current moderation status"),
     GAME_NOT_PENDING(HttpStatus.CONFLICT, "Game is not pending moderation"),
     GAME_NOT_REJECTED(HttpStatus.CONFLICT, "Game is not rejected"),

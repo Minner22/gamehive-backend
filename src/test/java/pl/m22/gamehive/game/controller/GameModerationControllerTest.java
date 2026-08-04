@@ -23,8 +23,7 @@ import pl.m22.gamehive.support.SeededUsers;
 import java.util.*;
 
 import static org.hamcrest.Matchers.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -80,6 +79,30 @@ class GameModerationControllerTest {
                 .andReturn().getResponse().getContentAsString();
 
         return ((Number) JsonPath.read(json, "$.id")).longValue();
+    }
+
+    // ciało edycji zatwierdzonej gry (mutowalna mapa — pojedyncze testy podmieniają wybrane pola)
+    private static Map<String, Object> editRequest() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("title", "Agricola (poprawiona)");
+        body.put("description", "Zaktualizowany opis biblioteczny.");
+        body.put("minPlayers", 1);
+        body.put("maxPlayers", 5);
+        body.put("playingTimeMinutes", 100);
+        body.put("yearPublished", 2007);
+        body.put("minAge", 12);
+        body.put("publisherIds", List.of(1));
+        body.put("newPublisherNames", List.of());
+        body.put("categoryIds", List.of(1));
+        body.put("mechanicIds", List.of(1));
+        body.put("authorIds", List.of(1));
+        body.put("newAuthors", List.of());
+        body.put("submit", false);           // ignorowane na PUT
+        return body;
+    }
+
+    private String json(Map<String, Object> body) throws Exception {
+        return objectMapper.writeValueAsString(body);
     }
 
     // ---------- GET /moderation/games : kolejka + autoryzacja ----------
@@ -288,5 +311,106 @@ class GameModerationControllerTest {
         mockMvc.perform(post("/api/v1/moderation/games/6/unlock")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
                 .andExpect(status().isForbidden());
+    }
+
+    // ---------- PUT /moderation/games/{id} : edycja zatwierdzonych ----------
+
+    @Test
+    @Transactional
+    @DisplayName("PUT edycja APPROVED jako MODERATOR -> 200, pola podmienione, status pozostaje APPROVED")
+    void edit_approvedAsModerator_200() throws Exception {
+        mockMvc.perform(put("/api/v1/moderation/games/1")      // Agricola (APPROVED)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(editRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.title").value("Agricola (poprawiona)"))
+                .andExpect(jsonPath("$.maxPlayers").value(5))
+                .andExpect(jsonPath("$.moderationStatus").value("APPROVED"))
+                // GameModerationDto eksponuje pola moderacyjne
+                .andExpect(jsonPath("$.submittedBy").exists());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("PUT edycja APPROVED jako ADMIN -> 200")
+    void edit_approvedAsAdmin_200() throws Exception {
+        mockMvc.perform(put("/api/v1/moderation/games/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(editRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Agricola (poprawiona)"));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("PUT edycja APPROVED z nowym wydawcą -> nowy wydawca od razu APPROVED (biblioteczna gra bez PENDING słownika)")
+    void edit_approvedAddsNewPublisher_becomesApproved() throws Exception {
+        Map<String, Object> body = editRequest();
+        body.put("newPublisherNames", List.of("Wydawca Dodany Przy Edycji"));
+
+        mockMvc.perform(put("/api/v1/moderation/games/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publishers[?(@.name=='Wydawca Dodany Przy Edycji')].status", contains("APPROVED")));
+    }
+
+    @Test
+    @DisplayName("PUT edycja gry nie-APPROVED (PENDING) -> 409 GAME_NOT_APPROVED")
+    void edit_notApproved_409() throws Exception {
+        mockMvc.perform(put("/api/v1/moderation/games/2")      // Pandemic (PENDING)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(editRequest())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_APPROVED"));
+    }
+
+    @Test
+    @DisplayName("PUT edycja nieistniejącej gry -> 404 GAME_NOT_FOUND")
+    void edit_notFound_404() throws Exception {
+        mockMvc.perform(put("/api/v1/moderation/games/99999")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(editRequest())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("PUT edycja minPlayers > maxPlayers -> 400 INVALID_PLAYER_COUNT (re-walidacja)")
+    void edit_minGreaterThanMax_400() throws Exception {
+        Map<String, Object> body = editRequest();
+        body.put("minPlayers", 9);
+
+        mockMvc.perform(put("/api/v1/moderation/games/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PLAYER_COUNT"));
+    }
+
+    @Test
+    @DisplayName("PUT edycja jako USER -> 403")
+    void edit_asUser_403() throws Exception {
+        mockMvc.perform(put("/api/v1/moderation/games/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(editRequest())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PUT edycja bez tokena -> 401")
+    void edit_unauthenticated_401() throws Exception {
+        mockMvc.perform(put("/api/v1/moderation/games/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(editRequest())))
+                .andExpect(status().isUnauthorized());
     }
 }
