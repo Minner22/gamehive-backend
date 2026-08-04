@@ -39,10 +39,14 @@ public class GameLibraryServiceImpl implements GameLibraryService {
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new ApplicationException(ErrorCode.GAME_NOT_FOUND));
 
-        boolean approved = game.getModerationStatus() == ModerationStatus.APPROVED;
-        boolean owner = game.getSubmittedBy().equals(userService.findUserIdByEmail(viewer));
+        // bibliotekę (APPROVED) widzi każdy zalogowany — bez rozwiązywania właściciela (gorąca ścieżka odczytu)
+        if (game.getModerationStatus() == ModerationStatus.APPROVED) {
+            return gameMapper.toDto(game);
+        }
 
-        if (!approved && !owner) {
+        // własne zgłoszenie właściciel widzi w dowolnym statusie; cudze nie-APPROVED jest nieodróżnialne
+        // od nieistniejącego (enumeration-safe, jak logowanie)
+        if (!game.getSubmittedBy().equals(userService.findUserIdByEmail(viewer))) {
             throw new ApplicationException(ErrorCode.GAME_NOT_FOUND);
         }
 

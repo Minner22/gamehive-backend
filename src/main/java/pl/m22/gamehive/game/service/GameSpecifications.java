@@ -3,6 +3,7 @@ package pl.m22.gamehive.game.service;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 import pl.m22.gamehive.common.persistence.ModerationStatus;
+import pl.m22.gamehive.common.persistence.Specifications;
 import pl.m22.gamehive.game.dto.GameLibraryFilter;
 import pl.m22.gamehive.game.model.Game;
 
@@ -59,6 +60,7 @@ public final class GameSpecifications {
         };
     }
 
+    // dwustronny zakres (min <= N <= max) — jedyny warunek nie sprowadzający się do prostego "atrybut op wartość"
     private static Specification<Game> supportsPlayers(Integer players) {
 
         return (root, query, cb) -> players == null ? null : cb.and(
@@ -68,18 +70,16 @@ public final class GameSpecifications {
 
     private static Specification<Game> playingTimeAtMost(Integer max) {
 
-        return (root, query, cb) -> max == null
-                ? null
-                : cb.lessThanOrEqualTo(root.<Integer>get("playingTimeMinutes"), max);
+        return Specifications.lessThanOrEqualToIfPresent("playingTimeMinutes", max);
     }
 
     private static Specification<Game> yearEquals(Integer year) {
 
-        return (root, query, cb) -> year == null ? null : cb.equal(root.get("yearPublished"), year);
+        return Specifications.equalsIfPresent("yearPublished", year);
     }
 
     private static Specification<Game> minAgeAtMost(Integer age) {
 
-        return (root, query, cb) -> age == null ? null : cb.lessThanOrEqualTo(root.<Integer>get("minAge"), age);
+        return Specifications.lessThanOrEqualToIfPresent("minAge", age);
     }
 }
