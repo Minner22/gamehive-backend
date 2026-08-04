@@ -146,4 +146,24 @@ public class GameModerationController {
 
         return ResponseEntity.ok(gameModerationService.updateApprovedGame(id, request, email));
     }
+
+    @Operation(summary = "Usuń grę (twardy delete)",
+            description = "Twarde usunięcie gry w dowolnym statusie oprócz DRAFT (prywatny szkic jest "
+                    + "niewidoczny → 404). Kaskadowo znikają powiązania słownikowe; wpis audytu DELETE "
+                    + "przeżywa usunięcie. Operacja nieodwracalna.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Gra usunięta"),
+            @ApiResponse(responseCode = "404", description = "Gra nie istnieje lub jest szkicem (GAME_NOT_FOUND)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteGame(
+            Authentication authentication,
+            @PathVariable Long id) {
+
+        Email email = new Email(authentication.getName());
+        gameModerationService.deleteGame(id, email);
+
+        return ResponseEntity.noContent().build();
+    }
 }

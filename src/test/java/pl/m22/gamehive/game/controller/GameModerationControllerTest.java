@@ -18,10 +18,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.game.repository.GameRepository;
 import pl.m22.gamehive.support.SeededUsers;
 
 import java.util.*;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,6 +36,7 @@ class GameModerationControllerTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired JwtService jwtService;
+    @Autowired GameRepository gameRepository;
     @Autowired RedisTemplate<String, String> redisTemplate;
     @MockitoBean JavaMailSender mailSender;
 
@@ -411,6 +414,74 @@ class GameModerationControllerTest {
         mockMvc.perform(put("/api/v1/moderation/games/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(editRequest())))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ---------- DELETE /moderation/games/{id} : twardy delete ----------
+
+    @Test
+    @Transactional
+    @DisplayName("DELETE gry APPROVED jako MODERATOR -> 204, gra znika (kaskada join-rows pokryta w GameRepositoryTest)")
+    void delete_approved_204() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/games/1")   // Agricola (APPROVED)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isNoContent());
+
+        assertThat(gameRepository.findById(1L)).isEmpty();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("DELETE gry PENDING jako MODERATOR -> 204 (wariant C: dowolny status oprócz DRAFT)")
+    void delete_pending_204() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/games/2")   // Pandemic (PENDING)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isNoContent());
+
+        assertThat(gameRepository.findById(2L)).isEmpty();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("DELETE gry REJECTED (cudzej) jako ADMIN -> 204")
+    void delete_rejectedAsAdmin_204() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/games/3")   // Odrzucona Gra (REJECTED, John)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        assertThat(gameRepository.findById(3L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("DELETE gry DRAFT -> 404 GAME_NOT_FOUND (prywatny szkic niewidoczny dla moderatora)")
+    void delete_draft_404() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/games/4")   // Szkic Jane (DRAFT)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("DELETE nieistniejącej gry -> 404 GAME_NOT_FOUND")
+    void delete_notFound_404() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/games/99999")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("DELETE jako USER -> 403")
+    void delete_asUser_403() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/games/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("DELETE bez tokena -> 401")
+    void delete_unauthenticated_401() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/games/1"))
                 .andExpect(status().isUnauthorized());
     }
 }

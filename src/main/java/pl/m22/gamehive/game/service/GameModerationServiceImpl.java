@@ -126,6 +126,23 @@ public class GameModerationServiceImpl implements GameModerationService {
         return gameMapper.toModerationDto(game);
     }
 
+    @Transactional
+    @Override
+    public void deleteGame(Long gameId, Email moderatorEmail) {
+
+        Game game = gameRepository.findById(gameId)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.GAME_NOT_FOUND));
+
+        if (game.getModerationStatus() == ModerationStatus.DRAFT) {
+            throw new ApplicationException(ErrorCode.GAME_NOT_FOUND);
+        }
+
+        String deletedTitle = game.getTitle();
+        gameRepository.delete(game);
+
+        publishAudit(ContentModerationAction.DELETE, gameId, moderatorEmail, deletedTitle);
+    }
+
     private Game findPendingGame(Long gameId) {
 
         Game game = gameRepository.findById(gameId)

@@ -116,6 +116,33 @@ class GameModerationServiceAuditTest {
     }
 
     @Test
+    @DisplayName("deleteGame po committcie -> jeden wpis DELETE, details = tytuł, wpis przeżywa hard-delete gry")
+    void delete_committed_writesDeleteEntry_survivingHardDelete() {
+        new TransactionTemplate(txManager).executeWithoutResult(_ ->
+                moderationService.deleteGame(gameId, MODERATOR));   // gra jest PENDING -> kwalifikuje się (wariant C)
+
+        assertThat(gameRepository.findById(gameId)).isEmpty();      // twardy delete
+        List<ContentModerationAuditLog> entries = auditRepository.findByTargetId(gameId);
+        assertThat(entries).hasSize(1);
+        assertThat(entries.getFirst().getAction()).isEqualTo(ContentModerationAction.DELETE);
+        assertThat(entries.getFirst().getDetails()).isEqualTo("Cel audytu");   // tytuł zasianej gry z setUp
+    }
+
+    @Test
+    @DisplayName("rollback deleteGame -> brak wpisu audytu i gra nadal istnieje")
+    void delete_rolledBack_noAuditEntry() {
+        assertThatThrownBy(() ->
+                new TransactionTemplate(txManager).executeWithoutResult(_ -> {
+                    moderationService.deleteGame(gameId, MODERATOR);
+                    throw new IllegalStateException("forced rollback after delete");
+                })
+        ).isInstanceOf(IllegalStateException.class);
+
+        assertThat(auditRepository.findByTargetId(gameId)).isEmpty();
+        assertThat(gameRepository.findById(gameId)).isPresent();
+    }
+
+    @Test
     @DisplayName("rollback approve -> brak wpisu audytu (AFTER_COMMIT nie odpala się na wycofanej transakcji)")
     void approve_rolledBack_noAuditEntry() {
         assertThatThrownBy(() ->

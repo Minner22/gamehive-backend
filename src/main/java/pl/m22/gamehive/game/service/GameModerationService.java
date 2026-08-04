@@ -17,4 +17,6 @@ public interface GameModerationService {
     GameModerationDto unlock(Long gameId, Email moderatorEmail);
 
     GameModerationDto updateApprovedGame(Long gameId, GameRequestDto request, Email moderatorEmail);
+
+    void deleteGame(Long gameId, Email moderatorEmail);
 }
