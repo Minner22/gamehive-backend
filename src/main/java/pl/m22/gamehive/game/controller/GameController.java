@@ -1,6 +1,7 @@
 package pl.m22.gamehive.game.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,8 +22,10 @@ import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.ApiError;
 import pl.m22.gamehive.common.exception.ApiValidationError;
 import pl.m22.gamehive.game.dto.GameDto;
+import pl.m22.gamehive.game.dto.GameLibraryFilter;
 import pl.m22.gamehive.game.dto.GameRequestDto;
 import pl.m22.gamehive.game.dto.PageGameDto;
+import pl.m22.gamehive.game.service.GameLibraryService;
 import pl.m22.gamehive.game.service.GameSubmissionService;
 
 @RestController
@@ -41,6 +44,36 @@ import pl.m22.gamehive.game.service.GameSubmissionService;
 public class GameController {
 
     private final GameSubmissionService gameSubmissionService;
+    private final GameLibraryService gameLibraryService;
+
+    @Operation(summary = "Biblioteka gier (stronicowana, tylko APPROVED)",
+            description = "Zwraca zatwierdzone gry z globalnej biblioteki. Opcjonalne filtry: wydawca, kategoria, "
+                    + "mechanika, liczba graczy, maksymalny czas gry, rok wydania, wiek. Parametry stronicowania: page, size, sort.")
+    @ApiResponse(responseCode = "200", description = "Strona wyników z biblioteki",
+            content = @Content(schema = @Schema(implementation = PageGameDto.class)))
+    @GetMapping
+    public ResponseEntity<Page<GameDto>> library(
+            @Parameter(description = "Filtr: id wydawcy")
+            @RequestParam(required = false) Long publisherId,
+            @Parameter(description = "Filtr: id kategorii")
+            @RequestParam(required = false) Long categoryId,
+            @Parameter(description = "Filtr: id mechaniki")
+            @RequestParam(required = false) Long mechanicId,
+            @Parameter(description = "Filtr: liczba graczy — gra obsługuje N graczy (minPlayers ≤ N ≤ maxPlayers)")
+            @RequestParam(required = false) Integer players,
+            @Parameter(description = "Filtr: maksymalny czas gry w minutach (playingTimeMinutes ≤ wartość)")
+            @RequestParam(required = false) Integer maxPlayingTime,
+            @Parameter(description = "Filtr: rok wydania (dokładny)")
+            @RequestParam(required = false) Integer yearPublished,
+            @Parameter(description = "Filtr: wiek gracza — gra odpowiednia dla wieku N (minAge ≤ N)")
+            @RequestParam(required = false) Integer age,
+            @PageableDefault(sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        GameLibraryFilter filter =
+                new GameLibraryFilter(publisherId, categoryId, mechanicId, players, maxPlayingTime, yearPublished, age);
+
+        return ResponseEntity.ok(gameLibraryService.findLibrary(filter, pageable));
+    }
 
     @Operation(summary = "Utwórz zgłoszenie gry",
             description = "Tworzy zgłoszenie przypisane do zalogowanego użytkownika. "
@@ -80,23 +113,23 @@ public class GameController {
         return ResponseEntity.ok(gameSubmissionService.findMySubmissions(email, pageable));
     }
 
-    @Operation(summary = "Pobierz własne zgłoszenie",
-            description = "Zwraca grę zalogowanego użytkownika w dowolnym statusie. "
-                    + "Cudze i nieistniejące zgłoszenia są nierozróżnialne (404).")
+    @Operation(summary = "Pobierz grę",
+            description = "Zwraca grę APPROVED z biblioteki (widoczną dla każdego zalogowanego) albo własne "
+                    + "zgłoszenie w dowolnym statusie. Cudze nie-APPROVED i nieistniejące są nierozróżnialne (404).")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Znaleziono zgłoszenie"),
+            @ApiResponse(responseCode = "200", description = "Znaleziono grę"),
             @ApiResponse(responseCode = "404",
-                    description = "Zgłoszenie nie istnieje lub należy do innego użytkownika (GAME_NOT_FOUND)",
+                    description = "Gra nie istnieje albo jest cudzym zgłoszeniem spoza biblioteki (GAME_NOT_FOUND)",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @GetMapping("/{id}")
-    public ResponseEntity<GameDto> getMySubmission(
+    public ResponseEntity<GameDto> getGame(
             Authentication authentication,
             @PathVariable Long id) {
 
         Email email = new Email(authentication.getName());
 
-        return ResponseEntity.ok(gameSubmissionService.findMySubmission(id, email));
+        return ResponseEntity.ok(gameLibraryService.findGame(id, email));
     }
 
     @Operation(summary = "Edytuj własne zgłoszenie",

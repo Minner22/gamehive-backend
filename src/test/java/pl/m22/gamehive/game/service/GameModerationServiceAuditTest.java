@@ -13,6 +13,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.persistence.ModerationStatus;
+import pl.m22.gamehive.game.dto.GameRequestDto;
 import pl.m22.gamehive.game.model.ContentModerationAction;
 import pl.m22.gamehive.game.model.ContentModerationAuditLog;
 import pl.m22.gamehive.game.model.ContentModerationTargetType;
@@ -60,8 +61,16 @@ class GameModerationServiceAuditTest {
 
     @AfterEach
     void cleanup() {
-        gameRepository.deleteById(gameId);
+        if (gameRepository.existsById(gameId)) {   // gra mogła zostać twardo usunięta w teście delete (GH-119)
+            gameRepository.deleteById(gameId);
+        }
         auditRepository.deleteAll();
+    }
+
+    private GameRequestDto editRequest() {
+        return new GameRequestDto("Cel audytu (edycja)", "Zmieniony opis.",
+                1, 4, 40, 2020, 8, null,
+                List.of(1L), List.of(), List.of(1L), List.of(), List.of(), List.of(), false);
     }
 
     @Test
@@ -88,6 +97,49 @@ class GameModerationServiceAuditTest {
         assertThat(entries).hasSize(1);
         assertThat(entries.getFirst().getAction()).isEqualTo(ContentModerationAction.REJECT);
         assertThat(entries.getFirst().getDetails()).isEqualTo("Niepełny opis");
+    }
+
+    @Test
+    @DisplayName("updateApprovedGame po committcie -> dokładnie jeden wpis EDIT, actor = moderator")
+    void edit_committed_writesSingleEditEntry() {
+        TransactionTemplate tx = new TransactionTemplate(txManager);
+        // przenieś zasianą grę PENDING do APPROVED przez encję (bez zdarzenia audytu)
+        tx.executeWithoutResult(_ -> gameRepository.findById(gameId).orElseThrow().approve(SeededUsers.MARK_ID));
+
+        tx.executeWithoutResult(_ ->
+                moderationService.updateApprovedGame(gameId, editRequest(), MODERATOR));
+
+        List<ContentModerationAuditLog> entries = auditRepository.findByTargetId(gameId);
+        assertThat(entries).extracting(ContentModerationAuditLog::getAction)
+                .containsExactly(ContentModerationAction.EDIT);
+        assertThat(entries.getFirst().getActor()).isEqualTo("mark.moderator@example.com");
+    }
+
+    @Test
+    @DisplayName("deleteGame po committcie -> jeden wpis DELETE, details = tytuł, wpis przeżywa hard-delete gry")
+    void delete_committed_writesDeleteEntry_survivingHardDelete() {
+        new TransactionTemplate(txManager).executeWithoutResult(_ ->
+                moderationService.deleteGame(gameId, MODERATOR));   // gra jest PENDING -> kwalifikuje się (wariant C)
+
+        assertThat(gameRepository.findById(gameId)).isEmpty();      // twardy delete
+        List<ContentModerationAuditLog> entries = auditRepository.findByTargetId(gameId);
+        assertThat(entries).hasSize(1);
+        assertThat(entries.getFirst().getAction()).isEqualTo(ContentModerationAction.DELETE);
+        assertThat(entries.getFirst().getDetails()).isEqualTo("Cel audytu");   // tytuł zasianej gry z setUp
+    }
+
+    @Test
+    @DisplayName("rollback deleteGame -> brak wpisu audytu i gra nadal istnieje")
+    void delete_rolledBack_noAuditEntry() {
+        assertThatThrownBy(() ->
+                new TransactionTemplate(txManager).executeWithoutResult(_ -> {
+                    moderationService.deleteGame(gameId, MODERATOR);
+                    throw new IllegalStateException("forced rollback after delete");
+                })
+        ).isInstanceOf(IllegalStateException.class);
+
+        assertThat(auditRepository.findByTargetId(gameId)).isEmpty();
+        assertThat(gameRepository.findById(gameId)).isPresent();
     }
 
     @Test

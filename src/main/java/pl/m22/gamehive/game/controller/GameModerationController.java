@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,7 +19,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.ApiError;
+import pl.m22.gamehive.common.exception.ApiValidationError;
 import pl.m22.gamehive.game.dto.GameModerationDto;
+import pl.m22.gamehive.game.dto.GameRequestDto;
 import pl.m22.gamehive.game.dto.PageGameModerationDto;
 import pl.m22.gamehive.game.dto.RejectGameRequestDto;
 import pl.m22.gamehive.game.service.GameModerationService;
@@ -114,5 +117,53 @@ public class GameModerationController {
         Email email = new Email(authentication.getName());
 
         return ResponseEntity.ok(gameModerationService.unlock(id, email));
+    }
+
+    @Operation(summary = "Edytuj zatwierdzoną grę (biblioteka)",
+            description = "Dozwolone tylko dla gry w statusie APPROVED. Re-walidacja reguł domenowych "
+                    + "(min ≤ max, ≥1 wydawca, ≥1 kategoria); relacje (wydawcy/kategorie/mechaniki/autorzy) są "
+                    + "zastępowane w całości. Nowi wydawcy/autorzy dodani przy edycji są od razu zatwierdzani. "
+                    + "Pole submit jest ignorowane.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Gra zaktualizowana"),
+            @ApiResponse(responseCode = "400",
+                    description = "Błąd walidacji (Bean Validation lub INVALID_PLAYER_COUNT / PUBLISHER_REQUIRED / CATEGORY_REQUIRED)",
+                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
+            @ApiResponse(responseCode = "404",
+                    description = "Gra nie istnieje (GAME_NOT_FOUND) lub wskazany id słownika nie istnieje "
+                            + "(PUBLISHER_NOT_FOUND / CATEGORY_NOT_FOUND / MECHANIC_NOT_FOUND / AUTHOR_NOT_FOUND)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Gra nie jest zatwierdzona (GAME_NOT_APPROVED)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @PutMapping("/{id}")
+    public ResponseEntity<GameModerationDto> updateApprovedGame(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody GameRequestDto request) {
+
+        Email email = new Email(authentication.getName());
+
+        return ResponseEntity.ok(gameModerationService.updateApprovedGame(id, request, email));
+    }
+
+    @Operation(summary = "Usuń grę (twardy delete)",
+            description = "Twarde usunięcie gry w dowolnym statusie oprócz DRAFT (prywatny szkic jest "
+                    + "niewidoczny → 404). Kaskadowo znikają powiązania słownikowe; wpis audytu DELETE "
+                    + "przeżywa usunięcie. Operacja nieodwracalna.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Gra usunięta"),
+            @ApiResponse(responseCode = "404", description = "Gra nie istnieje lub jest szkicem (GAME_NOT_FOUND)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteGame(
+            Authentication authentication,
+            @PathVariable Long id) {
+
+        Email email = new Email(authentication.getName());
+        gameModerationService.deleteGame(id, email);
+
+        return ResponseEntity.noContent().build();
     }
 }

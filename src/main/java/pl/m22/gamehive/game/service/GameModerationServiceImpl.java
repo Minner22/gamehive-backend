@@ -14,6 +14,7 @@ import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.logging.CorrelationIdFilter;
 import pl.m22.gamehive.common.persistence.ModerationStatus;
 import pl.m22.gamehive.game.dto.GameModerationDto;
+import pl.m22.gamehive.game.dto.GameRequestDto;
 import pl.m22.gamehive.game.event.ContentModerationAuditEvent;
 import pl.m22.gamehive.game.mapper.GameMapper;
 import pl.m22.gamehive.game.model.*;
@@ -28,6 +29,7 @@ public class GameModerationServiceImpl implements GameModerationService {
 
     private final GameRepository gameRepository;
     private final GameMapper gameMapper;
+    private final GameContentWriter contentWriter;
     private final UserService userService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -89,6 +91,56 @@ public class GameModerationServiceImpl implements GameModerationService {
         publishAudit(ContentModerationAction.UNLOCK, gameId, moderatorEmail, null);
 
         return gameMapper.toModerationDto(game);
+    }
+
+    @Transactional
+    @Override
+    public GameModerationDto updateApprovedGame(Long gameId, GameRequestDto request, Email moderatorEmail) {
+
+        Game game = gameRepository.findById(gameId)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.GAME_NOT_FOUND));
+
+        if (game.getModerationStatus() != ModerationStatus.APPROVED) {
+            throw new DomainException(ErrorCode.GAME_NOT_APPROVED);
+        }
+
+        contentWriter.validateDomainRules(request);
+
+        game.updateDetails(request.title(),
+                request.description(),
+                request.minPlayers(),
+                request.maxPlayers(),
+                request.playingTimeMinutes(),
+                request.yearPublished(),
+                request.minAge(),
+                request.coverImageUrl());
+
+        game.clearAssociations();
+        contentWriter.applyAssociations(game, request);
+        // nowi wydawcy/autorzy dodani przez moderatora są PENDING — biblioteczna gra nie może wskazywać
+        // na słownik PENDING, więc zatwierdzamy je od razu (jak przy approve)
+        approvePendingTaxonomy(game);
+
+        publishAudit(ContentModerationAction.EDIT, gameId, moderatorEmail, null);
+
+        return gameMapper.toModerationDto(game);
+    }
+
+    @Transactional
+    @Override
+    public void deleteGame(Long gameId, Email moderatorEmail) {
+
+        Game game = gameRepository.findById(gameId)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.GAME_NOT_FOUND));
+
+        if (game.getModerationStatus() == ModerationStatus.DRAFT) {
+            throw new ApplicationException(ErrorCode.GAME_NOT_FOUND);
+        }
+
+        String deletedTitle = game.getTitle();
+        gameRepository.delete(game);
+
+        publishAudit(ContentModerationAction.DELETE, gameId, moderatorEmail, deletedTitle);
     }
 
     private Game findPendingGame(Long gameId) {
