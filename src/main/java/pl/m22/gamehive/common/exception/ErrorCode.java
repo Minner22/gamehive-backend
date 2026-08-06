@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     // ===== Domain — naruszenia reguł biznesowych (handler loguje INFO) =====
+    ALREADY_IN_COLLECTION(HttpStatus.CONFLICT, "Item is already in your collection"),
     AUTHOR_IN_USE(HttpStatus.CONFLICT, "Author is in use"),
     AUTHOR_NAME_EXISTS(HttpStatus.CONFLICT, "Author already exists"),
     BASE_GAME_NOT_APPROVED(HttpStatus.CONFLICT, "Base game is not approved"),
@@ -51,6 +52,7 @@ public enum ErrorCode {
     ACCOUNT_DISABLED(HttpStatus.UNAUTHORIZED, "Account is disabled"),
     AUTHOR_NOT_FOUND(HttpStatus.NOT_FOUND, "Author not found"),
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "Category not found"),
+    COLLECTION_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "Collection item not found"),
     EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "Email not found"),
     EXPANSION_NOT_FOUND(HttpStatus.NOT_FOUND, "Expansion not found"),
     GAME_NOT_FOUND(HttpStatus.NOT_FOUND, "Game not found"),
