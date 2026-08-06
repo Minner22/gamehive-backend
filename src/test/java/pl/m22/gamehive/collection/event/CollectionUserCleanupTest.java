@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -19,6 +20,8 @@ import pl.m22.gamehive.collection.repository.GameCollectionItemRepository;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.domain.HashedPassword;
 import pl.m22.gamehive.common.domain.Username;
+import pl.m22.gamehive.common.exception.DomainException;
+import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.game.repository.GameExpansionRepository;
 import pl.m22.gamehive.game.repository.GameRepository;
 import pl.m22.gamehive.support.SeededUsers;
@@ -30,6 +33,7 @@ import pl.m22.gamehive.user.service.UserService;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Test NIE jest @Transactional — AFTER_COMMIT odpala się tylko po faktycznym committcie.
@@ -48,9 +52,13 @@ class CollectionUserCleanupTest {
     @Autowired GameExpansionRepository expansionRepository;
     @Autowired UserAuditLogRepository userAuditLogRepository;
     @Autowired PlatformTransactionManager txManager;
+    @Autowired PasswordEncoder passwordEncoder;
     @MockitoBean JavaMailSender mailSender;
 
     private static final Email ADMIN = new Email("john.doe@example.com");
+    private static final Email DOOMED = new Email("doomed.collector@example.com");
+    // hasło kodowane w locie, nie kopiowane z data.sql — tamte hashe nie mają udokumentowanego odpowiednika jawnego
+    private static final String DOOMED_PASSWORD = "doomedPass1";
 
     private UUID doomedUserId;
 
@@ -58,8 +66,8 @@ class CollectionUserCleanupTest {
     void setUp() {
         AppUser doomed = AppUser.register(
                 new Username("doomed-collector"),
-                new Email("doomed.collector@example.com"),
-                HashedPassword.fromHash("{bcrypt}$2a$10$wnJKcfT8rFhyhno51MBqHeZS.ZYKXUavokV3EAQkq/WTd5E17V9fe"));
+                DOOMED,
+                HashedPassword.fromRaw(DOOMED_PASSWORD, passwordEncoder));
         doomedUserId = userRepository.saveAndFlush(doomed).getId();
 
         // gra 1 (Agricola) i dodatek 1 (Rzeka) — jedyne APPROVED cele; wpisy Jane na tych samych celach
@@ -100,16 +108,28 @@ class CollectionUserCleanupTest {
     }
 
     @Test
+    @DisplayName("samodzielne usunięcie konta -> AFTER_COMMIT kasuje kolekcję (druga ścieżka publikacji zdarzenia)")
+    void deleteOwnAccount_removesOwnCollectionItems() {
+        assertThat(gameCollectionRepository.findByUserId(doomedUserId, Pageable.unpaged())).hasSize(1);
+        assertThat(expansionCollectionRepository.findByUserId(doomedUserId, Pageable.unpaged())).hasSize(1);
+
+        userService.deleteOwnAccount(DOOMED, DOOMED_PASSWORD);
+
+        assertThat(gameCollectionRepository.findByUserId(doomedUserId, Pageable.unpaged())).isEmpty();
+        assertThat(expansionCollectionRepository.findByUserId(doomedUserId, Pageable.unpaged())).isEmpty();
+        assertThat(gameCollectionRepository.existsByUserIdAndGameId(SeededUsers.JANE_ID, 1L)).isTrue();
+    }
+
+    @Test
     @DisplayName("nieudane usunięcie konta -> brak zdarzenia, kolekcja nietknięta")
     void failedDelete_keepsCollectionItems() {
         // próba usunięcia samego siebie -> CANNOT_MODIFY_OWN_ACCOUNT, transakcja nie commituje
         assertThat(userRepository.existsById(doomedUserId)).isTrue();
 
-        try {
-            userService.deleteUser(doomedUserId, new Email("doomed.collector@example.com"));
-        } catch (RuntimeException expected) {
-            // guard zadziałał — istotny jest stan po nim
-        }
+        assertThatThrownBy(() -> userService.deleteUser(doomedUserId, DOOMED))
+                .isInstanceOf(DomainException.class)
+                .extracting(ex -> ((DomainException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.CANNOT_MODIFY_OWN_ACCOUNT);
 
         assertThat(userRepository.existsById(doomedUserId)).isTrue();
         assertThat(gameCollectionRepository.findByUserId(doomedUserId, Pageable.unpaged())).hasSize(1);

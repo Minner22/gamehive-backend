@@ -3,6 +3,9 @@ package pl.m22.gamehive.collection.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import pl.m22.gamehive.collection.model.ExpansionCollectionItem;
 
@@ -18,5 +21,7 @@ public interface ExpansionCollectionItemRepository extends JpaRepository<Expansi
 
     boolean existsByUserIdAndExpansionId(UUID userId, Long expansionId);
 
-    void deleteByUserId(UUID userId);
+    @Modifying
+    @Query("delete from ExpansionCollectionItem c where c.userId = :userId")
+    void deleteByUserId(@Param("userId") UUID userId);
 }
