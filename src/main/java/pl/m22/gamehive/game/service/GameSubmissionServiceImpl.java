@@ -1,8 +1,6 @@
 package pl.m22.gamehive.game.service;
 
 import lombok.RequiredArgsConstructor;
-import org.slf4j.MDC;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -11,12 +9,10 @@ import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
-import pl.m22.gamehive.common.logging.CorrelationIdFilter;
 import pl.m22.gamehive.common.persistence.ModerationStatus;
 import pl.m22.gamehive.game.config.ModerationProperties;
 import pl.m22.gamehive.game.dto.GameDto;
 import pl.m22.gamehive.game.dto.GameRequestDto;
-import pl.m22.gamehive.game.event.ContentModerationAuditEvent;
 import pl.m22.gamehive.game.mapper.GameMapper;
 import pl.m22.gamehive.game.model.ContentModerationAction;
 import pl.m22.gamehive.game.model.ContentModerationTargetType;
@@ -39,7 +35,7 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
     private final GameContentWriter contentWriter;
     private final ModerationProperties moderationProperties;
     private final UserService userService;
-    private final ApplicationEventPublisher eventPublisher;
+    private final ContentModerationAuditPublisher auditPublisher;
 
     @Transactional
     @Override
@@ -152,12 +148,6 @@ public class GameSubmissionServiceImpl implements GameSubmissionService {
 
     private void publishAudit(ContentModerationAction action, Long targetId, Email actor, String details) {
 
-        eventPublisher.publishEvent(new ContentModerationAuditEvent(
-                action, ContentModerationTargetType.GAME, targetId, actor.value(), details, currentCorrelationId()));
-    }
-
-    private String currentCorrelationId() {
-
-        return MDC.get(CorrelationIdFilter.CORRELATION_ID);
+        auditPublisher.publish(action, ContentModerationTargetType.GAME, targetId, actor, details);
     }
 }

@@ -280,8 +280,8 @@ class GameControllerTest {
         mockMvc.perform(get("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(1))
-                .andExpect(jsonPath("$.content[*].title", contains("Agricola")))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[*].title", containsInAnyOrder("Agricola", "Carcassonne")))
                 .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("APPROVED"))));
     }
 

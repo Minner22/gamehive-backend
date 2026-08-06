@@ -20,6 +20,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
     private final MechanicRepository mechanicRepository;
     private final PublisherRepository publisherRepository;
     private final GameRepository gameRepository;
+    private final GameExpansionRepository gameExpansionRepository;
 
     @Transactional(readOnly = true)
     @Override
@@ -66,7 +67,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
             throw new ApplicationException(ErrorCode.CATEGORY_NOT_FOUND);
         }
 
-        if (gameRepository.existsByCategoriesId(id)) {
+        if (gameRepository.existsByCategoriesId(id) || gameExpansionRepository.existsByCategoriesId(id)) {
             throw new DomainException(ErrorCode.CATEGORY_IN_USE);
         }
 
@@ -118,7 +119,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
             throw new ApplicationException(ErrorCode.MECHANIC_NOT_FOUND);
         }
 
-        if (gameRepository.existsByMechanicsId(id)) {
+        if (gameRepository.existsByMechanicsId(id) || gameExpansionRepository.existsByMechanicsId(id)) {
             throw new DomainException(ErrorCode.MECHANIC_IN_USE);
         }
 

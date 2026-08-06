@@ -1,8 +1,6 @@
 package pl.m22.gamehive.game.service;
 
 import lombok.RequiredArgsConstructor;
-import org.slf4j.MDC;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -11,13 +9,12 @@ import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
-import pl.m22.gamehive.common.logging.CorrelationIdFilter;
 import pl.m22.gamehive.common.persistence.ModerationStatus;
 import pl.m22.gamehive.game.dto.GameModerationDto;
 import pl.m22.gamehive.game.dto.GameRequestDto;
-import pl.m22.gamehive.game.event.ContentModerationAuditEvent;
 import pl.m22.gamehive.game.mapper.GameMapper;
 import pl.m22.gamehive.game.model.*;
+import pl.m22.gamehive.game.repository.GameExpansionRepository;
 import pl.m22.gamehive.game.repository.GameRepository;
 import pl.m22.gamehive.user.service.UserService;
 
@@ -28,10 +25,11 @@ import java.util.UUID;
 public class GameModerationServiceImpl implements GameModerationService {
 
     private final GameRepository gameRepository;
+    private final GameExpansionRepository gameExpansionRepository;
     private final GameMapper gameMapper;
     private final GameContentWriter contentWriter;
     private final UserService userService;
-    private final ApplicationEventPublisher eventPublisher;
+    private final ContentModerationAuditPublisher auditPublisher;
 
     @Transactional(readOnly = true)
     @Override
@@ -137,6 +135,10 @@ public class GameModerationServiceImpl implements GameModerationService {
             throw new ApplicationException(ErrorCode.GAME_NOT_FOUND);
         }
 
+        if (gameExpansionRepository.existsByBaseGameId(gameId)) {
+            throw new DomainException(ErrorCode.GAME_HAS_EXPANSIONS);
+        }
+
         String deletedTitle = game.getTitle();
         gameRepository.delete(game);
 
@@ -173,12 +175,6 @@ public class GameModerationServiceImpl implements GameModerationService {
 
     private void publishAudit(ContentModerationAction action, Long targetId, Email actor, String details) {
 
-        eventPublisher.publishEvent(new ContentModerationAuditEvent(
-                action, ContentModerationTargetType.GAME, targetId, actor.value(), details, currentCorrelationId()));
-    }
-
-    private String currentCorrelationId() {
-
-        return MDC.get(CorrelationIdFilter.CORRELATION_ID);
+        auditPublisher.publish(action, ContentModerationTargetType.GAME, targetId, actor, details);
     }
 }

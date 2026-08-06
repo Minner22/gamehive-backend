@@ -1,7 +1,6 @@
 package pl.m22.gamehive.game.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.game.repository.GameExpansionRepository;
 import pl.m22.gamehive.game.repository.GameRepository;
 import pl.m22.gamehive.support.SeededUsers;
 
@@ -32,10 +32,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-class GameModerationControllerTest {
+class GameExpansionModerationControllerTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired JwtService jwtService;
+    @Autowired GameExpansionRepository expansionRepository;
     @Autowired GameRepository gameRepository;
     @Autowired RedisTemplate<String, String> redisTemplate;
     @MockitoBean JavaMailSender mailSender;
@@ -54,52 +55,18 @@ class GameModerationControllerTest {
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
     }
 
-    // buduje PENDING grę z wydawcą i autorem PENDING (przez find-or-create #117) i zwraca jej id;
-    // dzięki temu test kaskady nie zależy od fixtur data.sql (i nie psuje GameRepositoryTest)
-    private long createPendingGameWithPendingTaxonomy() throws Exception {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("title", "Kandydat do moderacji");
-        body.put("description", "Gra oczekująca na decyzję.");
-        body.put("minPlayers", 2);
-        body.put("maxPlayers", 4);
-        body.put("playingTimeMinutes", 60);
-        body.put("yearPublished", 2021);
-        body.put("minAge", 10);
-        body.put("publisherIds", List.of(1));                       // Rio Grande (APPROVED)
-        body.put("newPublisherNames", List.of("Nowy Wydawca Mod")); // -> PENDING
-        body.put("categoryIds", List.of(1));
-        body.put("mechanicIds", List.of());
-        body.put("authorIds", List.of(2));                          // Reiner Knizia (APPROVED)
-        body.put("newAuthors", List.of(Map.of("firstName", "Nowy", "lastName", "AutorMod"))); // -> PENDING
-        body.put("submit", true);                                   // od razu PENDING
-
-        String json = mockMvc.perform(post("/api/v1/games")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.moderationStatus").value("PENDING"))
-                .andReturn().getResponse().getContentAsString();
-
-        return ((Number) JsonPath.read(json, "$.id")).longValue();
-    }
-
-    // ciało edycji zatwierdzonej gry (mutowalna mapa — pojedyncze testy podmieniają wybrane pola)
+    // ciało edycji zatwierdzonego dodatku (mutowalna mapa — pojedyncze testy podmieniają wybrane pola)
     private static Map<String, Object> editRequest() {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("title", "Agricola (poprawiona)");
+        body.put("baseGameId", 7);
+        body.put("name", "Carcassonne: Rzeka (poprawiona)");
         body.put("description", "Zaktualizowany opis biblioteczny.");
-        body.put("minPlayers", 1);
-        body.put("maxPlayers", 5);
-        body.put("playingTimeMinutes", 100);
-        body.put("yearPublished", 2007);
-        body.put("minAge", 12);
-        body.put("publisherIds", List.of(1));
-        body.put("newPublisherNames", List.of());
+        body.put("minPlayers", null);
+        body.put("maxPlayers", 8);
+        body.put("playingTimeMinutes", 70);
+        body.put("minAge", null);
         body.put("categoryIds", List.of(1));
-        body.put("mechanicIds", List.of(1));
-        body.put("authorIds", List.of(1));
-        body.put("newAuthors", List.of());
+        body.put("mechanicIds", List.of());
         body.put("submit", false);           // ignorowane na PUT
         return body;
     }
@@ -108,50 +75,49 @@ class GameModerationControllerTest {
         return objectMapper.writeValueAsString(body);
     }
 
-    // ---------- GET /moderation/games : kolejka + autoryzacja ----------
+    // ---------- GET /moderation/expansions : kolejka + autoryzacja ----------
 
     @Test
-    @DisplayName("GET /moderation/games jako MODERATOR -> 200, same PENDING (m.in. Pandemic)")
+    @DisplayName("GET /moderation/expansions jako MODERATOR -> 200, same PENDING + pola moderacyjne")
     void queue_asModerator_200() throws Exception {
-        mockMvc.perform(get("/api/v1/moderation/games")
+        mockMvc.perform(get("/api/v1/moderation/expansions")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("PENDING"))))
-                .andExpect(jsonPath("$.content[*].title", hasItem("Pandemic")))
-                // GameModerationDto eksponuje pola moderacyjne, których GameDto nie pokazuje
+                .andExpect(jsonPath("$.content[*].name", hasItem("Carcassonne: Karczmy")))
+                // GameExpansionModerationDto eksponuje pola moderacyjne, których GameExpansionDto nie pokazuje
                 .andExpect(jsonPath("$.content[0].submittedBy").exists())
                 .andExpect(jsonPath("$.content[0].resubmissionCount").exists());
     }
 
     @Test
-    @DisplayName("GET /moderation/games jako ADMIN -> 200, same PENDING (m.in. Pandemic)")
+    @DisplayName("GET /moderation/expansions jako ADMIN -> 200")
     void queue_asAdmin_200() throws Exception {
-        mockMvc.perform(get("/api/v1/moderation/games")
+        mockMvc.perform(get("/api/v1/moderation/expansions")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("PENDING"))))
-                .andExpect(jsonPath("$.content[*].title", hasItem("Pandemic")));
+                .andExpect(jsonPath("$.content[*].name", hasItem("Carcassonne: Karczmy")));
     }
 
     @Test
-    @DisplayName("GET /moderation/games jako USER -> 403")
+    @DisplayName("GET /moderation/expansions jako USER -> 403")
     void queue_asUser_403() throws Exception {
-        mockMvc.perform(get("/api/v1/moderation/games")
+        mockMvc.perform(get("/api/v1/moderation/expansions")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("GET /moderation/games bez tokena -> 401")
+    @DisplayName("GET /moderation/expansions bez tokena -> 401")
     void queue_unauthenticated_401() throws Exception {
-        mockMvc.perform(get("/api/v1/moderation/games"))
+        mockMvc.perform(get("/api/v1/moderation/expansions"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("GET /moderation/games z paginacją -> pełna strona rozmiaru 1 (Pandemic gwarantuje >=1 PENDING)")
+    @DisplayName("GET /moderation/expansions z paginacją -> pełna strona rozmiaru 1")
     void queue_pagination_200() throws Exception {
-        mockMvc.perform(get("/api/v1/moderation/games")
+        mockMvc.perform(get("/api/v1/moderation/expansions")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
                         .param("page", "0").param("size", "1"))
                 .andExpect(status().isOk())
@@ -160,13 +126,13 @@ class GameModerationControllerTest {
                 .andExpect(jsonPath("$.totalElements", greaterThanOrEqualTo(1)));
     }
 
-    // ---------- POST /moderation/games/{id}/approve ----------
+    // ---------- POST /moderation/expansions/{id}/approve ----------
 
     @Test
     @Transactional
     @DisplayName("approve PENDING -> 200 APPROVED + reviewedBy/reviewedAt ustawione")
     void approve_pending_200() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/2/approve")     // Pandemic (PENDING, Jane)
+        mockMvc.perform(post("/api/v1/moderation/expansions/2/approve")     // Carcassonne: Karczmy (PENDING)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(2))
@@ -177,44 +143,55 @@ class GameModerationControllerTest {
 
     @Test
     @Transactional
-    @DisplayName("approve zatwierdza WSZYSTKICH wydawców i autorów PENDING gry, APPROVED zostają bez zmian")
-    void approve_cascadesPendingPublishersAndAuthors() throws Exception {
-        long id = createPendingGameWithPendingTaxonomy();
-
-        mockMvc.perform(post("/api/v1/moderation/games/" + id + "/approve")
+    @DisplayName("approve zwraca wartości dziedziczone z gry bazowej (dodatek bez nadpisań)")
+    void approve_exposesInheritedValues() throws Exception {
+        mockMvc.perform(post("/api/v1/moderation/expansions/2/approve")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.moderationStatus").value("APPROVED"))
-                // wcześniej PENDING -> teraz APPROVED
-                .andExpect(jsonPath("$.publishers[?(@.name=='Nowy Wydawca Mod')].status", contains("APPROVED")))
-                .andExpect(jsonPath("$.authors[?(@.lastName=='AutorMod')].status", contains("APPROVED")))
-                // były APPROVED -> nadal APPROVED
-                .andExpect(jsonPath("$.publishers[?(@.name=='Rio Grande Games')].status", contains("APPROVED")))
-                .andExpect(jsonPath("$.authors[?(@.lastName=='Knizia')].status", contains("APPROVED")));
+                .andExpect(jsonPath("$.baseGameTitle").value("Carcassonne"))
+                .andExpect(jsonPath("$.minPlayers").doesNotExist())
+                .andExpect(jsonPath("$.effectiveMinPlayers").value(2))
+                .andExpect(jsonPath("$.effectiveCategories[*].name", contains("Family")));
     }
 
     @Test
-    @DisplayName("approve gry spoza PENDING (APPROVED) -> 409 GAME_NOT_PENDING")
+    @DisplayName("approve dodatku spoza PENDING (APPROVED) -> 409 EXPANSION_NOT_PENDING")
     void approve_notPending_409() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/1/approve")     // Agricola (APPROVED)
+        mockMvc.perform(post("/api/v1/moderation/expansions/1/approve")     // Carcassonne: Rzeka (APPROVED)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_PENDING"));
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_PENDING"));
     }
 
     @Test
-    @DisplayName("approve nieistniejącej gry -> 404 GAME_NOT_FOUND")
+    @DisplayName("approve nieistniejącego dodatku -> 404 EXPANSION_NOT_FOUND")
     void approve_notFound_404() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/99999/approve")
+        mockMvc.perform(post("/api/v1/moderation/expansions/99999/approve")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_FOUND"));
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_FOUND"));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("approve gdy gra bazowa nie jest APPROVED -> 409 BASE_GAME_NOT_APPROVED (obrona w głąb)")
+    void approve_baseGameNoLongerApproved_409() throws Exception {
+        // Stan budowany na encji z pominięciem serwisu, bo API nie potrafi go dziś wytworzyć: APPROVED
+        // opuszcza się wyłącznie przez hard-delete, a ten jest zablokowany przy istniejących dodatkach
+        // (GAME_HAS_EXPANSIONS). Test pilnuje więc obrony w głąb, nie realnego scenariusza użytkownika.
+        expansionRepository.findById(2L).orElseThrow()
+                .getBaseGame().reject("Wycofana z biblioteki", SeededUsers.MARK_ID);
+
+        mockMvc.perform(post("/api/v1/moderation/expansions/2/approve")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("BASE_GAME_NOT_APPROVED"));
     }
 
     @Test
     @DisplayName("approve jako USER -> 403")
     void approve_asUser_403() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/2/approve")
+        mockMvc.perform(post("/api/v1/moderation/expansions/2/approve")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }
@@ -222,30 +199,30 @@ class GameModerationControllerTest {
     @Test
     @DisplayName("approve bez tokena -> 401")
     void approve_unauthenticated_401() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/2/approve"))
+        mockMvc.perform(post("/api/v1/moderation/expansions/2/approve"))
                 .andExpect(status().isUnauthorized());
     }
 
-    // ---------- POST /moderation/games/{id}/reject ----------
+    // ---------- POST /moderation/expansions/{id}/reject ----------
 
     @Test
     @Transactional
     @DisplayName("reject z powodem -> 200 REJECTED + rejectionReason + reviewedBy")
     void reject_withReason_200() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/2/reject")      // Pandemic (PENDING)
+        mockMvc.perform(post("/api/v1/moderation/expansions/2/reject")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"Brak zdjęć komponentów\"}"))
+                        .content("{\"reason\":\"Opis nie odróżnia dodatku od bazy\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.moderationStatus").value("REJECTED"))
-                .andExpect(jsonPath("$.rejectionReason").value("Brak zdjęć komponentów"))
+                .andExpect(jsonPath("$.rejectionReason").value("Opis nie odróżnia dodatku od bazy"))
                 .andExpect(jsonPath("$.reviewedBy").value(SeededUsers.MARK_ID.toString()));
     }
 
     @Test
     @DisplayName("reject z pustym powodem -> 400 REJECTION_REASON_REQUIRED")
     void reject_blankReason_400() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/2/reject")
+        mockMvc.perform(post("/api/v1/moderation/expansions/2/reject")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"  \"}"))
@@ -256,7 +233,7 @@ class GameModerationControllerTest {
     @Test
     @DisplayName("reject bez ciała żądania -> 400 VALIDATION_ERROR (nie 500)")
     void reject_missingBody_400() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/2/reject")
+        mockMvc.perform(post("/api/v1/moderation/expansions/2/reject")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
@@ -264,33 +241,33 @@ class GameModerationControllerTest {
     }
 
     @Test
-    @DisplayName("reject gry spoza PENDING (REJECTED) -> 409 GAME_NOT_PENDING")
+    @DisplayName("reject dodatku spoza PENDING (REJECTED) -> 409 EXPANSION_NOT_PENDING")
     void reject_notPending_409() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/3/reject")      // Odrzucona Gra (REJECTED)
+        mockMvc.perform(post("/api/v1/moderation/expansions/4/reject")      // Odrzucony Dodatek Jane
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"cokolwiek\"}"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_PENDING"));
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_PENDING"));
     }
 
     @Test
     @DisplayName("reject jako USER -> 403")
     void reject_asUser_403() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/2/reject")
+        mockMvc.perform(post("/api/v1/moderation/expansions/2/reject")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"x\"}"))
                 .andExpect(status().isForbidden());
     }
 
-    // ---------- POST /moderation/games/{id}/unlock ----------
+    // ---------- POST /moderation/expansions/{id}/unlock ----------
 
     @Test
     @Transactional
-    @DisplayName("unlock gry REJECTED na limicie -> 200 DRAFT + resubmissionCount=0 + powód wyczyszczony")
+    @DisplayName("unlock dodatku REJECTED na limicie -> 200 DRAFT + resubmissionCount=0 + powód wyczyszczony")
     void unlock_rejectedAtLimit_200() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/6/unlock")      // Limit Jane (REJECTED, count=2=limit)
+        mockMvc.perform(post("/api/v1/moderation/expansions/5/unlock")      // Limit Dodatku Jane (count=2=limit)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.moderationStatus").value("DRAFT"))
@@ -300,38 +277,49 @@ class GameModerationControllerTest {
     }
 
     @Test
-    @DisplayName("unlock gry spoza REJECTED (PENDING) -> 409 GAME_NOT_REJECTED")
+    @DisplayName("unlock dodatku spoza REJECTED (PENDING) -> 409 EXPANSION_NOT_REJECTED")
     void unlock_notRejected_409() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/2/unlock")      // Pandemic (PENDING)
+        mockMvc.perform(post("/api/v1/moderation/expansions/2/unlock")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_REJECTED"));
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_REJECTED"));
+    }
+
+    @Test
+    @DisplayName("unlock nieistniejącego dodatku -> 404 EXPANSION_NOT_FOUND")
+    void unlock_notFound_404() throws Exception {
+        mockMvc.perform(post("/api/v1/moderation/expansions/99999/unlock")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_FOUND"));
     }
 
     @Test
     @DisplayName("unlock jako USER -> 403")
     void unlock_asUser_403() throws Exception {
-        mockMvc.perform(post("/api/v1/moderation/games/6/unlock")
+        mockMvc.perform(post("/api/v1/moderation/expansions/5/unlock")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }
 
-    // ---------- PUT /moderation/games/{id} : edycja zatwierdzonych ----------
+    // ---------- PUT /moderation/expansions/{id} : edycja zatwierdzonych ----------
 
     @Test
     @Transactional
     @DisplayName("PUT edycja APPROVED jako MODERATOR -> 200, pola podmienione, status pozostaje APPROVED")
     void edit_approvedAsModerator_200() throws Exception {
-        mockMvc.perform(put("/api/v1/moderation/games/1")      // Agricola (APPROVED)
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")      // Carcassonne: Rzeka (APPROVED)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(editRequest())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.title").value("Agricola (poprawiona)"))
-                .andExpect(jsonPath("$.maxPlayers").value(5))
+                .andExpect(jsonPath("$.name").value("Carcassonne: Rzeka (poprawiona)"))
+                .andExpect(jsonPath("$.maxPlayers").value(8))
+                .andExpect(jsonPath("$.effectivePlayingTimeMinutes").value(70))
+                .andExpect(jsonPath("$.categories[*].name", contains("Strategy")))
                 .andExpect(jsonPath("$.moderationStatus").value("APPROVED"))
-                // GameModerationDto eksponuje pola moderacyjne
+                // GameExpansionModerationDto eksponuje pola moderacyjne
                 .andExpect(jsonPath("$.submittedBy").exists());
     }
 
@@ -339,58 +327,74 @@ class GameModerationControllerTest {
     @Transactional
     @DisplayName("PUT edycja APPROVED jako ADMIN -> 200")
     void edit_approvedAsAdmin_200() throws Exception {
-        mockMvc.perform(put("/api/v1/moderation/games/1")
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(editRequest())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.title").value("Agricola (poprawiona)"));
+                .andExpect(jsonPath("$.name").value("Carcassonne: Rzeka (poprawiona)"));
     }
 
     @Test
     @Transactional
-    @DisplayName("PUT edycja APPROVED z nowym wydawcą -> nowy wydawca od razu APPROVED (biblioteczna gra bez PENDING słownika)")
-    void edit_approvedAddsNewPublisher_becomesApproved() throws Exception {
+    @DisplayName("PUT edycja czyszcząca własne kategorie -> dodatek wraca do dziedziczenia z gry bazowej")
+    void edit_clearingOwnCategories_fallsBackToInheritance() throws Exception {
         Map<String, Object> body = editRequest();
-        body.put("newPublisherNames", List.of("Wydawca Dodany Przy Edycji"));
+        body.put("categoryIds", List.of());
 
-        mockMvc.perform(put("/api/v1/moderation/games/1")
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(body)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.publishers[?(@.name=='Wydawca Dodany Przy Edycji')].status", contains("APPROVED")));
+                .andExpect(jsonPath("$.categories", hasSize(0)))
+                .andExpect(jsonPath("$.effectiveCategories[*].name", contains("Family")));
     }
 
     @Test
-    @DisplayName("PUT edycja gry nie-APPROVED (PENDING) -> 409 GAME_NOT_APPROVED")
+    @Transactional
+    @DisplayName("PUT edycja bez baseGameId -> 200 (PUT nie używa tego pola)")
+    void edit_missingBaseGameId_200() throws Exception {
+        Map<String, Object> body = editRequest();
+        body.remove("baseGameId");
+
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.baseGameId").value(7));
+    }
+
+    @Test
+    @DisplayName("PUT edycja dodatku nie-APPROVED (PENDING) -> 409 EXPANSION_NOT_APPROVED")
     void edit_notApproved_409() throws Exception {
-        mockMvc.perform(put("/api/v1/moderation/games/2")      // Pandemic (PENDING)
+        mockMvc.perform(put("/api/v1/moderation/expansions/2")      // Carcassonne: Karczmy (PENDING)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(editRequest())))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_APPROVED"));
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_APPROVED"));
     }
 
     @Test
-    @DisplayName("PUT edycja nieistniejącej gry -> 404 GAME_NOT_FOUND")
+    @DisplayName("PUT edycja nieistniejącego dodatku -> 404 EXPANSION_NOT_FOUND")
     void edit_notFound_404() throws Exception {
-        mockMvc.perform(put("/api/v1/moderation/games/99999")
+        mockMvc.perform(put("/api/v1/moderation/expansions/99999")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(editRequest())))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_FOUND"));
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("PUT edycja minPlayers > maxPlayers -> 400 INVALID_PLAYER_COUNT (re-walidacja)")
+    @DisplayName("PUT edycja z niespójnymi graczami -> 400 INVALID_PLAYER_COUNT (re-walidacja)")
     void edit_minGreaterThanMax_400() throws Exception {
         Map<String, Object> body = editRequest();
         body.put("minPlayers", 9);
 
-        mockMvc.perform(put("/api/v1/moderation/games/1")
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(body)))
@@ -401,7 +405,7 @@ class GameModerationControllerTest {
     @Test
     @DisplayName("PUT edycja jako USER -> 403")
     void edit_asUser_403() throws Exception {
-        mockMvc.perform(put("/api/v1/moderation/games/1")
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(editRequest())))
@@ -411,81 +415,70 @@ class GameModerationControllerTest {
     @Test
     @DisplayName("PUT edycja bez tokena -> 401")
     void edit_unauthenticated_401() throws Exception {
-        mockMvc.perform(put("/api/v1/moderation/games/1")
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(editRequest())))
                 .andExpect(status().isUnauthorized());
     }
 
-    // ---------- DELETE /moderation/games/{id} : twardy delete ----------
+    // ---------- DELETE /moderation/expansions/{id} : twardy delete ----------
 
     @Test
     @Transactional
-    @DisplayName("DELETE gry APPROVED jako MODERATOR -> 204, gra znika (kaskada join-rows pokryta w GameRepositoryTest)")
+    @DisplayName("DELETE dodatku APPROVED jako MODERATOR -> 204, dodatek znika, gra bazowa zostaje")
     void delete_approved_204() throws Exception {
-        mockMvc.perform(delete("/api/v1/moderation/games/1")   // Agricola (APPROVED)
+        mockMvc.perform(delete("/api/v1/moderation/expansions/1")   // Carcassonne: Rzeka (APPROVED)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isNoContent());
 
-        assertThat(gameRepository.findById(1L)).isEmpty();
-    }
-
-    @Test
-    @Transactional
-    @DisplayName("DELETE gry PENDING jako MODERATOR -> 204 (wariant C: dowolny status oprócz DRAFT)")
-    void delete_pending_204() throws Exception {
-        mockMvc.perform(delete("/api/v1/moderation/games/2")   // Pandemic (PENDING)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
-                .andExpect(status().isNoContent());
-
-        assertThat(gameRepository.findById(2L)).isEmpty();
-    }
-
-    @Test
-    @Transactional
-    @DisplayName("DELETE gry REJECTED (cudzej) jako ADMIN -> 204")
-    void delete_rejectedAsAdmin_204() throws Exception {
-        mockMvc.perform(delete("/api/v1/moderation/games/3")   // Odrzucona Gra (REJECTED, John)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
-                .andExpect(status().isNoContent());
-
-        assertThat(gameRepository.findById(3L)).isEmpty();
-    }
-
-    @Test
-    @DisplayName("DELETE gry DRAFT -> 404 GAME_NOT_FOUND (prywatny szkic niewidoczny dla moderatora)")
-    void delete_draft_404() throws Exception {
-        mockMvc.perform(delete("/api/v1/moderation/games/4")   // Szkic Jane (DRAFT)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_FOUND"));
-    }
-
-    @Test
-    @DisplayName("DELETE gry, do której istnieją dodatki -> 409 GAME_HAS_EXPANSIONS, gra nietknięta")
-    void delete_gameWithExpansions_409() throws Exception {
-        // Carcassonne (gra 7) jest bazą dodatków 1..6 (GH-120) — kaskada skasowałaby po cichu cudze zgłoszenia
-        mockMvc.perform(delete("/api/v1/moderation/games/7")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("GAME_HAS_EXPANSIONS"));
-
+        assertThat(expansionRepository.findById(1L)).isEmpty();
         assertThat(gameRepository.findById(7L)).isPresent();
     }
 
     @Test
-    @DisplayName("DELETE nieistniejącej gry -> 404 GAME_NOT_FOUND")
-    void delete_notFound_404() throws Exception {
-        mockMvc.perform(delete("/api/v1/moderation/games/99999")
+    @Transactional
+    @DisplayName("DELETE dodatku PENDING -> 204 (wariant C: dowolny status oprócz DRAFT)")
+    void delete_pending_204() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/expansions/2")   // Carcassonne: Karczmy (PENDING)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isNoContent());
+
+        assertThat(expansionRepository.findById(2L)).isEmpty();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("DELETE dodatku REJECTED jako ADMIN -> 204")
+    void delete_rejectedAsAdmin_204() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/expansions/4")   // Odrzucony Dodatek Jane (REJECTED)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        assertThat(expansionRepository.findById(4L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("DELETE dodatku DRAFT -> 404 EXPANSION_NOT_FOUND (prywatny szkic niewidoczny dla moderatora)")
+    void delete_draft_404() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/expansions/3")   // Szkic Dodatku Jane (DRAFT)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_FOUND"));
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("DELETE nieistniejącego dodatku -> 404 EXPANSION_NOT_FOUND")
+    void delete_notFound_404() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/expansions/99999")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_FOUND"));
     }
 
     @Test
     @DisplayName("DELETE jako USER -> 403")
     void delete_asUser_403() throws Exception {
-        mockMvc.perform(delete("/api/v1/moderation/games/1")
+        mockMvc.perform(delete("/api/v1/moderation/expansions/1")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
                 .andExpect(status().isForbidden());
     }
@@ -493,7 +486,7 @@ class GameModerationControllerTest {
     @Test
     @DisplayName("DELETE bez tokena -> 401")
     void delete_unauthenticated_401() throws Exception {
-        mockMvc.perform(delete("/api/v1/moderation/games/1"))
+        mockMvc.perform(delete("/api/v1/moderation/expansions/1"))
                 .andExpect(status().isUnauthorized());
     }
 }
