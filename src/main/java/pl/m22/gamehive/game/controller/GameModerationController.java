@@ -149,11 +149,15 @@ public class GameModerationController {
 
     @Operation(summary = "Usuń grę (twardy delete)",
             description = "Twarde usunięcie gry w dowolnym statusie oprócz DRAFT (prywatny szkic jest "
-                    + "niewidoczny → 404). Kaskadowo znikają powiązania słownikowe; wpis audytu DELETE "
+                    + "niewidoczny → 404). Gry, do której istnieją dodatki, nie można usunąć — najpierw "
+                    + "trzeba usunąć dodatki. Kaskadowo znikają powiązania słownikowe; wpis audytu DELETE "
                     + "przeżywa usunięcie. Operacja nieodwracalna.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Gra usunięta"),
             @ApiResponse(responseCode = "404", description = "Gra nie istnieje lub jest szkicem (GAME_NOT_FOUND)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409",
+                    description = "Gra ma dodatki i nie może zostać usunięta (GAME_HAS_EXPANSIONS)",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @DeleteMapping("/{id}")

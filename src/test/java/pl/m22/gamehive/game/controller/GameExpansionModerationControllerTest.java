@@ -174,9 +174,11 @@ class GameExpansionModerationControllerTest {
 
     @Test
     @Transactional
-    @DisplayName("approve gdy gra bazowa przestała być APPROVED -> 409 BASE_GAME_NOT_APPROVED (re-check)")
+    @DisplayName("approve gdy gra bazowa nie jest APPROVED -> 409 BASE_GAME_NOT_APPROVED (obrona w głąb)")
     void approve_baseGameNoLongerApproved_409() throws Exception {
-        // cofnięcie gry bazowej poza bibliotekę na poziomie encji — dodatek nie może dziedziczyć spoza APPROVED
+        // Stan budowany na encji z pominięciem serwisu, bo API nie potrafi go dziś wytworzyć: APPROVED
+        // opuszcza się wyłącznie przez hard-delete, a ten jest zablokowany przy istniejących dodatkach
+        // (GAME_HAS_EXPANSIONS). Test pilnuje więc obrony w głąb, nie realnego scenariusza użytkownika.
         expansionRepository.findById(2L).orElseThrow()
                 .getBaseGame().reject("Wycofana z biblioteki", SeededUsers.MARK_ID);
 
@@ -347,6 +349,21 @@ class GameExpansionModerationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.categories", hasSize(0)))
                 .andExpect(jsonPath("$.effectiveCategories[*].name", contains("Family")));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("PUT edycja bez baseGameId -> 200 (PUT nie używa tego pola)")
+    void edit_missingBaseGameId_200() throws Exception {
+        Map<String, Object> body = editRequest();
+        body.remove("baseGameId");
+
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.baseGameId").value(7));
     }
 
     @Test

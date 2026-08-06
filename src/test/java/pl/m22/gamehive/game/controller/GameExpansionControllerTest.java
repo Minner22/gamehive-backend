@@ -228,16 +228,17 @@ class GameExpansionControllerTest {
     }
 
     @Test
-    @DisplayName("POST /expansions bez baseGameId -> 400 (Bean Validation)")
+    @DisplayName("POST /expansions bez baseGameId -> 400 (BASE_GAME_REQUIRED)")
     void createExpansion_missingBaseGameId_400() throws Exception {
         Map<String, Object> body = validRequest(false);
-        body.put("baseGameId", null);
+        body.remove("baseGameId");
 
         mockMvc.perform(post("/api/v1/expansions")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(body)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BASE_GAME_REQUIRED"));
     }
 
     @Test
@@ -507,6 +508,23 @@ class GameExpansionControllerTest {
         GameExpansion untouched = expansionRepository.findById(3L).orElseThrow();
         assertThat(untouched.getName()).isEqualTo("Szkic Dodatku Jane");
         assertThat(untouched.getMinPlayers()).isNull();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("PUT /expansions/{id} bez baseGameId -> 200 (PUT nie używa tego pola)")
+    void updateExpansion_missingBaseGameId_200() throws Exception {
+        Map<String, Object> body = validRequest(false);
+        body.remove("baseGameId");
+        body.put("name", "Szkic Dodatku Jane v3");
+
+        mockMvc.perform(put("/api/v1/expansions/3")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Szkic Dodatku Jane v3"))
+                .andExpect(jsonPath("$.baseGameId").value(7));
     }
 
     @Test

@@ -9,6 +9,7 @@ import pl.m22.gamehive.common.persistence.ModeratedLongEntity;
 import pl.m22.gamehive.common.persistence.ModerationStatus;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -58,7 +59,7 @@ public class GameExpansion extends ModeratedLongEntity {
                           Integer playingTimeMinutes, Integer minAge) {
 
         super(submittedBy, moderationStatus != null ? moderationStatus : ModerationStatus.PENDING);
-        this.baseGame = baseGame;
+        this.baseGame = Objects.requireNonNull(baseGame, "baseGame must not be null");
         this.name = name;
         this.description = description;
         this.minPlayers = minPlayers;

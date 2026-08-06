@@ -1,7 +1,10 @@
 package pl.m22.gamehive.game.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
@@ -9,10 +12,11 @@ import java.util.List;
         + "Pola liczbowe i kolekcje są opcjonalnymi nadpisaniami gry bazowej — puste oznacza dziedziczenie.")
 public record GameExpansionRequestDto(
 
-        @Schema(description = "Id gry bazowej (musi być APPROVED). Używane tylko przy POST; "
-                + "PUT ignoruje to pole — dodatku nie da się przenieść na inną grę.",
-                example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotNull Long baseGameId,
+        @Schema(description = "Id gry bazowej (musi być APPROVED). Wymagane przy POST; "
+                + "PUT ignoruje to pole — dodatku nie da się przenieść na inną grę — więc przy edycji "
+                + "można je pominąć.",
+                example = "1")
+        Long baseGameId,
 
         @Schema(description = "Nazwa dodatku.", example = "Terraforming Mars: Preludium",
                 requiredMode = Schema.RequiredMode.REQUIRED)

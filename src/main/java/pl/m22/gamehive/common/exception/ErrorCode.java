@@ -12,6 +12,7 @@ public enum ErrorCode {
     AUTHOR_IN_USE(HttpStatus.CONFLICT, "Author is in use"),
     AUTHOR_NAME_EXISTS(HttpStatus.CONFLICT, "Author already exists"),
     BASE_GAME_NOT_APPROVED(HttpStatus.CONFLICT, "Base game is not approved"),
+    BASE_GAME_REQUIRED(HttpStatus.BAD_REQUEST, "Base game is required"),
     CANNOT_MODIFY_OWN_ACCOUNT(HttpStatus.FORBIDDEN, "Cannot modify your own account"),
     CANNOT_REMOVE_LAST_ADMIN(HttpStatus.CONFLICT, "Cannot remove last administrator"),
     CATEGORY_IN_USE(HttpStatus.CONFLICT, "Category is in use"),

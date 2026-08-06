@@ -16,7 +16,8 @@ import pl.m22.gamehive.game.repository.PublisherRepository;
 import java.util.ArrayList;
 import java.util.List;
 
-import static pl.m22.gamehive.game.service.TaxonomyResolver.*;
+import static pl.m22.gamehive.common.persistence.RepositoryLookups.findAllOrThrow;
+import static pl.m22.gamehive.common.persistence.RepositoryLookups.nullSafe;
 
 @Component
 @RequiredArgsConstructor
@@ -77,5 +78,10 @@ public class GameContentWriter {
         }
 
         return authors;
+    }
+
+    private static boolean isEmpty(List<?> list) {
+
+        return list == null || list.isEmpty();
     }
 }

@@ -17,8 +17,7 @@ import pl.m22.gamehive.support.SeededUsers;
 
 import java.util.Set;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.*;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -196,6 +195,16 @@ class GameExpansionRepositoryTest {
                 .description("Próba utworzenia od razu jako APPROVED.")
                 .submittedBy(SeededUsers.JANE_ID)
                 .moderationStatus(ModerationStatus.APPROVED)
+                .build());
+    }
+
+    @Test
+    @DisplayName("builder bez gry bazowej -> NullPointerException (guard błędu programisty, jak submittedBy)")
+    void builder_missingBaseGame_rejected() {
+        assertThatNullPointerException().isThrownBy(() -> GameExpansion.builder()
+                .name("Dodatek bez bazy")
+                .description("Próba utworzenia bez gry bazowej.")
+                .submittedBy(SeededUsers.JANE_ID)
                 .build());
     }
 

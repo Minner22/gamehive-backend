@@ -46,6 +46,10 @@ public class GameExpansionSubmissionServiceImpl implements GameExpansionSubmissi
     @Override
     public GameExpansionDto createExpansion(GameExpansionRequestDto request, Email submitterEmail) {
 
+        if (request.baseGameId() == null) {
+            throw new DomainException(ErrorCode.BASE_GAME_REQUIRED);
+        }
+
         Game baseGame = gameRepository.findById(request.baseGameId())
                 .orElseThrow(() -> new ApplicationException(ErrorCode.GAME_NOT_FOUND));
 
@@ -152,7 +156,7 @@ public class GameExpansionSubmissionServiceImpl implements GameExpansionSubmissi
         return expansion;
     }
 
-    private void publishAudit(ContentModerationAction action, Long targetId, Email actor, String details) {
+private void publishAudit(ContentModerationAction action, Long targetId, Email actor, String details) {
 
         auditPublisher.publish(action, ContentModerationTargetType.EXPANSION, targetId, actor, details);
     }
