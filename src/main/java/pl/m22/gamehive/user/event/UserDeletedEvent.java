@@ -1,4 +1,6 @@
 package pl.m22.gamehive.user.event;
 
-public record UserDeletedEvent(String email) {
+import java.util.UUID;
+
+public record UserDeletedEvent(String email, UUID userId) {
 }

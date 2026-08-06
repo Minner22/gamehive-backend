@@ -161,7 +161,7 @@ public class UserServiceImpl implements UserService {
         UUID targetId = user.getId();
 
         userRepository.delete(user);
-        eventPublisher.publishEvent(new UserDeletedEvent(email));
+        eventPublisher.publishEvent(new UserDeletedEvent(email, targetId));
         publishAudit(AuditAction.DELETE, targetId, email, requesterEmail, null);
     }
 
@@ -182,7 +182,7 @@ public class UserServiceImpl implements UserService {
 
         userRepository.delete(user);
 
-        eventPublisher.publishEvent(new UserDeletedEvent(email));
+        eventPublisher.publishEvent(new UserDeletedEvent(email, targetId));
         publishAudit(AuditAction.DELETE, targetId, email, requesterEmail, null);
     }
 
