@@ -128,4 +128,23 @@ VALUES
 INSERT INTO expansion_category (expansion_id, category_id) VALUES (1, 5);
 
 
+-- kolekcje (GH-121 / G8) — MVP zna wyłącznie ownership_status = OWNED.
+-- Cele dobrane tak, by kaskada z hard-delete była pokryta również przez ISTNIEJĄCE testy kasujące
+-- grę 1 (GameRepositoryTest, GameModerationControllerTest) i dodatek 1 (GameExpansionModerationControllerTest):
+--   Jane ma w kolekcji grę 1 (Agricola) i dodatek 1 (Carcassonne: Rzeka),
+--   John ma grę 7 (Carcassonne) — przypadek „cudzy wpis" dla testów izolacji.
+-- UWAGA: Jane NIE ma gry 7, mimo że ma dodatek 1 oparty właśnie o nią — to fixture pod kryterium
+--        „dodatek dodaje się do kolekcji niezależnie od gry bazowej".
+-- UWAGA: Mark (moderator) musi mieć PUSTĄ kolekcję — jest użytkownikiem „bez wpisów" w testach.
+-- created_at ustawiane jawnie (inaczej byłoby NULL jak w pozostałych fixture'ach) — DTO wystawia addedAt.
+INSERT INTO game_collection_items (created_at, user_id, game_id, ownership_status)
+VALUES
+    (CURRENT_TIMESTAMP, '0192a1b2-0000-7000-8000-000000000002', 1, 'OWNED'),   -- Jane: Agricola
+    (CURRENT_TIMESTAMP, '0192a1b2-0000-7000-8000-000000000001', 7, 'OWNED');   -- John: Carcassonne
+
+INSERT INTO expansion_collection_items (created_at, user_id, expansion_id, ownership_status)
+VALUES
+    (CURRENT_TIMESTAMP, '0192a1b2-0000-7000-8000-000000000002', 1, 'OWNED');   -- Jane: Carcassonne: Rzeka
+
+
 
