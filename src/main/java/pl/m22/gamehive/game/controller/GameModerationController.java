@@ -23,7 +23,7 @@ import pl.m22.gamehive.common.exception.ApiValidationError;
 import pl.m22.gamehive.game.dto.GameModerationDto;
 import pl.m22.gamehive.game.dto.GameRequestDto;
 import pl.m22.gamehive.game.dto.PageGameModerationDto;
-import pl.m22.gamehive.game.dto.RejectGameRequestDto;
+import pl.m22.gamehive.game.dto.RejectContentRequestDto;
 import pl.m22.gamehive.game.service.GameModerationService;
 
 @RestController
@@ -92,7 +92,7 @@ public class GameModerationController {
     public ResponseEntity<GameModerationDto> reject(
             Authentication authentication,
             @PathVariable Long id,
-            @RequestBody RejectGameRequestDto request) {
+            @RequestBody RejectContentRequestDto request) {
 
         Email email = new Email(authentication.getName());
 
