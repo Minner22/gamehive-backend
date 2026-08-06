@@ -18,14 +18,14 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.game.repository.GameExpansionRepository;
+import pl.m22.gamehive.game.repository.GameRepository;
 import pl.m22.gamehive.support.SeededUsers;
 
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -37,6 +37,7 @@ class GameExpansionModerationControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired JwtService jwtService;
     @Autowired GameExpansionRepository expansionRepository;
+    @Autowired GameRepository gameRepository;
     @Autowired RedisTemplate<String, String> redisTemplate;
     @MockitoBean JavaMailSender mailSender;
 
@@ -52,6 +53,26 @@ class GameExpansionModerationControllerTest {
         adminToken     = jwtService.generateToken("john.doe@example.com",       JwtTokenType.ACCESS, Set.of("ROLE_ADMIN", "ROLE_USER"));
         userToken      = jwtService.generateToken("jane.smith@example.com",     JwtTokenType.ACCESS, Set.of("ROLE_USER"));
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
+    }
+
+    // ciało edycji zatwierdzonego dodatku (mutowalna mapa — pojedyncze testy podmieniają wybrane pola)
+    private static Map<String, Object> editRequest() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("baseGameId", 7);
+        body.put("name", "Carcassonne: Rzeka (poprawiona)");
+        body.put("description", "Zaktualizowany opis biblioteczny.");
+        body.put("minPlayers", null);
+        body.put("maxPlayers", 8);
+        body.put("playingTimeMinutes", 70);
+        body.put("minAge", null);
+        body.put("categoryIds", List.of(1));
+        body.put("mechanicIds", List.of());
+        body.put("submit", false);           // ignorowane na PUT
+        return body;
+    }
+
+    private String json(Map<String, Object> body) throws Exception {
+        return objectMapper.writeValueAsString(body);
     }
 
     // ---------- GET /moderation/expansions : kolejka + autoryzacja ----------
@@ -277,5 +298,178 @@ class GameExpansionModerationControllerTest {
         mockMvc.perform(post("/api/v1/moderation/expansions/5/unlock")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
                 .andExpect(status().isForbidden());
+    }
+
+    // ---------- PUT /moderation/expansions/{id} : edycja zatwierdzonych ----------
+
+    @Test
+    @Transactional
+    @DisplayName("PUT edycja APPROVED jako MODERATOR -> 200, pola podmienione, status pozostaje APPROVED")
+    void edit_approvedAsModerator_200() throws Exception {
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")      // Carcassonne: Rzeka (APPROVED)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(editRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.name").value("Carcassonne: Rzeka (poprawiona)"))
+                .andExpect(jsonPath("$.maxPlayers").value(8))
+                .andExpect(jsonPath("$.effectivePlayingTimeMinutes").value(70))
+                .andExpect(jsonPath("$.categories[*].name", contains("Strategy")))
+                .andExpect(jsonPath("$.moderationStatus").value("APPROVED"))
+                // GameExpansionModerationDto eksponuje pola moderacyjne
+                .andExpect(jsonPath("$.submittedBy").exists());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("PUT edycja APPROVED jako ADMIN -> 200")
+    void edit_approvedAsAdmin_200() throws Exception {
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(editRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Carcassonne: Rzeka (poprawiona)"));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("PUT edycja czyszcząca własne kategorie -> dodatek wraca do dziedziczenia z gry bazowej")
+    void edit_clearingOwnCategories_fallsBackToInheritance() throws Exception {
+        Map<String, Object> body = editRequest();
+        body.put("categoryIds", List.of());
+
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories", hasSize(0)))
+                .andExpect(jsonPath("$.effectiveCategories[*].name", contains("Family")));
+    }
+
+    @Test
+    @DisplayName("PUT edycja dodatku nie-APPROVED (PENDING) -> 409 EXPANSION_NOT_APPROVED")
+    void edit_notApproved_409() throws Exception {
+        mockMvc.perform(put("/api/v1/moderation/expansions/2")      // Carcassonne: Karczmy (PENDING)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(editRequest())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_APPROVED"));
+    }
+
+    @Test
+    @DisplayName("PUT edycja nieistniejącego dodatku -> 404 EXPANSION_NOT_FOUND")
+    void edit_notFound_404() throws Exception {
+        mockMvc.perform(put("/api/v1/moderation/expansions/99999")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(editRequest())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("PUT edycja z niespójnymi graczami -> 400 INVALID_PLAYER_COUNT (re-walidacja)")
+    void edit_minGreaterThanMax_400() throws Exception {
+        Map<String, Object> body = editRequest();
+        body.put("minPlayers", 9);
+
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PLAYER_COUNT"));
+    }
+
+    @Test
+    @DisplayName("PUT edycja jako USER -> 403")
+    void edit_asUser_403() throws Exception {
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(editRequest())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PUT edycja bez tokena -> 401")
+    void edit_unauthenticated_401() throws Exception {
+        mockMvc.perform(put("/api/v1/moderation/expansions/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(editRequest())))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ---------- DELETE /moderation/expansions/{id} : twardy delete ----------
+
+    @Test
+    @Transactional
+    @DisplayName("DELETE dodatku APPROVED jako MODERATOR -> 204, dodatek znika, gra bazowa zostaje")
+    void delete_approved_204() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/expansions/1")   // Carcassonne: Rzeka (APPROVED)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isNoContent());
+
+        assertThat(expansionRepository.findById(1L)).isEmpty();
+        assertThat(gameRepository.findById(7L)).isPresent();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("DELETE dodatku PENDING -> 204 (wariant C: dowolny status oprócz DRAFT)")
+    void delete_pending_204() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/expansions/2")   // Carcassonne: Karczmy (PENDING)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isNoContent());
+
+        assertThat(expansionRepository.findById(2L)).isEmpty();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("DELETE dodatku REJECTED jako ADMIN -> 204")
+    void delete_rejectedAsAdmin_204() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/expansions/4")   // Odrzucony Dodatek Jane (REJECTED)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        assertThat(expansionRepository.findById(4L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("DELETE dodatku DRAFT -> 404 EXPANSION_NOT_FOUND (prywatny szkic niewidoczny dla moderatora)")
+    void delete_draft_404() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/expansions/3")   // Szkic Dodatku Jane (DRAFT)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("DELETE nieistniejącego dodatku -> 404 EXPANSION_NOT_FOUND")
+    void delete_notFound_404() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/expansions/99999")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("DELETE jako USER -> 403")
+    void delete_asUser_403() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/expansions/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("DELETE bez tokena -> 401")
+    void delete_unauthenticated_401() throws Exception {
+        mockMvc.perform(delete("/api/v1/moderation/expansions/1"))
+                .andExpect(status().isUnauthorized());
     }
 }

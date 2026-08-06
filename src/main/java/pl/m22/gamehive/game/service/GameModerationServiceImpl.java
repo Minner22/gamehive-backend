@@ -14,6 +14,7 @@ import pl.m22.gamehive.game.dto.GameModerationDto;
 import pl.m22.gamehive.game.dto.GameRequestDto;
 import pl.m22.gamehive.game.mapper.GameMapper;
 import pl.m22.gamehive.game.model.*;
+import pl.m22.gamehive.game.repository.GameExpansionRepository;
 import pl.m22.gamehive.game.repository.GameRepository;
 import pl.m22.gamehive.user.service.UserService;
 
@@ -24,6 +25,7 @@ import java.util.UUID;
 public class GameModerationServiceImpl implements GameModerationService {
 
     private final GameRepository gameRepository;
+    private final GameExpansionRepository gameExpansionRepository;
     private final GameMapper gameMapper;
     private final GameContentWriter contentWriter;
     private final UserService userService;
@@ -131,6 +133,10 @@ public class GameModerationServiceImpl implements GameModerationService {
 
         if (game.getModerationStatus() == ModerationStatus.DRAFT) {
             throw new ApplicationException(ErrorCode.GAME_NOT_FOUND);
+        }
+
+        if (gameExpansionRepository.existsByBaseGameId(gameId)) {
+            throw new DomainException(ErrorCode.GAME_HAS_EXPANSIONS);
         }
 
         String deletedTitle = game.getTitle();

@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,7 +19,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.ApiError;
+import pl.m22.gamehive.common.exception.ApiValidationError;
 import pl.m22.gamehive.game.dto.GameExpansionModerationDto;
+import pl.m22.gamehive.game.dto.GameExpansionRequestDto;
 import pl.m22.gamehive.game.dto.PageGameExpansionModerationDto;
 import pl.m22.gamehive.game.dto.RejectContentRequestDto;
 import pl.m22.gamehive.game.service.GameExpansionModerationService;
@@ -116,5 +119,52 @@ public class GameExpansionModerationController {
         Email email = new Email(authentication.getName());
 
         return ResponseEntity.ok(gameExpansionModerationService.unlock(id, email));
+    }
+
+    @Operation(summary = "Edytuj zatwierdzony dodatek (biblioteka)",
+            description = "Dozwolone tylko dla dodatku w statusie APPROVED. Re-walidacja reguł domenowych "
+                    + "na wartościach efektywnych; własne kategorie i mechaniki są zastępowane w całości. "
+                    + "Pola baseGameId i submit są ignorowane.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Dodatek zaktualizowany"),
+            @ApiResponse(responseCode = "400",
+                    description = "Błąd walidacji (Bean Validation lub INVALID_PLAYER_COUNT dla wartości efektywnych)",
+                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
+            @ApiResponse(responseCode = "404",
+                    description = "Dodatek nie istnieje (EXPANSION_NOT_FOUND) lub wskazany id słownika nie istnieje "
+                            + "(CATEGORY_NOT_FOUND / MECHANIC_NOT_FOUND)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Dodatek nie jest zatwierdzony (EXPANSION_NOT_APPROVED)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @PutMapping("/{id}")
+    public ResponseEntity<GameExpansionModerationDto> updateApprovedExpansion(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody GameExpansionRequestDto request) {
+
+        Email email = new Email(authentication.getName());
+
+        return ResponseEntity.ok(gameExpansionModerationService.updateApprovedExpansion(id, request, email));
+    }
+
+    @Operation(summary = "Usuń dodatek (twardy delete)",
+            description = "Twarde usunięcie dodatku w dowolnym statusie oprócz DRAFT (prywatny szkic jest "
+                    + "niewidoczny → 404). Kaskadowo znikają powiązania słownikowe; wpis audytu DELETE "
+                    + "przeżywa usunięcie. Gra bazowa pozostaje nietknięta. Operacja nieodwracalna.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Dodatek usunięty"),
+            @ApiResponse(responseCode = "404", description = "Dodatek nie istnieje lub jest szkicem (EXPANSION_NOT_FOUND)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteExpansion(
+            Authentication authentication,
+            @PathVariable Long id) {
+
+        Email email = new Email(authentication.getName());
+        gameExpansionModerationService.deleteExpansion(id, email);
+
+        return ResponseEntity.noContent().build();
     }
 }

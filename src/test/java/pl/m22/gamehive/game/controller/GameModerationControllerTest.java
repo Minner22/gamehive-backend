@@ -462,6 +462,18 @@ class GameModerationControllerTest {
     }
 
     @Test
+    @DisplayName("DELETE gry, do której istnieją dodatki -> 409 GAME_HAS_EXPANSIONS, gra nietknięta")
+    void delete_gameWithExpansions_409() throws Exception {
+        // Carcassonne (gra 7) jest bazą dodatków 1..6 (GH-120) — kaskada skasowałaby po cichu cudze zgłoszenia
+        mockMvc.perform(delete("/api/v1/moderation/games/7")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("GAME_HAS_EXPANSIONS"));
+
+        assertThat(gameRepository.findById(7L)).isPresent();
+    }
+
+    @Test
     @DisplayName("DELETE nieistniejącej gry -> 404 GAME_NOT_FOUND")
     void delete_notFound_404() throws Exception {
         mockMvc.perform(delete("/api/v1/moderation/games/99999")

@@ -46,10 +46,12 @@ class GameExpansionControllerTest {
     // Jane: dodatki 1 (APPROVED), 2 (PENDING), 3 (DRAFT), 4 (REJECTED count=1), 5 (REJECTED count=2 = limit testowy);
     // dodatek 6 należy do Johna. Gra bazowa wszystkich: 7 (Carcassonne, APPROVED, 2..2 graczy, 45 min, wiek 8)
     private String janeToken;
+    private String johnToken;   // inny użytkownik — do testu „cudzy dodatek APPROVED widoczny dla każdego"
 
     @BeforeEach
     void setUp() {
         janeToken = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
+        johnToken = jwtService.generateToken("john.doe@example.com", JwtTokenType.ACCESS, Set.of("ROLE_ADMIN", "ROLE_USER"));
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
     }
 
@@ -264,6 +266,140 @@ class GameExpansionControllerTest {
                         .content(json(body)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("MECHANIC_NOT_FOUND"));
+    }
+
+    // ---------- GET /api/v1/expansions : biblioteka (tylko APPROVED) ----------
+
+    @Test
+    @DisplayName("GET /expansions -> 200, tylko dodatki APPROVED (PENDING/REJECTED/DRAFT pominięte)")
+    void library_returnsOnlyApproved_200() throws Exception {
+        mockMvc.perform(get("/api/v1/expansions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[*].name", contains("Carcassonne: Rzeka")))
+                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("APPROVED"))));
+    }
+
+    @Test
+    @DisplayName("GET /expansions -> pozycja biblioteki niesie wartości własne i efektywne")
+    void library_exposesOwnAndEffectiveValues() throws Exception {
+        mockMvc.perform(get("/api/v1/expansions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].maxPlayers").value(6))              // nadpisane
+                .andExpect(jsonPath("$.content[0].effectiveMaxPlayers").value(6))
+                .andExpect(jsonPath("$.content[0].minPlayers").doesNotExist())        // dziedziczone
+                .andExpect(jsonPath("$.content[0].effectiveMinPlayers").value(2))
+                .andExpect(jsonPath("$.content[0].baseGameTitle").value("Carcassonne"));
+    }
+
+    @Test
+    @DisplayName("GET /expansions?baseGameId=7 -> Rzeka; ?baseGameId=1 -> pusto (Agricola bez dodatków)")
+    void library_filterByBaseGame() throws Exception {
+        mockMvc.perform(get("/api/v1/expansions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("baseGameId", "7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].name", contains("Carcassonne: Rzeka")));
+
+        mockMvc.perform(get("/api/v1/expansions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("baseGameId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /expansions?categoryId=5 -> Rzeka (własna kategoria); ?categoryId=2 -> pusto (dziedziczona nie filtruje)")
+    void library_filterByOwnCategory() throws Exception {
+        mockMvc.perform(get("/api/v1/expansions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("categoryId", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].name", contains("Carcassonne: Rzeka")));
+
+        // filtr działa po WŁASNYCH kolekcjach dodatku — dziedziczona Family (2) go nie łapie
+        mockMvc.perform(get("/api/v1/expansions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("categoryId", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /expansions?mechanicId=3 -> pusto (Area Control jest dziedziczona, nie własna)")
+    void library_filterByMechanic_ignoresInherited() throws Exception {
+        mockMvc.perform(get("/api/v1/expansions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("mechanicId", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /expansions bez tokena -> 401")
+    void library_unauthenticated_401() throws Exception {
+        mockMvc.perform(get("/api/v1/expansions"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ---------- GET /api/v1/expansions/{id} ----------
+
+    @Test
+    @DisplayName("GET /expansions/{id} własny DRAFT -> 200 + pełne DTO")
+    void getExpansion_ownDraft_200() throws Exception {
+        mockMvc.perform(get("/api/v1/expansions/3")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(3))
+                .andExpect(jsonPath("$.name").value("Szkic Dodatku Jane"))
+                .andExpect(jsonPath("$.moderationStatus").value("DRAFT"));
+    }
+
+    @Test
+    @DisplayName("GET /expansions/{id} własny APPROVED -> 200 (właściciel widzi własny dodatek w każdym statusie)")
+    void getExpansion_ownApproved_200() throws Exception {
+        mockMvc.perform(get("/api/v1/expansions/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Carcassonne: Rzeka"))
+                .andExpect(jsonPath("$.moderationStatus").value("APPROVED"));
+    }
+
+    @Test
+    @DisplayName("GET /expansions/{id} cudzy dodatek APPROVED -> 200 (biblioteka widoczna dla każdego zalogowanego)")
+    void getExpansion_othersApproved_200() throws Exception {
+        // dodatek 1 należy do Jane; John widzi go, bo jest APPROVED
+        mockMvc.perform(get("/api/v1/expansions/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + johnToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Carcassonne: Rzeka"));
+    }
+
+    @Test
+    @DisplayName("GET /expansions/{id} cudze zgłoszenie -> 404 (EXPANSION_NOT_FOUND, bez ujawniania istnienia)")
+    void getExpansion_notOwner_404() throws Exception {
+        mockMvc.perform(get("/api/v1/expansions/6")     // szkic Johna
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("GET /expansions/{id} nieistniejący -> 404 (EXPANSION_NOT_FOUND)")
+    void getExpansion_notFound_404() throws Exception {
+        mockMvc.perform(get("/api/v1/expansions/99999")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EXPANSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("GET /expansions/{id} bez tokena -> 401")
+    void getExpansion_unauthenticated_401() throws Exception {
+        mockMvc.perform(get("/api/v1/expansions/1"))
+                .andExpect(status().isUnauthorized());
     }
 
     // ---------- GET /api/v1/expansions/my ----------

@@ -11,6 +11,7 @@ import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.persistence.ModerationStatus;
 import pl.m22.gamehive.game.dto.GameExpansionModerationDto;
+import pl.m22.gamehive.game.dto.GameExpansionRequestDto;
 import pl.m22.gamehive.game.mapper.GameExpansionMapper;
 import pl.m22.gamehive.game.model.ContentModerationAction;
 import pl.m22.gamehive.game.model.ContentModerationTargetType;
@@ -89,6 +90,52 @@ public class GameExpansionModerationServiceImpl implements GameExpansionModerati
         publishAudit(ContentModerationAction.UNLOCK, expansionId, moderatorEmail, null);
 
         return expansionMapper.toModerationDto(expansion);
+    }
+
+    @Transactional
+    @Override
+    public GameExpansionModerationDto updateApprovedExpansion(Long expansionId, GameExpansionRequestDto request,
+                                                              Email moderatorEmail) {
+
+        GameExpansion expansion = expansionRepository.findById(expansionId)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EXPANSION_NOT_FOUND));
+
+        if (expansion.getModerationStatus() != ModerationStatus.APPROVED) {
+            throw new DomainException(ErrorCode.EXPANSION_NOT_APPROVED);
+        }
+
+        contentWriter.validateDomainRules(request, expansion.getBaseGame());
+
+        expansion.updateDetails(request.name(),
+                request.description(),
+                request.minPlayers(),
+                request.maxPlayers(),
+                request.playingTimeMinutes(),
+                request.minAge());
+
+        expansion.clearAssociations();
+        contentWriter.applyAssociations(expansion, request);
+
+        publishAudit(ContentModerationAction.EDIT, expansionId, moderatorEmail, null);
+
+        return expansionMapper.toModerationDto(expansion);
+    }
+
+    @Transactional
+    @Override
+    public void deleteExpansion(Long expansionId, Email moderatorEmail) {
+
+        GameExpansion expansion = expansionRepository.findById(expansionId)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.EXPANSION_NOT_FOUND));
+
+        if (expansion.getModerationStatus() == ModerationStatus.DRAFT) {
+            throw new ApplicationException(ErrorCode.EXPANSION_NOT_FOUND);
+        }
+
+        String deletedName = expansion.getName();
+        expansionRepository.delete(expansion);
+
+        publishAudit(ContentModerationAction.DELETE, expansionId, moderatorEmail, deletedName);
     }
 
     private GameExpansion findPendingExpansion(Long expansionId) {

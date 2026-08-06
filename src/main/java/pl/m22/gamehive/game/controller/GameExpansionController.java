@@ -1,6 +1,7 @@
 package pl.m22.gamehive.game.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,8 +22,10 @@ import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.ApiError;
 import pl.m22.gamehive.common.exception.ApiValidationError;
 import pl.m22.gamehive.game.dto.GameExpansionDto;
+import pl.m22.gamehive.game.dto.GameExpansionLibraryFilter;
 import pl.m22.gamehive.game.dto.GameExpansionRequestDto;
 import pl.m22.gamehive.game.dto.PageGameExpansionDto;
+import pl.m22.gamehive.game.service.GameExpansionLibraryService;
 import pl.m22.gamehive.game.service.GameExpansionSubmissionService;
 
 @RestController
@@ -42,6 +45,47 @@ import pl.m22.gamehive.game.service.GameExpansionSubmissionService;
 public class GameExpansionController {
 
     private final GameExpansionSubmissionService gameExpansionSubmissionService;
+    private final GameExpansionLibraryService gameExpansionLibraryService;
+
+    @Operation(summary = "Biblioteka dodatków (stronicowana, tylko APPROVED)",
+            description = "Zwraca zatwierdzone dodatki. Opcjonalne filtry: gra bazowa oraz WŁASNE kategorie "
+                    + "i mechaniki dodatku (odziedziczone nie są brane pod uwagę). "
+                    + "Parametry stronicowania: page, size, sort.")
+    @ApiResponse(responseCode = "200", description = "Strona wyników z biblioteki dodatków",
+            content = @Content(schema = @Schema(implementation = PageGameExpansionDto.class)))
+    @GetMapping
+    public ResponseEntity<Page<GameExpansionDto>> library(
+            @Parameter(description = "Filtr: id gry bazowej")
+            @RequestParam(required = false) Long baseGameId,
+            @Parameter(description = "Filtr: id własnej kategorii dodatku")
+            @RequestParam(required = false) Long categoryId,
+            @Parameter(description = "Filtr: id własnej mechaniki dodatku")
+            @RequestParam(required = false) Long mechanicId,
+            @PageableDefault(sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        GameExpansionLibraryFilter filter = new GameExpansionLibraryFilter(baseGameId, categoryId, mechanicId);
+
+        return ResponseEntity.ok(gameExpansionLibraryService.findLibrary(filter, pageable));
+    }
+
+    @Operation(summary = "Pobierz dodatek",
+            description = "Zwraca dodatek APPROVED z biblioteki (widoczny dla każdego zalogowanego) albo własne "
+                    + "zgłoszenie w dowolnym statusie. Cudze nie-APPROVED i nieistniejące są nierozróżnialne (404).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Znaleziono dodatek"),
+            @ApiResponse(responseCode = "404",
+                    description = "Dodatek nie istnieje albo jest cudzym zgłoszeniem spoza biblioteki (EXPANSION_NOT_FOUND)",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @GetMapping("/{id}")
+    public ResponseEntity<GameExpansionDto> getExpansion(
+            Authentication authentication,
+            @PathVariable Long id) {
+
+        Email email = new Email(authentication.getName());
+
+        return ResponseEntity.ok(gameExpansionLibraryService.findExpansion(id, email));
+    }
 
     @Operation(summary = "Utwórz zgłoszenie dodatku",
             description = "Tworzy zgłoszenie przypisane do zalogowanego użytkownika. Gra bazowa musi być APPROVED. "

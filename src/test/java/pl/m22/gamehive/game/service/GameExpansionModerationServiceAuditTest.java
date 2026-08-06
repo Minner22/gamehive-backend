@@ -13,6 +13,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.persistence.ModerationStatus;
+import pl.m22.gamehive.game.dto.GameExpansionRequestDto;
 import pl.m22.gamehive.game.model.ContentModerationAction;
 import pl.m22.gamehive.game.model.ContentModerationAuditLog;
 import pl.m22.gamehive.game.model.ContentModerationTargetType;
@@ -68,6 +69,12 @@ class GameExpansionModerationServiceAuditTest {
         return auditRepository.findByTargetTypeAndTargetId(ContentModerationTargetType.EXPANSION, id);
     }
 
+    private GameExpansionRequestDto editRequest() {
+        Long baseGameId = gameRepository.findByTitle("Carcassonne").getFirst().getId();
+        return new GameExpansionRequestDto(baseGameId, "Cel audytu dodatku (edycja)", "Zmieniony opis.",
+                null, null, 50, null, List.of(1L), List.of(), false);
+    }
+
     @Test
     @DisplayName("approve po committcie -> dokładnie jeden wpis APPROVE z targetType=EXPANSION")
     void approve_committed_writesSingleAuditEntry() {
@@ -115,6 +122,49 @@ class GameExpansionModerationServiceAuditTest {
 
         assertThat(auditRepository.findByTargetTypeAndTargetId(ContentModerationTargetType.GAME, expansionId))
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("updateApprovedExpansion po committcie -> dokładnie jeden wpis EDIT, actor = moderator")
+    void edit_committed_writesSingleEditEntry() {
+        TransactionTemplate tx = new TransactionTemplate(txManager);
+        // przenieś zasiany dodatek PENDING do APPROVED przez encję (bez zdarzenia audytu)
+        tx.executeWithoutResult(_ ->
+                expansionRepository.findById(expansionId).orElseThrow().approve(SeededUsers.MARK_ID));
+
+        tx.executeWithoutResult(_ ->
+                moderationService.updateApprovedExpansion(expansionId, editRequest(), MODERATOR));
+
+        assertThat(auditFor(expansionId)).extracting(ContentModerationAuditLog::getAction)
+                .containsExactly(ContentModerationAction.EDIT);
+        assertThat(auditFor(expansionId).getFirst().getActor()).isEqualTo("mark.moderator@example.com");
+    }
+
+    @Test
+    @DisplayName("deleteExpansion po committcie -> jeden wpis DELETE, details = nazwa, wpis przeżywa hard-delete")
+    void delete_committed_writesDeleteEntry_survivingHardDelete() {
+        new TransactionTemplate(txManager).executeWithoutResult(_ ->
+                moderationService.deleteExpansion(expansionId, MODERATOR));   // PENDING -> kwalifikuje się (wariant C)
+
+        assertThat(expansionRepository.findById(expansionId)).isEmpty();
+        List<ContentModerationAuditLog> entries = auditFor(expansionId);
+        assertThat(entries).hasSize(1);
+        assertThat(entries.getFirst().getAction()).isEqualTo(ContentModerationAction.DELETE);
+        assertThat(entries.getFirst().getDetails()).isEqualTo("Cel audytu dodatku");   // nazwa z setUp
+    }
+
+    @Test
+    @DisplayName("rollback deleteExpansion -> brak wpisu audytu i dodatek nadal istnieje")
+    void delete_rolledBack_noAuditEntry() {
+        assertThatThrownBy(() ->
+                new TransactionTemplate(txManager).executeWithoutResult(_ -> {
+                    moderationService.deleteExpansion(expansionId, MODERATOR);
+                    throw new IllegalStateException("forced rollback after delete");
+                })
+        ).isInstanceOf(IllegalStateException.class);
+
+        assertThat(auditFor(expansionId)).isEmpty();
+        assertThat(expansionRepository.findById(expansionId)).isPresent();
     }
 
     @Test
