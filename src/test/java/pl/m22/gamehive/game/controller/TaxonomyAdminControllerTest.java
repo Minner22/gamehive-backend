@@ -588,6 +588,16 @@ class TaxonomyAdminControllerTest {
     }
 
     @Test
+    @DisplayName("DELETE /categories/{id} używana wyłącznie przez DODATEK -> 409 (CATEGORY_IN_USE)")
+    void deleteCategory_inUseByExpansionOnly_409() throws Exception {
+        // kategoria 5 (Expansion Only) nie jest powiązana z żadną grą — tylko z dodatkiem 1 (GH-120)
+        mockMvc.perform(delete("/api/v1/admin/taxonomy/categories/5")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("CATEGORY_IN_USE"));
+    }
+
+    @Test
     @DisplayName("DELETE /mechanics/{id} używana przez grę -> 409 (MECHANIC_IN_USE)")
     void deleteMechanic_inUse_409() throws Exception {
         // mechanika 1 (Worker Placement) powiązana z grą 1 w game_mechanic

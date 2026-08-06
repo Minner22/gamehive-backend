@@ -27,8 +27,11 @@ VALUES
     ('0192a1b2-0000-7000-8000-000000000003', 3);  -- Mark: MODERATOR
 
 -- game dictionaries (GH-114 / G1)
+-- kategoria 5 (GH-120) celowo NIE jest powiązana z żadną GRĄ — używa jej wyłącznie dodatek 1,
+-- co daje czysty test guardu CATEGORY_IN_USE po stronie dodatków.
+-- kategoria 3 (Party) musi pozostać niepowiązana z NICZYM (test deleteCategory_asAdmin_204).
 INSERT INTO categories (name) VALUES
-                                  ('Strategy'), ('Family'), ('Party'), ('Cooperative');
+                                  ('Strategy'), ('Family'), ('Party'), ('Cooperative'), ('Expansion Only');
 
 INSERT INTO mechanics (name) VALUES
                                  ('Worker Placement'), ('Deck-building'), ('Area Control'), ('Dice Rolling');
@@ -76,6 +79,53 @@ VALUES
 
 INSERT INTO game_publisher (game_id, publisher_id) VALUES (4, 1), (5, 1), (6, 2);
 INSERT INTO game_category (game_id, category_id) VALUES (4, 2), (5, 2), (6, 1);
+
+
+-- gra 7 (GH-120 / G7) — DRUGA gra APPROVED, baza dla wszystkich dodatków.
+-- Dodatki nie mogą wisieć przy Agricoli (gra 1): GameModerationControllerTest.delete_approved_204 ją kasuje,
+-- a hard-delete gry z dodatkami jest blokowany (GAME_HAS_EXPANSIONS).
+-- Parametry dobrane tak, by NIE wpaść w żaden istniejący filtr biblioteki gier:
+--   publisher 2 (nie 1, nie 3), category 2 (nie 1, nie 4), mechanic 3 (nie 1),
+--   2..2 graczy (nie łapie players=3 ani players=5), rok 2000 (nie 2007, nie 1999).
+-- Właściciel: John — dzięki temu asercja findBySubmittedBy(JANE_ID) zostaje bez zmian.
+INSERT INTO games (title, description, min_players, max_players, playing_time_minutes, year_published, min_age, cover_image_url,
+                   moderation_status, submitted_by, reviewed_by, reviewed_at, rejection_reason, resubmission_count)
+VALUES
+    ('Carcassonne', 'Baza dla dodatków w testach.', 2, 2, 45, 2000, 8, NULL,
+     'APPROVED', '0192a1b2-0000-7000-8000-000000000001', '0192a1b2-0000-7000-8000-000000000003', CURRENT_TIMESTAMP, NULL, 0);
+
+INSERT INTO game_publisher (game_id, publisher_id) VALUES (7, 2);
+INSERT INTO game_category (game_id, category_id) VALUES (7, 2);   -- Family
+INSERT INTO game_mechanic (game_id, mechanic_id) VALUES (7, 3);   -- Area Control
+
+-- dodatki 1..6 (GH-120 / G7) — wszystkie oparte o grę 7.
+-- UWAGA: dodatek 2 jest JEDYNYM PENDING dodatkiem (GameExpansionRepositoryTest robi containsExactly).
+-- UWAGA: limit resubmisji w testach = 2 (application-test.yml), więc dodatek 5 stoi dokładnie na limicie.
+INSERT INTO game_expansions (base_game_id, name, description, min_players, max_players, playing_time_minutes, min_age,
+                             moderation_status, submitted_by, reviewed_by, reviewed_at, rejection_reason, resubmission_count)
+VALUES
+    -- 1: APPROVED, nadpisuje maxPlayers i kategorie; reszta dziedziczona (biblioteka + edycja/delete moderatora)
+    (7, 'Carcassonne: Rzeka', 'Zatwierdzony dodatek z częściowymi nadpisaniami.', NULL, 6, NULL, NULL,
+     'APPROVED', '0192a1b2-0000-7000-8000-000000000002', '0192a1b2-0000-7000-8000-000000000003', CURRENT_TIMESTAMP, NULL, 0),
+    -- 2: PENDING, ZERO nadpisań — czyste dziedziczenie (kolejka moderacji + test dziedziczenia w DTO)
+    (7, 'Carcassonne: Karczmy', 'Dodatek oczekujący na decyzję, bez nadpisań.', NULL, NULL, NULL, NULL,
+     'PENDING', '0192a1b2-0000-7000-8000-000000000002', NULL, NULL, NULL, 0),
+    -- 3: DRAFT Jane (edycja + submit)
+    (7, 'Szkic Dodatku Jane', 'Roboczy szkic dodatku.', NULL, NULL, NULL, NULL,
+     'DRAFT', '0192a1b2-0000-7000-8000-000000000002', NULL, NULL, NULL, 0),
+    -- 4: REJECTED count=1 (resubmit)
+    (7, 'Odrzucony Dodatek Jane', 'Dodatek po pierwszym odrzuceniu.', NULL, NULL, NULL, NULL,
+     'REJECTED', '0192a1b2-0000-7000-8000-000000000002', '0192a1b2-0000-7000-8000-000000000003', CURRENT_TIMESTAMP, 'Za mało szczegółów', 1),
+    -- 5: REJECTED count=2 = limit testowy (RESUBMISSION_LIMIT_EXCEEDED + unlock)
+    (7, 'Limit Dodatku Jane', 'Dodatek z wyczerpanym limitem poprawek.', NULL, NULL, NULL, NULL,
+     'REJECTED', '0192a1b2-0000-7000-8000-000000000002', '0192a1b2-0000-7000-8000-000000000003', CURRENT_TIMESTAMP, 'Wielokrotnie odrzucane', 2),
+    -- 6: DRAFT Johna — „cudze zgłoszenie" z perspektywy Jane (enumeration-safe 404)
+    (7, 'Szkic Dodatku Johna', 'Cudzy szkic dodatku.', NULL, NULL, NULL, NULL,
+     'DRAFT', '0192a1b2-0000-7000-8000-000000000001', NULL, NULL, NULL, 0);
+
+-- tylko dodatek 1 nadpisuje kategorie (5 = Expansion Only); nie ma własnych mechanik,
+-- więc dziedziczy Area Control z gry 7 (test dziedziczenia kolekcji)
+INSERT INTO expansion_category (expansion_id, category_id) VALUES (1, 5);
 
 
 

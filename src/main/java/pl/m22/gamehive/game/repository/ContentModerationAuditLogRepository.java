@@ -3,6 +3,7 @@ package pl.m22.gamehive.game.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import pl.m22.gamehive.game.model.ContentModerationAuditLog;
+import pl.m22.gamehive.game.model.ContentModerationTargetType;
 
 import java.util.List;
 
@@ -10,4 +11,6 @@ import java.util.List;
 public interface ContentModerationAuditLogRepository extends JpaRepository<ContentModerationAuditLog, Long> {
 
     List<ContentModerationAuditLog> findByTargetId(Long targetId);
+
+    List<ContentModerationAuditLog> findByTargetTypeAndTargetId(ContentModerationTargetType targetType, Long targetId);
 }
