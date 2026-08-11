@@ -13,19 +13,18 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
 import pl.m22.gamehive.game.dto.GameDto;
 import pl.m22.gamehive.game.model.ContentModerationTargetType;
 import pl.m22.gamehive.game.search.config.MeiliProperties;
-import pl.m22.gamehive.game.search.dto.GameSearchDocument;
-import pl.m22.gamehive.game.search.dto.GameSearchFilter;
-import pl.m22.gamehive.game.search.dto.SearchHitRef;
-import pl.m22.gamehive.game.search.dto.SearchResultDto;
+import pl.m22.gamehive.game.search.dto.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -44,6 +43,7 @@ class MeiliGameSearchServiceTest {
     @Mock Client client;
     @Mock Index index;
     @Mock SearchResultHydrator hydrator;
+    @Mock ApprovedContentDocumentReader documentReader;
 
     private MeiliGameSearchService service;
 
@@ -53,18 +53,29 @@ class MeiliGameSearchServiceTest {
         properties.setHost("http://localhost:7700");
         properties.setApiKey("test-key");
         properties.setIndexUid(INDEX_UID);
-        properties.setReindexBatchSize(200);
+        properties.setReindexBatchSize(2);   // mały batch, żeby test reindeksu przeszedł przez dwie strony
 
         service = new MeiliGameSearchService(client, new GsonJsonHandler(), new MeiliFilterBuilder(),
-                hydrator, properties);
+                hydrator, documentReader, properties);
         lenient().when(client.index(INDEX_UID)).thenReturn(index);
     }
 
     private static GameSearchDocument gameDocument() {
-        return new GameSearchDocument("game-1", ContentModerationTargetType.GAME, 1L,
+        return gameDocument("game-1", 1L);
+    }
+
+    private static GameSearchDocument gameDocument(String id, long targetId) {
+        return new GameSearchDocument(id, ContentModerationTargetType.GAME, targetId,
                 "Agricola", "Klasyczna gra o rozwoju farmy.", null,
                 List.of(1L, 2L), List.of(1L), List.of(1L), List.of(1L),
                 1, 4, 120, 2007, 12, null);
+    }
+
+    private static GameSearchDocument expansionDocument() {
+        return new GameSearchDocument("expansion-1", ContentModerationTargetType.EXPANSION, 1L,
+                "Carcassonne: Rzeka", "Zatwierdzony dodatek.", "Carcassonne",
+                List.of(), List.of(5L), List.of(3L), List.of(),
+                2, 6, 45, null, 8, 7L);
     }
 
     private static GameSearchFilter emptyFilter() {
@@ -192,6 +203,42 @@ class MeiliGameSearchServiceTest {
                 .isEqualTo(ErrorCode.SEARCH_FAILED);
 
         verify(index, never()).updateSearchableAttributesSettings(any());
+    }
+
+    @Test
+    @DisplayName("reindexAll(): konfiguruje indeks, czyści go, wypycha wszystko partiami i zwraca liczniki")
+    void reindexAll_appliesSettingsClearsAndPushesAllApproved() {
+        // batch = 2: pierwsza strona pełna i z następnikiem, druga domyka zbiór (3 gry, 1 dodatek)
+        when(documentReader.readGames(any())).thenReturn(
+                new PageImpl<>(List.of(gameDocument("game-1", 1L), gameDocument("game-2", 2L)),
+                        PageRequest.of(0, 2), 3),
+                new PageImpl<>(List.of(gameDocument("game-3", 3L)), PageRequest.of(1, 2), 3));
+        when(documentReader.readExpansions(any())).thenReturn(
+                new PageImpl<>(List.of(expansionDocument()), PageRequest.of(0, 2), 1));
+
+        ReindexResultDto result = service.reindexAll();
+
+        assertThat(result).isEqualTo(new ReindexResultDto(3, 1));
+
+        InOrder order = inOrder(client, index);
+        order.verify(client).createIndex(INDEX_UID, "id");
+        order.verify(index).updateSearchableAttributesSettings(MeiliGameSearchService.SEARCHABLE_ATTRIBUTES);
+        order.verify(index).updateFilterableAttributesSettings(MeiliGameSearchService.FILTERABLE_ATTRIBUTES);
+        order.verify(index).deleteAllDocuments();
+        // dwie partie gier + jedna dodatków
+        order.verify(index, times(3)).addDocuments(anyString(), eq("id"));
+    }
+
+    @Test
+    @DisplayName("reindexAll() na pustej bazie -> zerowe liczniki, indeks tylko wyczyszczony")
+    void reindexAll_withNoApprovedContent_returnsZeros() {
+        when(documentReader.readGames(any())).thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 2), 0));
+        when(documentReader.readExpansions(any())).thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 2), 0));
+
+        assertThat(service.reindexAll()).isEqualTo(new ReindexResultDto(0, 0));
+
+        verify(index).deleteAllDocuments();
+        verify(index, never()).addDocuments(anyString(), eq("id"));
     }
 
     @Test

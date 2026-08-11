@@ -11,21 +11,17 @@ import com.meilisearch.sdk.json.JsonHandler;
 import com.meilisearch.sdk.model.SearchResultPaginated;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
 import pl.m22.gamehive.game.model.ContentModerationTargetType;
 import pl.m22.gamehive.game.search.config.MeiliProperties;
-import pl.m22.gamehive.game.search.dto.GameSearchDocument;
-import pl.m22.gamehive.game.search.dto.GameSearchFilter;
-import pl.m22.gamehive.game.search.dto.SearchHitRef;
-import pl.m22.gamehive.game.search.dto.SearchResultDto;
+import pl.m22.gamehive.game.search.dto.*;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.function.Function;
 
 @Slf4j
 @Service
@@ -44,19 +40,24 @@ public class MeiliGameSearchService implements GameSearchService {
     private final JsonHandler jsonHandler;
     private final MeiliFilterBuilder filterBuilder;
     private final SearchResultHydrator hydrator;
+    private final ApprovedContentDocumentReader documentReader;
     private final String indexUid;
+    private final int reindexBatchSize;
 
     public MeiliGameSearchService(Client client,
                                   JsonHandler jsonHandler,
                                   MeiliFilterBuilder filterBuilder,
                                   SearchResultHydrator hydrator,
+                                  ApprovedContentDocumentReader documentReader,
                                   MeiliProperties properties) {
 
         this.client = client;
         this.jsonHandler = jsonHandler;
         this.filterBuilder = filterBuilder;
         this.hydrator = hydrator;
+        this.documentReader = documentReader;
         this.indexUid = properties.getIndexUid();
+        this.reindexBatchSize = properties.getReindexBatchSize();
     }
 
     @Override
@@ -90,6 +91,40 @@ public class MeiliGameSearchService implements GameSearchService {
                 .toList();
 
         return new PageImpl<>(hydrator.hydrate(hits), pageable, result.getTotalHits());
+    }
+
+    @Override
+    public ReindexResultDto reindexAll() {
+
+        ensureIndexSettings();
+        call(() -> index().deleteAllDocuments(), "clear index " + indexUid);
+
+        long games = pushAll(documentReader::readGames);
+        long expansions = pushAll(documentReader::readExpansions);
+
+        log.info("Reindexed {} games and {} expansions into {}", games, expansions, indexUid);
+
+        return new ReindexResultDto(games, expansions);
+    }
+
+    private long pushAll(Function<Pageable, Page<GameSearchDocument>> reader) {
+
+        long pushed = 0;
+        Pageable pageable = PageRequest.of(0, reindexBatchSize, Sort.by("id"));
+
+        while (true) {
+            Page<GameSearchDocument> batch = reader.apply(pageable);
+
+            if (batch.hasContent()) {
+                call(() -> index().addDocuments(jsonHandler.encode(batch.getContent()), PRIMARY_KEY),
+                        "index batch of " + batch.getNumberOfElements() + " documents");
+                pushed += batch.getNumberOfElements();
+            }
+            if (!batch.hasNext()) {
+                return pushed;
+            }
+            pageable = pageable.next();
+        }
     }
 
     public void ensureIndexSettings() {

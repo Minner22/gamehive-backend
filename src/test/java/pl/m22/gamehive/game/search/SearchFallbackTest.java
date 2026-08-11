@@ -22,6 +22,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -41,10 +42,12 @@ class SearchFallbackTest {
     @MockitoBean JavaMailSender mailSender;
 
     private String janeToken;
+    private String moderatorToken;
 
     @BeforeEach
     void setUp() {
         janeToken = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
+        moderatorToken = jwtService.generateToken("mark.moderator@example.com", JwtTokenType.ACCESS, Set.of("ROLE_MODERATOR"));
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
     }
 
@@ -64,5 +67,15 @@ class SearchFallbackTest {
                 .andExpect(jsonPath("$.totalElements").value(0))
                 .andExpect(jsonPath("$.content").isEmpty())
                 .andExpect(jsonPath("$.size").value(20));
+    }
+
+    @Test
+    @DisplayName("POST /admin/search/reindex na fallbacku -> 200 i zerowe liczniki (nie próbuje łączyć się z Meili)")
+    void reindex_onFallback_returnsZeroCounters() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/search/reindex")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.games").value(0))
+                .andExpect(jsonPath("$.expansions").value(0));
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import pl.m22.gamehive.game.search.dto.GameSearchDocument;
 import pl.m22.gamehive.game.search.dto.GameSearchFilter;
+import pl.m22.gamehive.game.search.dto.ReindexResultDto;
 import pl.m22.gamehive.game.search.dto.SearchResultDto;
 
 @Slf4j
@@ -31,5 +32,12 @@ public class NoOpGameSearchService implements GameSearchService {
 
         log.debug("Search disabled - returning empty page for '{}'", query);
         return Page.empty(pageable);
+    }
+
+    @Override
+    public ReindexResultDto reindexAll() {
+
+        log.debug("Search disabled - skipping reindex");
+        return new ReindexResultDto(0, 0);
     }
 }
