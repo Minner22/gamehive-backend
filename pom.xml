@@ -170,6 +170,12 @@
 			<groupId>com.meilisearch.sdk</groupId>
 			<artifactId>meilisearch-java</artifactId>
 			<version>0.21.0</version>
+			<exclusions>
+				<exclusion>
+					<groupId>com.auth0</groupId>
+					<artifactId>java-jwt</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>com.squareup.okhttp3</groupId>

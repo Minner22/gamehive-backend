@@ -114,6 +114,32 @@ class GameSearchControllerTest {
     }
 
     @Test
+    @DisplayName("GET /games/search?size=2000 -> rozmiar strony zaciśnięty do 50 (hydracja to wiersze z bazy)")
+    void search_clampsExcessivePageSize() throws Exception {
+        mockMvc.perform(get("/api/v1/games/search")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("q", "x")
+                        .param("size", "2000"))
+                .andExpect(status().isOk());
+
+        verify(gameSearchService).search(eq("x"), any(),
+                argThat(pageable -> pageable.getPageSize() == 50));
+    }
+
+    @Test
+    @DisplayName("GET /games/search?size=10 -> rozmiar poniżej limitu przechodzi bez zmian")
+    void search_keepsPageSizeBelowLimit() throws Exception {
+        mockMvc.perform(get("/api/v1/games/search")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
+                        .param("q", "x")
+                        .param("size", "10"))
+                .andExpect(status().isOk());
+
+        verify(gameSearchService).search(eq("x"), any(),
+                argThat(pageable -> pageable.getPageSize() == 10));
+    }
+
+    @Test
     @DisplayName("GET /games/search?targetType=FOO -> 400 VALIDATION_ERROR, wyszukiwarka nietknięta")
     void search_invalidTargetType_400() throws Exception {
         mockMvc.perform(get("/api/v1/games/search")

@@ -8,6 +8,9 @@ import com.meilisearch.sdk.exceptions.MeilisearchCommunicationException;
 import com.meilisearch.sdk.exceptions.MeilisearchException;
 import com.meilisearch.sdk.json.GsonJsonHandler;
 import com.meilisearch.sdk.model.SearchResultPaginated;
+import com.meilisearch.sdk.model.Task;
+import com.meilisearch.sdk.model.TaskInfo;
+import com.meilisearch.sdk.model.TaskStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -94,9 +97,28 @@ class MeiliGameSearchServiceTest {
                 null, null, List.of(), List.of(), List.of(), List.of()));
     }
 
+    /**
+     * Operacje na dokumentach zwracają zakolejkowane zadanie — bez tego stuba kod nie ma czego zalogować.
+     * Mock trzeba zbudować PRZED wejściem w {@code when(...)}, bo Mockito nie pozwala zagnieżdżać stubowania.
+     */
+    private static TaskInfo enqueuedTask(int taskUid) {
+        TaskInfo taskInfo = mock(TaskInfo.class);
+        lenient().when(taskInfo.getTaskUid()).thenReturn(taskUid);
+        return taskInfo;
+    }
+
+    private void stubTaskStatus(int taskUid, TaskStatus status) {
+        Task task = mock(Task.class);
+        lenient().when(task.getStatus()).thenReturn(status);
+        when(index.getTask(taskUid)).thenReturn(task);
+    }
+
     @Test
     @DisplayName("index() wysyła dokument jako tablicę JSON z kluczem głównym 'id', bez pól null")
     void index_sendsDocumentJsonWithPrimaryKey() {
+        TaskInfo indexTask = enqueuedTask(7);
+        when(index.addDocuments(anyString(), eq("id"))).thenReturn(indexTask);
+
         service.index(gameDocument());
 
         ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
@@ -114,6 +136,9 @@ class MeiliGameSearchServiceTest {
     @Test
     @DisplayName("delete() usuwa dokument po prefiksowanym id")
     void delete_removesDocumentById() {
+        TaskInfo deleteTask = enqueuedTask(8);
+        when(index.deleteDocument("expansion-1")).thenReturn(deleteTask);
+
         service.delete("expansion-1");
 
         verify(index).deleteDocument("expansion-1");
@@ -135,7 +160,8 @@ class MeiliGameSearchServiceTest {
 
         assertThat(page.getTotalElements()).isEqualTo(42);
         assertThat(page.getNumber()).isEqualTo(1);
-        assertThat(page.getContent()).hasSize(1);   // drugie trafienie odsiane przy hydracji
+        // hydrator jest tu mockiem — realne odsiewanie nieaktualnych trafień pokrywa SearchResultHydratorTest
+        assertThat(page.getContent()).hasSize(1);
 
         ArgumentCaptor<SearchRequest> request = ArgumentCaptor.forClass(SearchRequest.class);
         verify(index).search(request.capture());
@@ -206,7 +232,7 @@ class MeiliGameSearchServiceTest {
     }
 
     @Test
-    @DisplayName("reindexAll(): konfiguruje indeks, czyści go, wypycha wszystko partiami i zwraca liczniki")
+    @DisplayName("reindexAll(): konfiguruje indeks, czyści go, wypycha wszystko partiami i czeka na każde zadanie")
     void reindexAll_appliesSettingsClearsAndPushesAllApproved() {
         // batch = 2: pierwsza strona pełna i z następnikiem, druga domyka zbiór (3 gry, 1 dodatek)
         when(documentReader.readGames(any())).thenReturn(
@@ -215,6 +241,15 @@ class MeiliGameSearchServiceTest {
                 new PageImpl<>(List.of(gameDocument("game-3", 3L)), PageRequest.of(1, 2), 3));
         when(documentReader.readExpansions(any())).thenReturn(
                 new PageImpl<>(List.of(expansionDocument()), PageRequest.of(0, 2), 1));
+        TaskInfo clearTask = enqueuedTask(1);
+        TaskInfo batch1 = enqueuedTask(2);
+        TaskInfo batch2 = enqueuedTask(3);
+        TaskInfo batch3 = enqueuedTask(4);
+        when(index.deleteAllDocuments()).thenReturn(clearTask);
+        when(index.addDocuments(anyString(), eq("id"))).thenReturn(batch1, batch2, batch3);
+        for (int taskUid = 1; taskUid <= 4; taskUid++) {
+            stubTaskStatus(taskUid, TaskStatus.SUCCEEDED);
+        }
 
         ReindexResultDto result = service.reindexAll();
 
@@ -225,8 +260,47 @@ class MeiliGameSearchServiceTest {
         order.verify(index).updateSearchableAttributesSettings(MeiliGameSearchService.SEARCHABLE_ATTRIBUTES);
         order.verify(index).updateFilterableAttributesSettings(MeiliGameSearchService.FILTERABLE_ATTRIBUTES);
         order.verify(index).deleteAllDocuments();
-        // dwie partie gier + jedna dodatków
+        order.verify(index).waitForTask(1);
+        // dwie partie gier + jedna dodatków, każda doczekana
         order.verify(index, times(3)).addDocuments(anyString(), eq("id"));
+        verify(index).waitForTask(2);
+        verify(index).waitForTask(3);
+        verify(index).waitForTask(4);
+    }
+
+    @Test
+    @DisplayName("zadanie Meili ze statusem FAILED -> SEARCH_FAILED, zamiast 200 z fałszywymi licznikami")
+    void reindexAll_failedTask_doesNotReportSuccess() {
+        TaskInfo clearTask = enqueuedTask(1);
+        when(index.deleteAllDocuments()).thenReturn(clearTask);
+        stubTaskStatus(1, TaskStatus.FAILED);
+
+        assertThatThrownBy(() -> service.reindexAll())
+                .isInstanceOf(InfrastructureException.class)
+                .extracting(exception -> ((InfrastructureException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.SEARCH_FAILED);
+
+        // nie ruszamy bazy ani nie dodajemy dokumentów po nieudanym czyszczeniu
+        verifyNoInteractions(documentReader);
+        verify(index, never()).addDocuments(anyString(), eq("id"));
+    }
+
+    @Test
+    @DisplayName("porażka zadania w środku wypychania też przerywa reindeks (indeks jest już wyczyszczony)")
+    void reindexAll_failedBatchTask_abortsWithoutFalseCounters() {
+        when(documentReader.readGames(any())).thenReturn(
+                new PageImpl<>(List.of(gameDocument("game-1", 1L)), PageRequest.of(0, 2), 1));
+        TaskInfo clearTask = enqueuedTask(1);
+        TaskInfo batchTask = enqueuedTask(2);
+        when(index.deleteAllDocuments()).thenReturn(clearTask);
+        when(index.addDocuments(anyString(), eq("id"))).thenReturn(batchTask);
+        stubTaskStatus(1, TaskStatus.SUCCEEDED);
+        stubTaskStatus(2, TaskStatus.FAILED);
+
+        assertThatThrownBy(() -> service.reindexAll())
+                .isInstanceOf(InfrastructureException.class);
+
+        verify(documentReader, never()).readExpansions(any());
     }
 
     @Test
@@ -234,11 +308,70 @@ class MeiliGameSearchServiceTest {
     void reindexAll_withNoApprovedContent_returnsZeros() {
         when(documentReader.readGames(any())).thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 2), 0));
         when(documentReader.readExpansions(any())).thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 2), 0));
+        TaskInfo clearTask = enqueuedTask(1);
+        when(index.deleteAllDocuments()).thenReturn(clearTask);
+        stubTaskStatus(1, TaskStatus.SUCCEEDED);
 
         assertThat(service.reindexAll()).isEqualTo(new ReindexResultDto(0, 0));
 
         verify(index).deleteAllDocuments();
         verify(index, never()).addDocuments(anyString(), eq("id"));
+    }
+
+    @Test
+    @DisplayName("targetId z Meili przychodzi jako Double (Gson) — rzutowanie przez Number musi to znosić")
+    void search_handlesDoubleTargetIdFromGson() {
+        HashMap<String, Object> gsonHit = new HashMap<>();
+        gsonHit.put("targetType", "GAME");
+        gsonHit.put("targetId", 7.0d);          // dokładnie to, co zwraca realny silnik
+        SearchResultPaginated meiliResult = mock(SearchResultPaginated.class);
+        when(meiliResult.getHits()).thenReturn(new ArrayList<>(List.of(gsonHit)));
+        when(meiliResult.getTotalHits()).thenReturn(1);
+        when(index.search(any(SearchRequest.class))).thenReturn(meiliResult);
+        when(hydrator.hydrate(anyList())).thenReturn(List.of(anyGameResult()));
+
+        service.search("x", emptyFilter(), PageRequest.of(0, 20));
+
+        verify(hydrator).hydrate(List.of(new SearchHitRef(ContentModerationTargetType.GAME, 7L)));
+    }
+
+    @Test
+    @DisplayName("uszkodzony dokument jest pomijany, a nie wywraca całego wyszukiwania na 500")
+    void search_skipsMalformedHits() {
+        HashMap<String, Object> noTargetId = new HashMap<>();
+        noTargetId.put("id", "game-666");
+        noTargetId.put("targetType", "GAME");
+        HashMap<String, Object> unknownType = new HashMap<>();
+        unknownType.put("id", "thing-1");
+        unknownType.put("targetType", "THING");
+        unknownType.put("targetId", 1.0d);
+        HashMap<String, Object> healthy = new HashMap<>();
+        healthy.put("targetType", "EXPANSION");
+        healthy.put("targetId", 3.0d);
+
+        SearchResultPaginated meiliResult = mock(SearchResultPaginated.class);
+        when(meiliResult.getHits()).thenReturn(new ArrayList<>(List.of(noTargetId, unknownType, healthy)));
+        when(meiliResult.getTotalHits()).thenReturn(3);
+        when(index.search(any(SearchRequest.class))).thenReturn(meiliResult);
+        when(hydrator.hydrate(anyList())).thenReturn(List.of());
+
+        service.search("x", emptyFilter(), PageRequest.of(0, 20));
+
+        verify(hydrator).hydrate(List.of(new SearchHitRef(ContentModerationTargetType.EXPANSION, 3L)));
+    }
+
+    @Test
+    @DisplayName("komunikat błędu nie odbija frazy zapytania ani szczegółów wewnętrznych")
+    void searchFailure_doesNotLeakQueryIntoMessage() {
+        when(index.search(any(SearchRequest.class)))
+                .thenThrow(new MeilisearchCommunicationException("connection refused"));
+
+        assertThatThrownBy(() -> service.search("sekretna fraza uzytkownika", emptyFilter(), PageRequest.of(0, 20)))
+                .isInstanceOf(InfrastructureException.class)
+                .hasMessage(ErrorCode.SEARCH_INDEX_UNAVAILABLE.getDefaultMessage())
+                .satisfies(exception -> assertThat(exception.getMessage())
+                        .doesNotContain("sekretna fraza uzytkownika")
+                        .doesNotContain(INDEX_UID));
     }
 
     @Test

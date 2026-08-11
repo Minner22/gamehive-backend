@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +34,9 @@ import pl.m22.gamehive.game.search.service.GameSearchService;
                 + "Wymaga uwierzytelnienia JWT (dowolna rola).")
 @SecurityRequirement(name = "bearerAuth")
 @ApiResponses({
+        @ApiResponse(responseCode = "400", description = "Nieprawidłowa wartość parametru (VALIDATION_ERROR) — "
+                + "np. nieznany targetType albo niecałkowita wartość filtra liczbowego",
+                content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
                 content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera lub odrzucone zapytanie wyszukiwarki (SEARCH_FAILED)",
@@ -42,6 +46,8 @@ import pl.m22.gamehive.game.search.service.GameSearchService;
 })
 public class GameSearchController {
 
+    private static final int MAX_PAGE_SIZE = 50;
+
     private final GameSearchService gameSearchService;
 
     @Operation(summary = "Szukaj w bibliotece (gry i dodatki, tylko APPROVED)",
@@ -49,7 +55,8 @@ public class GameSearchController {
                     + "to ranking trafności, dlatego parametr sort jest IGNOROWANY — działają tylko page i size. "
                     + "Pusta lub brakująca fraza zwraca wszystko, co pasuje do filtrów. Dodatki są filtrowane po "
                     + "wartościach efektywnych (własnych lub odziedziczonych z gry bazowej); filtry po wydawcy, "
-                    + "autorze i roku wydania dopasują wyłącznie gry, bo dodatek nie ma tych pól.")
+                    + "autorze i roku wydania dopasują wyłącznie gry, bo dodatek nie ma tych pól. Rozmiar strony "
+                    + "jest ograniczony do 50, a łączna liczba trafień do limitu maxTotalHits wyszukiwarki (1000).")
     @ApiResponse(responseCode = "200", description = "Strona trafień w kolejności rankingu",
             content = @Content(schema = @Schema(implementation = PageSearchResultDto.class)))
     @GetMapping
@@ -81,6 +88,13 @@ public class GameSearchController {
         GameSearchFilter filter = new GameSearchFilter(targetType, publisherId, categoryId, mechanicId, authorId,
                 baseGameId, players, maxPlayingTime, yearPublished, age);
 
-        return ResponseEntity.ok(gameSearchService.search(q, filter, pageable));
+        return ResponseEntity.ok(gameSearchService.search(q, filter, clampPageSize(pageable)));
+    }
+
+    private static Pageable clampPageSize(Pageable pageable) {
+
+        return pageable.getPageSize() <= MAX_PAGE_SIZE
+                ? pageable
+                : PageRequest.of(pageable.getPageNumber(), MAX_PAGE_SIZE);
     }
 }

@@ -11,13 +11,11 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "gamehive.search")
 public class MeiliProperties {
 
-    private boolean enabled = true;
-
-    private String host;
+    private String host = "http://localhost:7700";
 
     private String apiKey;
 
-    private String indexUid;
+    private String indexUid = "gamehive_content";
 
-    private int reindexBatchSize;
+    private int reindexBatchSize = 200;
 }
