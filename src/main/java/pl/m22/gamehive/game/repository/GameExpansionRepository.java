@@ -25,6 +25,8 @@ public interface GameExpansionRepository extends JpaRepository<GameExpansion, Lo
 
     boolean existsByBaseGameId(Long baseGameId);
 
+    List<GameExpansion> findByBaseGameIdAndModerationStatus(Long baseGameId, ModerationStatus moderationStatus);
+
     boolean existsByCategoriesId(Long categoriesId);
 
     boolean existsByMechanicsId(Long mechanicsId);

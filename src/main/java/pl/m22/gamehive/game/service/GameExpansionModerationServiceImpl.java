@@ -17,6 +17,7 @@ import pl.m22.gamehive.game.model.ContentModerationAction;
 import pl.m22.gamehive.game.model.ContentModerationTargetType;
 import pl.m22.gamehive.game.model.GameExpansion;
 import pl.m22.gamehive.game.repository.GameExpansionRepository;
+import pl.m22.gamehive.game.search.service.GameSearchIndexPublisher;
 import pl.m22.gamehive.user.service.UserService;
 
 import java.util.UUID;
@@ -30,6 +31,7 @@ public class GameExpansionModerationServiceImpl implements GameExpansionModerati
     private final GameExpansionContentWriter contentWriter;
     private final UserService userService;
     private final ContentModerationAuditPublisher auditPublisher;
+    private final GameSearchIndexPublisher searchIndexPublisher;
 
     @Transactional(readOnly = true)
     @Override
@@ -51,6 +53,7 @@ public class GameExpansionModerationServiceImpl implements GameExpansionModerati
         expansion.approve(moderatorId);
 
         publishAudit(ContentModerationAction.APPROVE, expansionId, moderatorEmail, null);
+        searchIndexPublisher.publishUpsert(expansion);
 
         return expansionMapper.toModerationDto(expansion);
     }
@@ -70,6 +73,7 @@ public class GameExpansionModerationServiceImpl implements GameExpansionModerati
         expansion.reject(trimmedReason, moderatorId);
 
         publishAudit(ContentModerationAction.REJECT, expansionId, moderatorEmail, trimmedReason);
+        searchIndexPublisher.publishRemoval(ContentModerationTargetType.EXPANSION, expansionId);
 
         return expansionMapper.toModerationDto(expansion);
     }
@@ -117,6 +121,7 @@ public class GameExpansionModerationServiceImpl implements GameExpansionModerati
         contentWriter.applyAssociations(expansion, request);
 
         publishAudit(ContentModerationAction.EDIT, expansionId, moderatorEmail, null);
+        searchIndexPublisher.publishUpsert(expansion);
 
         return expansionMapper.toModerationDto(expansion);
     }
@@ -136,6 +141,7 @@ public class GameExpansionModerationServiceImpl implements GameExpansionModerati
         expansionRepository.delete(expansion);
 
         publishAudit(ContentModerationAction.DELETE, expansionId, moderatorEmail, deletedName);
+        searchIndexPublisher.publishRemoval(ContentModerationTargetType.EXPANSION, expansionId);
     }
 
     private GameExpansion findPendingExpansion(Long expansionId) {

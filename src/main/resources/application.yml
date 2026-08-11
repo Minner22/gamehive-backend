@@ -46,3 +46,8 @@ jwt:
 gamehive:
   moderation:
       max-resubmissions: 5
+  search:
+      enabled: true
+      host: http://localhost:7700
+      index-uid: gamehive_content
+      reindex-batch-size: 200

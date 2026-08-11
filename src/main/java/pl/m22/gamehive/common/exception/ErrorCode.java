@@ -79,6 +79,8 @@ public enum ErrorCode {
     JWT_KEY_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Invalid JWT signing key"),
     JWT_SIGNING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to sign or verify JWT"),
     REDIS_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Token service temporarily unavailable"),
+    SEARCH_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Search request failed"),
+    SEARCH_INDEX_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Search service temporarily unavailable"),
 
     // ===== Handler-only — nierzucane bezpośrednio, używane przez GlobalExceptionHandler =====
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "Access denied"),
