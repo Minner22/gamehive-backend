@@ -40,3 +40,6 @@ jwt:
 gamehive:
   moderation:
     max-resubmissions: 2
+  search:
+    # Meilisearch nie ma wersji embedded (inaczej niż Redis) — testy biegają na fallbacku bez indeksu
+    enabled: false

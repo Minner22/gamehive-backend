@@ -40,3 +40,8 @@ springdoc:
         enabled: false
     swagger-ui:
         enabled: false
+
+gamehive:
+    search:
+        host: ${MEILI_HOST}
+        api-key: ${MEILI_MASTER_KEY}

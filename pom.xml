@@ -165,6 +165,13 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Meilisearch - brak wersji embedded, dlatego na profilu test aktywny jest fallback -->
+		<dependency>
+			<groupId>com.meilisearch.sdk</groupId>
+			<artifactId>meilisearch-java</artifactId>
+			<version>0.21.0</version>
+		</dependency>
+
 		<!-- Flyway -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
