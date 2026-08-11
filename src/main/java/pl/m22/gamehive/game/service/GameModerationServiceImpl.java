@@ -16,6 +16,7 @@ import pl.m22.gamehive.game.mapper.GameMapper;
 import pl.m22.gamehive.game.model.*;
 import pl.m22.gamehive.game.repository.GameExpansionRepository;
 import pl.m22.gamehive.game.repository.GameRepository;
+import pl.m22.gamehive.game.search.service.GameSearchIndexPublisher;
 import pl.m22.gamehive.user.service.UserService;
 
 import java.util.UUID;
@@ -30,6 +31,7 @@ public class GameModerationServiceImpl implements GameModerationService {
     private final GameContentWriter contentWriter;
     private final UserService userService;
     private final ContentModerationAuditPublisher auditPublisher;
+    private final GameSearchIndexPublisher searchIndexPublisher;
 
     @Transactional(readOnly = true)
     @Override
@@ -50,6 +52,7 @@ public class GameModerationServiceImpl implements GameModerationService {
         approvePendingTaxonomy(game);
 
         publishAudit(ContentModerationAction.APPROVE, gameId, moderatorEmail, null);
+        searchIndexPublisher.publishUpsert(game);
 
         return gameMapper.toModerationDto(game);
     }
@@ -69,6 +72,7 @@ public class GameModerationServiceImpl implements GameModerationService {
         game.reject(trimmedReason, moderatorId);
 
         publishAudit(ContentModerationAction.REJECT, gameId, moderatorEmail, trimmedReason);
+        searchIndexPublisher.publishRemoval(ContentModerationTargetType.GAME, gameId);
 
         return gameMapper.toModerationDto(game);
     }
@@ -115,11 +119,12 @@ public class GameModerationServiceImpl implements GameModerationService {
 
         game.clearAssociations();
         contentWriter.applyAssociations(game, request);
-        // nowi wydawcy/autorzy dodani przez moderatora są PENDING — biblioteczna gra nie może wskazywać
-        // na słownik PENDING, więc zatwierdzamy je od razu (jak przy approve)
         approvePendingTaxonomy(game);
 
         publishAudit(ContentModerationAction.EDIT, gameId, moderatorEmail, null);
+        searchIndexPublisher.publishUpsert(game);
+        gameExpansionRepository.findByBaseGameIdAndModerationStatus(gameId, ModerationStatus.APPROVED)
+                .forEach(searchIndexPublisher::publishUpsert);
 
         return gameMapper.toModerationDto(game);
     }
@@ -143,6 +148,7 @@ public class GameModerationServiceImpl implements GameModerationService {
         gameRepository.delete(game);
 
         publishAudit(ContentModerationAction.DELETE, gameId, moderatorEmail, deletedTitle);
+        searchIndexPublisher.publishRemoval(ContentModerationTargetType.GAME, gameId);
     }
 
     private Game findPendingGame(Long gameId) {
