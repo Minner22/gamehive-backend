@@ -72,19 +72,19 @@ public class MeiliGameSearchService implements GameSearchService {
             return;
         }
 
-        String ids = documentIds(documents);
-        TaskInfo task = call(() -> index().addDocuments(jsonHandler.encode(documents), PRIMARY_KEY),
-                "index documents " + ids);
+        String action = "index documents " + documentIds(documents);
+        TaskInfo task = call(() -> index().addDocuments(jsonHandler.encode(documents), PRIMARY_KEY), action);
 
-        log.debug("Enqueued Meili task {} to index documents {}", task.getTaskUid(), ids);
+        awaitTaskSucceeded(task, action);
     }
 
     @Override
     public void delete(String documentId) {
 
-        TaskInfo task = call(() -> index().deleteDocument(documentId), "delete document " + documentId);
+        String action = "delete document " + documentId;
+        TaskInfo task = call(() -> index().deleteDocument(documentId), action);
 
-        log.debug("Enqueued Meili task {} to delete document {}", task.getTaskUid(), documentId);
+        awaitTaskSucceeded(task, action);
     }
 
     @Override
@@ -112,7 +112,7 @@ public class MeiliGameSearchService implements GameSearchService {
     public ReindexResultDto reindexAll() {
 
         ensureIndexSettings();
-        awaitTask(call(() -> index().deleteAllDocuments(), "clear index " + indexUid), "clear index");
+        awaitTaskOrThrow(call(() -> index().deleteAllDocuments(), "clear index " + indexUid), "clear index");
 
         long games = pushAll(documentReader::readGames);
         long expansions = pushAll(documentReader::readExpansions);
@@ -134,7 +134,7 @@ public class MeiliGameSearchService implements GameSearchService {
                 String action = "index batch of " + batch.getNumberOfElements() + " documents";
                 TaskInfo task = call(
                         () -> index().addDocuments(jsonHandler.encode(batch.getContent()), PRIMARY_KEY), action);
-                awaitTask(task, action);
+                awaitTaskOrThrow(task, action);
                 pushed += batch.getNumberOfElements();
             }
             if (!batch.hasNext()) {
@@ -144,7 +144,14 @@ public class MeiliGameSearchService implements GameSearchService {
         }
     }
 
-    private void awaitTask(TaskInfo taskInfo, String action) {
+    private void awaitTaskOrThrow(TaskInfo taskInfo, String action) {
+
+        if (!awaitTaskSucceeded(taskInfo, action)) {
+            throw new InfrastructureException(ErrorCode.SEARCH_FAILED);
+        }
+    }
+
+    private boolean awaitTaskSucceeded(TaskInfo taskInfo, String action) {
 
         int taskUid = taskInfo.getTaskUid();
         Task task = call(() -> {
@@ -155,8 +162,12 @@ public class MeiliGameSearchService implements GameSearchService {
         if (task.getStatus() != TaskStatus.SUCCEEDED) {
             log.error("Meili task {} ({}) finished with status {}: {}", taskUid, action, task.getStatus(),
                     task.getError() != null ? task.getError().getMessage() : "no error details");
-            throw new InfrastructureException(ErrorCode.SEARCH_FAILED);
+
+            return false;
         }
+        log.debug("Meili task {} ({}) succeeded", taskUid, action);
+
+        return true;
     }
 
     public void ensureIndexSettings() {
