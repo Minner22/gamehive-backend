@@ -18,10 +18,13 @@ import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
 import pl.m22.gamehive.game.search.dto.ReindexResultDto;
 import pl.m22.gamehive.game.search.service.GameSearchService;
+import pl.m22.gamehive.game.search.service.SearchReindexService;
 
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -92,6 +95,34 @@ class SearchAdminControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
 
         verifyNoInteractions(gameSearchService);
+    }
+
+    @Test
+    @DisplayName("reindeks przy zajętej blokadzie -> 409 REINDEX_ALREADY_RUNNING, drugi przebieg nie startuje")
+    void reindex_whileAnotherRunIsInProgress_409() throws Exception {
+        redisTemplate.opsForValue()
+                .set(SearchReindexService.REINDEX_LOCK_KEY, "inny-przebieg", Duration.ofMinutes(15));
+
+        mockMvc.perform(post("/api/v1/admin/search/reindex")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("REINDEX_ALREADY_RUNNING"));
+
+        verifyNoInteractions(gameSearchService);
+    }
+
+    @Test
+    @DisplayName("po zakończonym reindeksie blokada jest zwolniona — kolejny przebieg wchodzi normalnie")
+    void reindex_releasesLockForTheNextRun() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/search/reindex")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/admin/search/reindex")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk());
+
+        verify(gameSearchService, times(2)).reindexAll();
+        assertThat(redisTemplate.hasKey(SearchReindexService.REINDEX_LOCK_KEY)).isFalse();
     }
 
     @Test

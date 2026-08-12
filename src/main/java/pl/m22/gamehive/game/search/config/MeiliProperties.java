@@ -5,6 +5,8 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 @Getter
 @Setter
 @Component
@@ -18,4 +20,6 @@ public class MeiliProperties {
     private String indexUid = "gamehive_content";
 
     private int reindexBatchSize = 200;
+
+    private Duration reindexLockTtl = Duration.ofMinutes(15);
 }
