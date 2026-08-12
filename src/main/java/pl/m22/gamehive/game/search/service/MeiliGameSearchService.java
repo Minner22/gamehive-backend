@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -65,12 +66,17 @@ public class MeiliGameSearchService implements GameSearchService {
     }
 
     @Override
-    public void index(GameSearchDocument document) {
+    public void index(List<GameSearchDocument> documents) {
 
-        TaskInfo task = call(() -> index().addDocuments(jsonHandler.encode(List.of(document)), PRIMARY_KEY),
-                "index document " + document.id());
+        if (documents.isEmpty()) {
+            return;
+        }
 
-        log.debug("Enqueued Meili task {} to index document {}", task.getTaskUid(), document.id());
+        String ids = documentIds(documents);
+        TaskInfo task = call(() -> index().addDocuments(jsonHandler.encode(documents), PRIMARY_KEY),
+                "index documents " + ids);
+
+        log.debug("Enqueued Meili task {} to index documents {}", task.getTaskUid(), ids);
     }
 
     @Override
@@ -177,6 +183,11 @@ public class MeiliGameSearchService implements GameSearchService {
     private Index index() {
 
         return client.index(indexUid);
+    }
+
+    private static String documentIds(List<GameSearchDocument> documents) {
+
+        return documents.stream().map(GameSearchDocument::id).collect(Collectors.joining(", "));
     }
 
     private static SearchHitRef toHitRefOrNull(HashMap<String, Object> hit) {

@@ -119,7 +119,7 @@ class MeiliGameSearchServiceTest {
         TaskInfo indexTask = enqueuedTask(7);
         when(index.addDocuments(anyString(), eq("id"))).thenReturn(indexTask);
 
-        service.index(gameDocument());
+        service.index(List.of(gameDocument()));
 
         ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
         verify(index).addDocuments(json.capture(), eq("id"));
@@ -131,6 +131,30 @@ class MeiliGameSearchServiceTest {
                 .contains("\"publisherIds\":[1,2]")
                 .doesNotContain("baseGameTitle")   // null pominięty — dodatkowe pola nie zaśmiecają indeksu
                 .doesNotContain("baseGameId");
+    }
+
+    @Test
+    @DisplayName("index() z partią -> JEDNO addDocuments z tablicą JSON obu dokumentów (fan-out edycji gry bazowej)")
+    void index_sendsWholeBatchInOneCall() {
+        TaskInfo batchTask = enqueuedTask(9);
+        when(index.addDocuments(anyString(), eq("id"))).thenReturn(batchTask);
+
+        service.index(List.of(gameDocument("game-1", 1L), expansionDocument()));
+
+        ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
+        verify(index, times(1)).addDocuments(json.capture(), eq("id"));
+        assertThat(json.getValue())
+                .startsWith("[")
+                .contains("\"id\":\"game-1\"")
+                .contains("\"id\":\"expansion-1\"");
+    }
+
+    @Test
+    @DisplayName("pusta partia -> zero wywołań HTTP (nie ma czego indeksować)")
+    void index_withEmptyBatch_doesNothing() {
+        service.index(List.of());
+
+        verifyNoInteractions(client);
     }
 
     @Test
@@ -403,7 +427,7 @@ class MeiliGameSearchServiceTest {
         doThrow(new MeilisearchCommunicationException("connection refused"))
                 .when(index).addDocuments(anyString(), eq("id"));
 
-        assertThatThrownBy(() -> service.index(gameDocument()))
+        assertThatThrownBy(() -> service.index(List.of(gameDocument())))
                 .isInstanceOf(InfrastructureException.class)
                 .extracting(exception -> ((InfrastructureException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.SEARCH_INDEX_UNAVAILABLE);

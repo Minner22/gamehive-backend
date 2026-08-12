@@ -22,12 +22,12 @@ public class SearchIndexListener {
 
         try {
             switch (event.operation()) {
-                case UPSERT -> gameSearchService.index(event.document());
+                case UPSERT -> gameSearchService.index(event.documents());
                 case REMOVE -> gameSearchService.delete(event.documentId());
             }
         } catch (RuntimeException e) {
             log.error("Search index update failed for {} ({}) - index is now out of sync until a reindex",
-                    event.documentId(), event.operation(), e);
+                    event.describeTargets(), event.operation(), e);
         }
     }
 }

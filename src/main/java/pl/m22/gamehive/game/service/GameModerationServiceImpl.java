@@ -122,9 +122,8 @@ public class GameModerationServiceImpl implements GameModerationService {
         approvePendingTaxonomy(game);
 
         publishAudit(ContentModerationAction.EDIT, gameId, moderatorEmail, null);
-        searchIndexPublisher.publishUpsert(game);
-        gameExpansionRepository.findByBaseGameIdAndModerationStatus(gameId, ModerationStatus.APPROVED)
-                .forEach(searchIndexPublisher::publishUpsert);
+        searchIndexPublisher.publishUpsert(game,
+                gameExpansionRepository.findByBaseGameIdAndModerationStatus(gameId, ModerationStatus.APPROVED));
 
         return gameMapper.toModerationDto(game);
     }
