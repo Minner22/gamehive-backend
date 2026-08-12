@@ -221,7 +221,10 @@ class GameSearchIndexingTest {
         tx.executeWithoutResult(_ ->
                 gameModerationService.updateApprovedGame(baseGameId, editRequest(60), MODERATOR));
 
-        verify(gameSearchService, times(1)).index(any());
+        ArgumentCaptor<List<GameSearchDocument>> batch = documentBatchCaptor();
+        verify(gameSearchService, times(1)).index(batch.capture());
+        assertThat(batch.getValue()).singleElement()
+                .extracting(GameSearchDocument::id).isEqualTo("game-" + baseGameId);
     }
 
     @Test

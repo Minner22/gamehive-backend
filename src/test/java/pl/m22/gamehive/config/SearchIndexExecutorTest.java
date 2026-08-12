@@ -12,9 +12,11 @@ import pl.m22.gamehive.game.search.event.SearchIndexListener;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 /**
  * Executor produkcyjny ma @Profile("!test"), więc w suicie nie istnieje jako bean — budujemy go
@@ -60,6 +62,50 @@ class SearchIndexExecutorTest {
 
         assertThat(executor.getCorePoolSize()).isOne();
         assertThat(executor.getMaxPoolSize()).isOne();
+    }
+
+    /**
+     * Najważniejsze twierdzenie tego designu: przy pełnej kolejce zadanie jest PORZUCANE, a nie
+     * wykonywane przez wątek zlecający (CallerRunsPolicy) ani zgłaszane wyjątkiem — inaczej
+     * indeksowanie wracałoby na wątek moderatora albo wyjątek leciałby z AFTER_COMMIT.
+     */
+    @Test
+    @DisplayName("przepełniona kolejka -> zadanie porzucone po cichu, wątek zlecający nie wykonuje niczego ani nie dostaje wyjątku")
+    void searchIndexExecutor_whenQueueIsFull_dropsTaskWithoutTouchingCaller() throws InterruptedException {
+
+        CountDownLatch workerBlocked = new CountDownLatch(1);
+        CountDownLatch releaseWorker = new CountDownLatch(1);
+        AtomicInteger ranOnCallerThread = new AtomicInteger();
+        String callerThread = Thread.currentThread().getName();
+
+        executor.execute(() -> {                       // zajmuje jedyny wątek puli
+            workerBlocked.countDown();
+            awaitQuietly(releaseWorker);
+        });
+        assertThat(workerBlocked.await(5, TimeUnit.SECONDS)).isTrue();
+
+        Runnable countIfOnCaller = () -> {
+            if (Thread.currentThread().getName().equals(callerThread)) {
+                ranOnCallerThread.incrementAndGet();
+            }
+        };
+
+        assertThatNoException().isThrownBy(() -> {
+            for (int task = 0; task < 502; task++) {   // 500 mieści się w kolejce, reszta musi zostać odrzucona
+                executor.execute(countIfOnCaller);
+            }
+        });
+        assertThat(ranOnCallerThread).hasValue(0);
+
+        releaseWorker.countDown();
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await(5, TimeUnit.SECONDS);
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**

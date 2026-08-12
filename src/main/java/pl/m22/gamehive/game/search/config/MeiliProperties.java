@@ -22,4 +22,6 @@ public class MeiliProperties {
     private int reindexBatchSize = 200;
 
     private Duration reindexLockTtl = Duration.ofMinutes(15);
+
+    private Duration taskWaitTimeout = Duration.ofSeconds(60);
 }

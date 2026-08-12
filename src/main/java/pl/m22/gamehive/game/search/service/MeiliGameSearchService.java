@@ -40,6 +40,7 @@ public class MeiliGameSearchService implements GameSearchService {
 
     private static final String PRIMARY_KEY = "id";
     private static final String INDEX_ALREADY_EXISTS = "index_already_exists";
+    private static final int TASK_POLL_INTERVAL_MILLIS = 50;
 
     private final Client client;
     private final JsonHandler jsonHandler;
@@ -48,6 +49,7 @@ public class MeiliGameSearchService implements GameSearchService {
     private final ApprovedContentDocumentReader documentReader;
     private final String indexUid;
     private final int reindexBatchSize;
+    private final int taskWaitTimeoutMillis;
 
     public MeiliGameSearchService(Client client,
                                   JsonHandler jsonHandler,
@@ -63,6 +65,7 @@ public class MeiliGameSearchService implements GameSearchService {
         this.documentReader = documentReader;
         this.indexUid = properties.getIndexUid();
         this.reindexBatchSize = properties.getReindexBatchSize();
+        this.taskWaitTimeoutMillis = Math.toIntExact(properties.getTaskWaitTimeout().toMillis());
     }
 
     @Override
@@ -154,10 +157,12 @@ public class MeiliGameSearchService implements GameSearchService {
     private boolean awaitTaskSucceeded(TaskInfo taskInfo, String action) {
 
         int taskUid = taskInfo.getTaskUid();
-        Task task = call(() -> {
-            index().waitForTask(taskUid);
-            return index().getTask(taskUid);
-        }, action);
+
+        if (!waitUntilSettled(taskUid, action)) {
+            return false;
+        }
+
+        Task task = call(() -> index().getTask(taskUid), action);
 
         if (task.getStatus() != TaskStatus.SUCCEEDED) {
             log.error("Meili task {} ({}) finished with status {}: {}", taskUid, action, task.getStatus(),
@@ -168,6 +173,22 @@ public class MeiliGameSearchService implements GameSearchService {
         log.debug("Meili task {} ({}) succeeded", taskUid, action);
 
         return true;
+    }
+
+    private boolean waitUntilSettled(int taskUid, String action) {
+
+        try {
+            index().waitForTask(taskUid, taskWaitTimeoutMillis, TASK_POLL_INTERVAL_MILLIS);
+
+            return true;
+        } catch (MeilisearchTimeoutException _) {
+            log.warn("Meili task {} ({}) did not settle within {} ms - status unknown, it may still complete",
+                    taskUid, action, taskWaitTimeoutMillis);
+
+            return false;
+        } catch (MeilisearchException e) {
+            throw failure(e, action);
+        }
     }
 
     public void ensureIndexSettings() {
@@ -217,13 +238,21 @@ public class MeiliGameSearchService implements GameSearchService {
 
         try {
             return meiliCall.execute();
-        } catch (MeilisearchCommunicationException | MeilisearchTimeoutException e) {
-            log.error("Meilisearch unreachable while trying to {}", action, e);
-            throw new InfrastructureException(ErrorCode.SEARCH_INDEX_UNAVAILABLE);
         } catch (MeilisearchException e) {
-            log.error("Meilisearch rejected request while trying to {}", action, e);
-            throw new InfrastructureException(ErrorCode.SEARCH_FAILED);
+            throw failure(e, action);
         }
+    }
+
+    private InfrastructureException failure(MeilisearchException e, String action) {
+
+        if (e instanceof MeilisearchCommunicationException || e instanceof MeilisearchTimeoutException) {
+            log.error("Meilisearch unreachable while trying to {}", action, e);
+
+            return new InfrastructureException(ErrorCode.SEARCH_INDEX_UNAVAILABLE);
+        }
+        log.error("Meilisearch rejected request while trying to {}", action, e);
+
+        return new InfrastructureException(ErrorCode.SEARCH_FAILED);
     }
 
     @FunctionalInterface

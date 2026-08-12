@@ -37,6 +37,8 @@ public class AsyncConfig {
         executor.setThreadNamePrefix("auth-email-");
         executor.setTaskDecorator(new MdcTaskDecorator());
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
         executor.initialize();
 
         return executor;
@@ -52,6 +54,8 @@ public class AsyncConfig {
         executor.setQueueCapacity(500);
         executor.setThreadNamePrefix("search-index-");
         executor.setTaskDecorator(new MdcTaskDecorator());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
         executor.setRejectedExecutionHandler((_, _) ->
                 log.error("Search index task rejected - queue full; index will drift until the next reindex"));
         executor.initialize();

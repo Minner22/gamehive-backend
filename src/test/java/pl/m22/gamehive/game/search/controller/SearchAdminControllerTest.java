@@ -1,5 +1,6 @@
 package pl.m22.gamehive.game.search.controller;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,12 @@ class SearchAdminControllerTest {
         userToken      = jwtService.generateToken("jane.smith@example.com",     JwtTokenType.ACCESS, Set.of("ROLE_USER"));
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
         when(gameSearchService.reindexAll()).thenReturn(new ReindexResultDto(2, 1));
+    }
+
+    // klucz blokady ma TTL 15 min, więc bez tego zostałby dla klas testowych, które nie robią flushAll
+    @AfterEach
+    void releaseLock() {
+        redisTemplate.delete(SearchReindexService.REINDEX_LOCK_KEY);
     }
 
     @Test
@@ -135,5 +142,8 @@ class SearchAdminControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.errorCode").value("SEARCH_INDEX_UNAVAILABLE"));
+
+        // blokada nie może zostać po nieudanym przebiegu, inaczej naprawa byłaby zablokowana na 15 min
+        assertThat(redisTemplate.hasKey(SearchReindexService.REINDEX_LOCK_KEY)).isFalse();
     }
 }

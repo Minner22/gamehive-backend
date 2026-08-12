@@ -4,11 +4,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
@@ -16,6 +18,7 @@ import pl.m22.gamehive.game.search.config.MeiliProperties;
 import pl.m22.gamehive.game.search.dto.ReindexResultDto;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,7 +55,13 @@ class SearchReindexServiceTest {
                     acquiredToken.set(invocation.getArgument(1));
                     return true;
                 });
-        when(valueOperations.get(LOCK_KEY)).thenAnswer(_ -> acquiredToken.get());
+    }
+
+    /** Zwolnienie idzie skryptem (compare-and-delete po stronie Redisa), więc weryfikujemy wysłany token. */
+    private void verifyReleasedWithOwnToken() {
+        ArgumentCaptor<Object> args = ArgumentCaptor.forClass(Object.class);
+        verify(redisTemplate).execute(any(RedisScript.class), eq(List.of(LOCK_KEY)), args.capture());
+        assertThat(args.getValue()).isEqualTo(acquiredToken.get());
     }
 
     @Test
@@ -64,7 +73,7 @@ class SearchReindexServiceTest {
         assertThat(service.reindex()).isEqualTo(new ReindexResultDto(3, 1));
 
         verify(gameSearchService).reindexAll();
-        verify(redisTemplate).delete(LOCK_KEY);
+        verifyReleasedWithOwnToken();
     }
 
     @Test
@@ -78,7 +87,7 @@ class SearchReindexServiceTest {
                 .isEqualTo(ErrorCode.REINDEX_ALREADY_RUNNING);
 
         verifyNoInteractions(gameSearchService);
-        verify(redisTemplate, never()).delete(anyString());
+        verify(redisTemplate, never()).execute(any(RedisScript.class), anyList(), any());
     }
 
     @Test
@@ -90,19 +99,7 @@ class SearchReindexServiceTest {
 
         assertThatThrownBy(() -> service.reindex()).isInstanceOf(InfrastructureException.class);
 
-        verify(redisTemplate).delete(LOCK_KEY);
-    }
-
-    @Test
-    @DisplayName("cudza blokada (przebieg dłuższy niż TTL) NIE jest kasowana przy zwalnianiu")
-    void reindex_doesNotReleaseSomebodyElsesLock() {
-        when(valueOperations.setIfAbsent(eq(LOCK_KEY), anyString(), any(Duration.class))).thenReturn(true);
-        when(valueOperations.get(LOCK_KEY)).thenReturn("token-innej-instancji");
-        when(gameSearchService.reindexAll()).thenReturn(new ReindexResultDto(0, 0));
-
-        service.reindex();
-
-        verify(redisTemplate, never()).delete(anyString());
+        verifyReleasedWithOwnToken();
     }
 
     @Test
@@ -110,7 +107,8 @@ class SearchReindexServiceTest {
     void reindex_whenRedisDown_proceedsWithoutLock() {
         when(valueOperations.setIfAbsent(eq(LOCK_KEY), anyString(), any(Duration.class)))
                 .thenThrow(new RedisConnectionFailureException("redis down"));
-        when(valueOperations.get(LOCK_KEY)).thenThrow(new RedisConnectionFailureException("redis down"));
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any()))
+                .thenThrow(new RedisConnectionFailureException("redis down"));
         when(gameSearchService.reindexAll()).thenReturn(new ReindexResultDto(1, 0));
 
         assertThat(service.reindex()).isEqualTo(new ReindexResultDto(1, 0));

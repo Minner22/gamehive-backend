@@ -10,6 +10,7 @@ import com.meilisearch.sdk.SearchRequest;
 import com.meilisearch.sdk.exceptions.MeilisearchApiException;
 import com.meilisearch.sdk.exceptions.MeilisearchCommunicationException;
 import com.meilisearch.sdk.exceptions.MeilisearchException;
+import com.meilisearch.sdk.exceptions.MeilisearchTimeoutException;
 import com.meilisearch.sdk.json.GsonJsonHandler;
 import com.meilisearch.sdk.model.SearchResultPaginated;
 import com.meilisearch.sdk.model.Task;
@@ -200,7 +201,7 @@ class MeiliGameSearchServiceTest {
 
         InOrder order = inOrder(index);
         order.verify(index).addDocuments(anyString(), eq("id"));
-        order.verify(index).waitForTask(10);
+        order.verify(index).waitForTask(10, 60000, 50);
         order.verify(index).getTask(10);
     }
 
@@ -224,6 +225,42 @@ class MeiliGameSearchServiceTest {
     }
 
     @Test
+    @DisplayName("zadanie, które nie zdążyło się rozstrzygnąć -> WARN 'status unknown', a NIE ERROR o rozjeździe indeksu")
+    void index_taskTimeout_isWarnedNotReportedAsFailure() {
+        ListAppender<ILoggingEvent> logs = attachAppender();
+        TaskInfo indexTask = enqueuedTask(13);
+        when(index.addDocuments(anyString(), eq("id"))).thenReturn(indexTask);
+        doThrow(new MeilisearchTimeoutException()).when(index).waitForTask(eq(13), anyInt(), anyInt());
+
+        assertThatNoException().isThrownBy(() -> service.index(List.of(gameDocument())));
+
+        verify(index, never()).getTask(anyInt());   // nie ma statusu, o który można by zapytać
+        assertThat(logs.list).noneMatch(event -> event.getLevel() == Level.ERROR);
+        assertThat(logs.list)
+                .filteredOn(event -> event.getLevel() == Level.WARN)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage())
+                        .contains("13")
+                        .contains("game-1")
+                        .contains("status unknown"));
+    }
+
+    @Test
+    @DisplayName("timeout zadania w reindeksie przerywa przebieg — liczniki muszą być potwierdzone")
+    void reindexAll_taskTimeout_doesNotReportSuccess() {
+        TaskInfo clearTask = enqueuedTask(1);
+        when(index.deleteAllDocuments()).thenReturn(clearTask);
+        doThrow(new MeilisearchTimeoutException()).when(index).waitForTask(eq(1), anyInt(), anyInt());
+
+        assertThatThrownBy(() -> service.reindexAll())
+                .isInstanceOf(InfrastructureException.class)
+                .extracting(exception -> ((InfrastructureException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.SEARCH_FAILED);
+
+        verifyNoInteractions(documentReader);
+    }
+
+    @Test
     @DisplayName("nieudane zadanie usuwania też kończy się samym ERROR-em")
     void delete_failedTask_isLoggedNotThrown() {
         TaskInfo deleteTask = enqueuedTask(12);
@@ -232,7 +269,7 @@ class MeiliGameSearchServiceTest {
 
         assertThatNoException().isThrownBy(() -> service.delete("game-1"));
 
-        verify(index).waitForTask(12);
+        verify(index).waitForTask(12, 60000, 50);
         verify(index).getTask(12);
     }
 
@@ -352,12 +389,12 @@ class MeiliGameSearchServiceTest {
         order.verify(index).updateSearchableAttributesSettings(MeiliGameSearchService.SEARCHABLE_ATTRIBUTES);
         order.verify(index).updateFilterableAttributesSettings(MeiliGameSearchService.FILTERABLE_ATTRIBUTES);
         order.verify(index).deleteAllDocuments();
-        order.verify(index).waitForTask(1);
+        order.verify(index).waitForTask(1, 60000, 50);
         // dwie partie gier + jedna dodatków, każda doczekana
         order.verify(index, times(3)).addDocuments(anyString(), eq("id"));
-        verify(index).waitForTask(2);
-        verify(index).waitForTask(3);
-        verify(index).waitForTask(4);
+        verify(index).waitForTask(2, 60000, 50);
+        verify(index).waitForTask(3, 60000, 50);
+        verify(index).waitForTask(4, 60000, 50);
     }
 
     @Test
