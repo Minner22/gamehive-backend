@@ -10,15 +10,17 @@ import pl.m22.gamehive.game.search.dto.GameSearchFilter;
 import pl.m22.gamehive.game.search.dto.ReindexResultDto;
 import pl.m22.gamehive.game.search.dto.SearchResultDto;
 
+import java.util.List;
+
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "gamehive.search.enabled", havingValue = "false")
 public class NoOpGameSearchService implements GameSearchService {
 
     @Override
-    public void index(GameSearchDocument document) {
+    public void index(List<GameSearchDocument> documents) {
 
-        log.debug("Search disabled - skipping index of {}", document.id());
+        log.debug("Search disabled - skipping index of {} document(s)", documents.size());
     }
 
     @Override

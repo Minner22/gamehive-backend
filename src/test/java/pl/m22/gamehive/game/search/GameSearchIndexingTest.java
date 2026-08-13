@@ -127,8 +127,9 @@ class GameSearchIndexingTest {
                 List.of(1L), List.of(), List.of(1L), List.of(), List.of(), List.of(), false);
     }
 
-    private static ArgumentCaptor<GameSearchDocument> documentCaptor() {
-        return ArgumentCaptor.forClass(GameSearchDocument.class);
+    @SuppressWarnings("unchecked")
+    private static ArgumentCaptor<List<GameSearchDocument>> documentBatchCaptor() {
+        return ArgumentCaptor.forClass(List.class);
     }
 
     // ---------- gry ----------
@@ -138,11 +139,13 @@ class GameSearchIndexingTest {
     void approve_indexesGameDocument() {
         tx.executeWithoutResult(_ -> gameModerationService.approve(pendingGameId, MODERATOR));
 
-        ArgumentCaptor<GameSearchDocument> document = documentCaptor();
-        verify(gameSearchService).index(document.capture());
-        assertThat(document.getValue().id()).isEqualTo("game-" + pendingGameId);
-        assertThat(document.getValue().title()).isEqualTo("Cel indeksu");
-        assertThat(document.getValue().categoryIds()).containsExactly(1L);
+        ArgumentCaptor<List<GameSearchDocument>> batch = documentBatchCaptor();
+        verify(gameSearchService).index(batch.capture());
+        assertThat(batch.getValue()).singleElement().satisfies(document -> {
+            assertThat(document.id()).isEqualTo("game-" + pendingGameId);
+            assertThat(document.title()).isEqualTo("Cel indeksu");
+            assertThat(document.categoryIds()).containsExactly(1L);
+        });
         verify(gameSearchService, never()).delete(any());
     }
 
@@ -186,20 +189,23 @@ class GameSearchIndexingTest {
     }
 
     @Test
-    @DisplayName("edycja APPROVED gry -> upsert gry ORAZ jej APPROVED dodatków (zmiana wartości dziedziczonych)")
-    void updateApprovedGame_reindexesInheritingExpansions() {
+    @DisplayName("edycja APPROVED gry -> JEDEN upsert z grą i jej APPROVED dodatkami (1 addDocuments, nie 1+N)")
+    void updateApprovedGame_batchesGameAndInheritingExpansions() {
         Long baseGameId = saveGame("Baza indeksu", ModerationStatus.APPROVED, 45);
-        Long expansionId = saveExpansion(baseGameId, "Dodatek dziedziczący", ModerationStatus.APPROVED);
+        Long firstExpansionId = saveExpansion(baseGameId, "Dodatek dziedziczący", ModerationStatus.APPROVED);
+        Long secondExpansionId = saveExpansion(baseGameId, "Drugi dodatek", ModerationStatus.APPROVED);
 
         tx.executeWithoutResult(_ ->
                 gameModerationService.updateApprovedGame(baseGameId, editRequest(90), MODERATOR));
 
-        ArgumentCaptor<GameSearchDocument> documents = documentCaptor();
-        verify(gameSearchService, times(2)).index(documents.capture());
-        assertThat(documents.getAllValues()).extracting(GameSearchDocument::id)
-                .containsExactlyInAnyOrder("game-" + baseGameId, "expansion-" + expansionId);
-        assertThat(documents.getAllValues())
-                .filteredOn(document -> document.targetId().equals(expansionId))
+        ArgumentCaptor<List<GameSearchDocument>> batch = documentBatchCaptor();
+        verify(gameSearchService, times(1)).index(batch.capture());
+        assertThat(batch.getValue()).extracting(GameSearchDocument::id)
+                .containsExactlyInAnyOrder("game-" + baseGameId,
+                        "expansion-" + firstExpansionId,
+                        "expansion-" + secondExpansionId);
+        assertThat(batch.getValue())
+                .filteredOn(document -> document.targetId().equals(firstExpansionId))
                 .singleElement()
                 .satisfies(document -> {
                     assertThat(document.playingTimeMinutes()).isEqualTo(90);   // nowa wartość dziedziczona
@@ -215,7 +221,10 @@ class GameSearchIndexingTest {
         tx.executeWithoutResult(_ ->
                 gameModerationService.updateApprovedGame(baseGameId, editRequest(60), MODERATOR));
 
-        verify(gameSearchService, times(1)).index(any());
+        ArgumentCaptor<List<GameSearchDocument>> batch = documentBatchCaptor();
+        verify(gameSearchService, times(1)).index(batch.capture());
+        assertThat(batch.getValue()).singleElement()
+                .extracting(GameSearchDocument::id).isEqualTo("game-" + baseGameId);
     }
 
     @Test
@@ -227,9 +236,10 @@ class GameSearchIndexingTest {
         tx.executeWithoutResult(_ ->
                 gameModerationService.updateApprovedGame(baseGameId, editRequest(75), MODERATOR));
 
-        ArgumentCaptor<GameSearchDocument> documents = documentCaptor();
-        verify(gameSearchService, times(1)).index(documents.capture());
-        assertThat(documents.getValue().id()).isEqualTo("game-" + baseGameId);
+        ArgumentCaptor<List<GameSearchDocument>> batch = documentBatchCaptor();
+        verify(gameSearchService, times(1)).index(batch.capture());
+        assertThat(batch.getValue()).singleElement()
+                .extracting(GameSearchDocument::id).isEqualTo("game-" + baseGameId);
     }
 
     // ---------- dodatki ----------
@@ -242,12 +252,14 @@ class GameSearchIndexingTest {
 
         tx.executeWithoutResult(_ -> expansionModerationService.approve(expansionId, MODERATOR));
 
-        ArgumentCaptor<GameSearchDocument> document = documentCaptor();
-        verify(gameSearchService).index(document.capture());
-        assertThat(document.getValue().id()).isEqualTo("expansion-" + expansionId);
-        assertThat(document.getValue().playingTimeMinutes()).isEqualTo(45);   // dziedziczone
-        assertThat(document.getValue().baseGameTitle()).isEqualTo("Baza dodatku");
-        assertThat(document.getValue().yearPublished()).isNull();
+        ArgumentCaptor<List<GameSearchDocument>> batch = documentBatchCaptor();
+        verify(gameSearchService).index(batch.capture());
+        assertThat(batch.getValue()).singleElement().satisfies(document -> {
+            assertThat(document.id()).isEqualTo("expansion-" + expansionId);
+            assertThat(document.playingTimeMinutes()).isEqualTo(45);   // dziedziczone
+            assertThat(document.baseGameTitle()).isEqualTo("Baza dodatku");
+            assertThat(document.yearPublished()).isNull();
+        });
     }
 
     @Test

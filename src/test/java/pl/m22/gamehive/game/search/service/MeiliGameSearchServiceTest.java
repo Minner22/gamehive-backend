@@ -1,16 +1,22 @@
 package pl.m22.gamehive.game.search.service;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.meilisearch.sdk.Client;
 import com.meilisearch.sdk.Index;
 import com.meilisearch.sdk.SearchRequest;
 import com.meilisearch.sdk.exceptions.MeilisearchApiException;
 import com.meilisearch.sdk.exceptions.MeilisearchCommunicationException;
 import com.meilisearch.sdk.exceptions.MeilisearchException;
+import com.meilisearch.sdk.exceptions.MeilisearchTimeoutException;
 import com.meilisearch.sdk.json.GsonJsonHandler;
 import com.meilisearch.sdk.model.SearchResultPaginated;
 import com.meilisearch.sdk.model.Task;
 import com.meilisearch.sdk.model.TaskInfo;
 import com.meilisearch.sdk.model.TaskStatus;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +25,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -33,8 +40,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -107,6 +113,19 @@ class MeiliGameSearchServiceTest {
         return taskInfo;
     }
 
+    /** Kryterium akceptacji mówi o TREŚCI ERROR-a (taskUid + id dokumentu), więc samo „nie rzuciło" nie wystarczy. */
+    private static ListAppender<ILoggingEvent> attachAppender() {
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        ((Logger) LoggerFactory.getLogger(MeiliGameSearchService.class)).addAppender(appender);
+        return appender;
+    }
+
+    @AfterEach
+    void detachAppenders() {
+        ((Logger) LoggerFactory.getLogger(MeiliGameSearchService.class)).detachAndStopAllAppenders();
+    }
+
     private void stubTaskStatus(int taskUid, TaskStatus status) {
         Task task = mock(Task.class);
         lenient().when(task.getStatus()).thenReturn(status);
@@ -118,8 +137,9 @@ class MeiliGameSearchServiceTest {
     void index_sendsDocumentJsonWithPrimaryKey() {
         TaskInfo indexTask = enqueuedTask(7);
         when(index.addDocuments(anyString(), eq("id"))).thenReturn(indexTask);
+        stubTaskStatus(7, TaskStatus.SUCCEEDED);
 
-        service.index(gameDocument());
+        service.index(List.of(gameDocument()));
 
         ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
         verify(index).addDocuments(json.capture(), eq("id"));
@@ -134,14 +154,123 @@ class MeiliGameSearchServiceTest {
     }
 
     @Test
+    @DisplayName("index() z partią -> JEDNO addDocuments z tablicą JSON obu dokumentów (fan-out edycji gry bazowej)")
+    void index_sendsWholeBatchInOneCall() {
+        TaskInfo batchTask = enqueuedTask(9);
+        when(index.addDocuments(anyString(), eq("id"))).thenReturn(batchTask);
+        stubTaskStatus(9, TaskStatus.SUCCEEDED);
+
+        service.index(List.of(gameDocument("game-1", 1L), expansionDocument()));
+
+        ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
+        verify(index, times(1)).addDocuments(json.capture(), eq("id"));
+        assertThat(json.getValue())
+                .startsWith("[")
+                .contains("\"id\":\"game-1\"")
+                .contains("\"id\":\"expansion-1\"");
+    }
+
+    @Test
+    @DisplayName("pusta partia -> zero wywołań HTTP (nie ma czego indeksować)")
+    void index_withEmptyBatch_doesNothing() {
+        service.index(List.of());
+
+        verifyNoInteractions(client);
+    }
+
+    @Test
     @DisplayName("delete() usuwa dokument po prefiksowanym id")
     void delete_removesDocumentById() {
         TaskInfo deleteTask = enqueuedTask(8);
         when(index.deleteDocument("expansion-1")).thenReturn(deleteTask);
+        stubTaskStatus(8, TaskStatus.SUCCEEDED);
 
         service.delete("expansion-1");
 
         verify(index).deleteDocument("expansion-1");
+    }
+
+    @Test
+    @DisplayName("index() czeka na zadanie i sprawdza jego stan — samo TaskInfo znaczy tylko 'zakolejkowane'")
+    void index_verifiesTaskStatus() {
+        TaskInfo indexTask = enqueuedTask(10);
+        when(index.addDocuments(anyString(), eq("id"))).thenReturn(indexTask);
+        stubTaskStatus(10, TaskStatus.SUCCEEDED);
+
+        service.index(List.of(gameDocument()));
+
+        InOrder order = inOrder(index);
+        order.verify(index).addDocuments(anyString(), eq("id"));
+        order.verify(index).waitForTask(10, 60000, 50);
+        order.verify(index).getTask(10);
+    }
+
+    @Test
+    @DisplayName("nieudane zadanie indeksowania -> ERROR z taskUid i id dokumentu, BEZ wyjątku (jesteśmy po committcie)")
+    void index_failedTask_isLoggedNotThrown() {
+        ListAppender<ILoggingEvent> logs = attachAppender();
+        TaskInfo indexTask = enqueuedTask(11);
+        when(index.addDocuments(anyString(), eq("id"))).thenReturn(indexTask);
+        stubTaskStatus(11, TaskStatus.FAILED);
+
+        assertThatNoException().isThrownBy(() -> service.index(List.of(gameDocument())));
+
+        assertThat(logs.list)
+                .filteredOn(event -> event.getLevel() == Level.ERROR)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage())
+                        .contains("11")
+                        .contains("game-1")
+                        .containsIgnoringCase("failed"));   // TaskStatus.toString() jest małymi literami
+    }
+
+    @Test
+    @DisplayName("zadanie, które nie zdążyło się rozstrzygnąć -> WARN 'status unknown', a NIE ERROR o rozjeździe indeksu")
+    void index_taskTimeout_isWarnedNotReportedAsFailure() {
+        ListAppender<ILoggingEvent> logs = attachAppender();
+        TaskInfo indexTask = enqueuedTask(13);
+        when(index.addDocuments(anyString(), eq("id"))).thenReturn(indexTask);
+        doThrow(new MeilisearchTimeoutException()).when(index).waitForTask(eq(13), anyInt(), anyInt());
+
+        assertThatNoException().isThrownBy(() -> service.index(List.of(gameDocument())));
+
+        verify(index, never()).getTask(anyInt());   // nie ma statusu, o który można by zapytać
+        assertThat(logs.list).noneMatch(event -> event.getLevel() == Level.ERROR);
+        assertThat(logs.list)
+                .filteredOn(event -> event.getLevel() == Level.WARN)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage())
+                        .contains("13")
+                        .contains("game-1")
+                        .contains("status unknown"));
+    }
+
+    @Test
+    @DisplayName("timeout zadania w reindeksie przerywa przebieg — liczniki muszą być potwierdzone")
+    void reindexAll_taskTimeout_doesNotReportSuccess() {
+        TaskInfo clearTask = enqueuedTask(1);
+        when(index.deleteAllDocuments()).thenReturn(clearTask);
+        doThrow(new MeilisearchTimeoutException()).when(index).waitForTask(eq(1), anyInt(), anyInt());
+
+        assertThatThrownBy(() -> service.reindexAll())
+                .isInstanceOf(InfrastructureException.class)
+                .extracting(exception -> ((InfrastructureException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.SEARCH_FAILED);
+
+        verifyNoInteractions(documentReader);
+    }
+
+    @Test
+    @DisplayName("nieudane zadanie usuwania też kończy się samym ERROR-em")
+    void delete_failedTask_isLoggedNotThrown() {
+        TaskInfo deleteTask = enqueuedTask(12);
+        when(index.deleteDocument("game-1")).thenReturn(deleteTask);
+        stubTaskStatus(12, TaskStatus.FAILED);
+
+        assertThatNoException().isThrownBy(() -> service.delete("game-1"));
+
+        verify(index).waitForTask(12, 60000, 50);
+        verify(index).getTask(12);
     }
 
     @Test
@@ -260,12 +389,12 @@ class MeiliGameSearchServiceTest {
         order.verify(index).updateSearchableAttributesSettings(MeiliGameSearchService.SEARCHABLE_ATTRIBUTES);
         order.verify(index).updateFilterableAttributesSettings(MeiliGameSearchService.FILTERABLE_ATTRIBUTES);
         order.verify(index).deleteAllDocuments();
-        order.verify(index).waitForTask(1);
+        order.verify(index).waitForTask(1, 60000, 50);
         // dwie partie gier + jedna dodatków, każda doczekana
         order.verify(index, times(3)).addDocuments(anyString(), eq("id"));
-        verify(index).waitForTask(2);
-        verify(index).waitForTask(3);
-        verify(index).waitForTask(4);
+        verify(index).waitForTask(2, 60000, 50);
+        verify(index).waitForTask(3, 60000, 50);
+        verify(index).waitForTask(4, 60000, 50);
     }
 
     @Test
@@ -403,7 +532,7 @@ class MeiliGameSearchServiceTest {
         doThrow(new MeilisearchCommunicationException("connection refused"))
                 .when(index).addDocuments(anyString(), eq("id"));
 
-        assertThatThrownBy(() -> service.index(gameDocument()))
+        assertThatThrownBy(() -> service.index(List.of(gameDocument())))
                 .isInstanceOf(InfrastructureException.class)
                 .extracting(exception -> ((InfrastructureException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.SEARCH_INDEX_UNAVAILABLE);

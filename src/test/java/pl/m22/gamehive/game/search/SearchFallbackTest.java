@@ -3,9 +3,12 @@ package pl.m22.gamehive.game.search;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -14,11 +17,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.config.AsyncConfig;
+import pl.m22.gamehive.game.search.event.SearchIndexListener;
 import pl.m22.gamehive.game.search.service.GameSearchService;
 import pl.m22.gamehive.game.search.service.NoOpGameSearchService;
 
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -39,6 +45,8 @@ class SearchFallbackTest {
     @Autowired JwtService jwtService;
     @Autowired RedisTemplate<String, String> redisTemplate;
     @Autowired GameSearchService gameSearchService;
+    @Autowired @Qualifier(AsyncConfig.SEARCH_INDEX_EXECUTOR) Executor searchIndexExecutor;
+    @Autowired SearchIndexListener searchIndexListener;
     @MockitoBean JavaMailSender mailSender;
 
     private String janeToken;
@@ -55,6 +63,19 @@ class SearchFallbackTest {
     @DisplayName("w profilu test aktywny jest NoOpGameSearchService (gamehive.search.enabled=false)")
     void testProfile_activatesFallbackImplementation() {
         assertThat(gameSearchService).isInstanceOf(NoOpGameSearchService.class);
+    }
+
+    @Test
+    @DisplayName("w profilu test executor indeksu jest inline (SyncTaskExecutor) — asercje po zdarzeniu zostają deterministyczne, bez Awaitility")
+    void testProfile_usesInlineSearchIndexExecutor() {
+        assertThat(searchIndexExecutor).isInstanceOf(SyncTaskExecutor.class);
+    }
+
+    /** Sama adnotacja @Async nic nie daje bez proxy — a proxy powstaje niezależnie od tego, że executor jest tu inline. */
+    @Test
+    @DisplayName("listener indeksu jest opakowany w proxy AOP — bez tego @Async byłoby martwą adnotacją")
+    void searchIndexListener_isProxied() {
+        assertThat(AopUtils.isAopProxy(searchIndexListener)).isTrue();
     }
 
     @Test

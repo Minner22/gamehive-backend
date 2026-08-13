@@ -15,7 +15,7 @@ import pl.m22.gamehive.game.search.service.GameSearchService;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatNoException;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,19 +25,23 @@ class SearchIndexListenerTest {
     @InjectMocks SearchIndexListener listener;
 
     private static GameSearchDocument document() {
-        return new GameSearchDocument("game-1", ContentModerationTargetType.GAME, 1L,
+        return document("game-1", 1L);
+    }
+
+    private static GameSearchDocument document(String id, long targetId) {
+        return new GameSearchDocument(id, ContentModerationTargetType.GAME, targetId,
                 "Agricola", "Opis.", null, List.of(1L), List.of(1L), List.of(), List.of(),
                 1, 4, 120, 2007, 12, null);
     }
 
     @Test
-    @DisplayName("UPSERT -> GameSearchService.index(dokument)")
-    void upsert_delegatesToIndex() {
-        GameSearchDocument document = document();
+    @DisplayName("UPSERT -> JEDNO index() z całą partią (jedno wywołanie HTTP na operację moderacyjną)")
+    void upsert_delegatesToIndexAsSingleBatch() {
+        List<GameSearchDocument> documents = List.of(document("game-1", 1L), document("expansion-1", 1L));
 
-        listener.onSearchIndex(SearchIndexEvent.upsert(document));
+        listener.onSearchIndex(SearchIndexEvent.upsert(documents));
 
-        verify(gameSearchService).index(document);
+        verify(gameSearchService, times(1)).index(documents);
         verifyNoMoreInteractions(gameSearchService);
     }
 
@@ -54,7 +58,7 @@ class SearchIndexListenerTest {
     @DisplayName("awaria indeksu jest logowana i NIE wypływa z listenera — akcja biznesowa jest już scommitowana")
     void indexFailure_isLoggedAndSwallowed() {
         doThrow(new InfrastructureException(ErrorCode.SEARCH_INDEX_UNAVAILABLE))
-                .when(gameSearchService).index(any());
+                .when(gameSearchService).index(anyList());
 
         assertThatNoException()
                 .isThrownBy(() -> listener.onSearchIndex(SearchIndexEvent.upsert(document())));

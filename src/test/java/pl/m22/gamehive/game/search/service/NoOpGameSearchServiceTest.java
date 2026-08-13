@@ -23,7 +23,8 @@ class NoOpGameSearchServiceTest {
                 "Agricola", "Opis.", null, List.of(1L), List.of(1L), List.of(), List.of(),
                 1, 4, 120, 2007, 12, null);
 
-        assertThatNoException().isThrownBy(() -> service.index(document));
+        assertThatNoException().isThrownBy(() -> service.index(List.of(document)));
+        assertThatNoException().isThrownBy(() -> service.index(List.of()));
         assertThatNoException().isThrownBy(() -> service.delete("game-1"));
     }
 

@@ -7,9 +7,11 @@ import pl.m22.gamehive.game.search.dto.GameSearchFilter;
 import pl.m22.gamehive.game.search.dto.ReindexResultDto;
 import pl.m22.gamehive.game.search.dto.SearchResultDto;
 
+import java.util.List;
+
 public interface GameSearchService {
 
-    void index(GameSearchDocument document);
+    void index(List<GameSearchDocument> documents);
 
     void delete(String documentId);
 

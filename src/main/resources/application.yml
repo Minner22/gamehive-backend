@@ -51,3 +51,5 @@ gamehive:
       host: http://localhost:7700
       index-uid: gamehive_content
       reindex-batch-size: 200
+      reindex-lock-ttl: 15m
+      task-wait-timeout: 60s

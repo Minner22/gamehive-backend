@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pl.m22.gamehive.common.exception.ApiError;
 import pl.m22.gamehive.game.search.dto.ReindexResultDto;
-import pl.m22.gamehive.game.search.service.GameSearchService;
+import pl.m22.gamehive.game.search.service.SearchReindexService;
 
 @RestController
 @RequestMapping("/api/v1/admin/search")
@@ -37,17 +37,20 @@ import pl.m22.gamehive.game.search.service.GameSearchService;
 })
 public class SearchAdminController {
 
-    private final GameSearchService gameSearchService;
+    private final SearchReindexService searchReindexService;
 
     @Operation(summary = "Przebuduj indeks wyszukiwania z bazy",
             description = "Kasuje zawartość indeksu i wypycha ponownie wszystkie zatwierdzone gry i dodatki. "
                     + "Narzędzie naprawcze po awarii wyszukiwarki — indeksowanie bieżące dzieje się zdarzeniami "
-                    + "po decyzjach moderacyjnych. Na czas przebudowy indeks bywa chwilowo niekompletny.")
+                    + "po decyzjach moderacyjnych. Na czas przebudowy indeks bywa chwilowo niekompletny. "
+                    + "Jednocześnie może biec tylko jedna przebudowa.")
     @ApiResponse(responseCode = "200", description = "Indeks przebudowany, w ciele liczniki dokumentów",
             content = @Content(schema = @Schema(implementation = ReindexResultDto.class)))
+    @ApiResponse(responseCode = "409", description = "Przebudowa indeksu już trwa (REINDEX_ALREADY_RUNNING)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/reindex")
     public ResponseEntity<ReindexResultDto> reindex() {
 
-        return ResponseEntity.ok(gameSearchService.reindexAll());
+        return ResponseEntity.ok(searchReindexService.reindex());
     }
 }
