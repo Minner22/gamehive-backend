@@ -1,24 +1,14 @@
 package pl.m22.gamehive.game.search.service;
 
-import com.meilisearch.sdk.Client;
-import com.meilisearch.sdk.Index;
 import com.meilisearch.sdk.SearchRequest;
-import com.meilisearch.sdk.exceptions.MeilisearchApiException;
-import com.meilisearch.sdk.exceptions.MeilisearchCommunicationException;
-import com.meilisearch.sdk.exceptions.MeilisearchException;
-import com.meilisearch.sdk.exceptions.MeilisearchTimeoutException;
-import com.meilisearch.sdk.json.JsonHandler;
 import com.meilisearch.sdk.model.SearchResultPaginated;
-import com.meilisearch.sdk.model.Task;
-import com.meilisearch.sdk.model.TaskInfo;
-import com.meilisearch.sdk.model.TaskStatus;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
-import pl.m22.gamehive.common.exception.ErrorCode;
-import pl.m22.gamehive.common.exception.InfrastructureException;
 import pl.m22.gamehive.game.model.ContentModerationTargetType;
+import pl.m22.gamehive.game.search.config.MeiliClientConfig;
 import pl.m22.gamehive.game.search.config.MeiliProperties;
 import pl.m22.gamehive.game.search.dto.*;
 
@@ -38,34 +28,23 @@ public class MeiliGameSearchService implements GameSearchService {
     static final String[] FILTERABLE_ATTRIBUTES = {"targetType", "publisherIds", "categoryIds", "mechanicIds",
             "authorIds", "baseGameId", "minPlayers", "maxPlayers", "playingTimeMinutes", "yearPublished", "minAge"};
 
-    private static final String PRIMARY_KEY = "id";
-    private static final String INDEX_ALREADY_EXISTS = "index_already_exists";
-    private static final int TASK_POLL_INTERVAL_MILLIS = 50;
-
-    private final Client client;
-    private final JsonHandler jsonHandler;
+    private final MeiliIndexGateway gateway;
     private final MeiliFilterBuilder filterBuilder;
     private final SearchResultHydrator hydrator;
     private final ApprovedContentDocumentReader documentReader;
-    private final String indexUid;
     private final int reindexBatchSize;
-    private final int taskWaitTimeoutMillis;
 
-    public MeiliGameSearchService(Client client,
-                                  JsonHandler jsonHandler,
+    public MeiliGameSearchService(@Qualifier(MeiliClientConfig.CONTENT_GATEWAY) MeiliIndexGateway gateway,
                                   MeiliFilterBuilder filterBuilder,
                                   SearchResultHydrator hydrator,
                                   ApprovedContentDocumentReader documentReader,
                                   MeiliProperties properties) {
 
-        this.client = client;
-        this.jsonHandler = jsonHandler;
+        this.gateway = gateway;
         this.filterBuilder = filterBuilder;
         this.hydrator = hydrator;
         this.documentReader = documentReader;
-        this.indexUid = properties.getIndexUid();
         this.reindexBatchSize = properties.getReindexBatchSize();
-        this.taskWaitTimeoutMillis = Math.toIntExact(properties.getTaskWaitTimeout().toMillis());
     }
 
     @Override
@@ -76,18 +55,16 @@ public class MeiliGameSearchService implements GameSearchService {
         }
 
         String action = "index documents " + documentIds(documents);
-        TaskInfo task = call(() -> index().addDocuments(jsonHandler.encode(documents), PRIMARY_KEY), action);
 
-        awaitTaskSucceeded(task, action);
+        gateway.awaitTaskSucceeded(gateway.addDocuments(documents, action), action);
     }
 
     @Override
     public void delete(String documentId) {
 
         String action = "delete document " + documentId;
-        TaskInfo task = call(() -> index().deleteDocument(documentId), action);
 
-        awaitTaskSucceeded(task, action);
+        gateway.awaitTaskSucceeded(gateway.deleteDocument(documentId, action), action);
     }
 
     @Override
@@ -100,8 +77,7 @@ public class MeiliGameSearchService implements GameSearchService {
                 .hitsPerPage(pageable.getPageSize())
                 .build();
 
-        SearchResultPaginated result = call(() -> (SearchResultPaginated) index().search(request),
-                "search '" + query + "'");
+        SearchResultPaginated result = gateway.searchPaginated(request, "search '" + query + "'");
 
         List<SearchHitRef> hits = result.getHits().stream()
                 .map(MeiliGameSearchService::toHitRefOrNull)
@@ -115,14 +91,21 @@ public class MeiliGameSearchService implements GameSearchService {
     public ReindexResultDto reindexAll() {
 
         ensureIndexSettings();
-        awaitTaskOrThrow(call(() -> index().deleteAllDocuments(), "clear index " + indexUid), "clear index");
+
+        String clearAction = "clear index " + gateway.indexUid();
+        gateway.awaitTaskOrThrow(gateway.deleteAllDocuments(clearAction), clearAction);
 
         long games = pushAll(documentReader::readGames);
         long expansions = pushAll(documentReader::readExpansions);
 
-        log.info("Reindexed {} games and {} expansions into {}", games, expansions, indexUid);
+        log.info("Reindexed {} games and {} expansions into {}", games, expansions, gateway.indexUid());
 
         return new ReindexResultDto(games, expansions);
+    }
+
+    public void ensureIndexSettings() {
+
+        gateway.ensureIndexSettings(SEARCHABLE_ATTRIBUTES, FILTERABLE_ATTRIBUTES);
     }
 
     private long pushAll(Function<Pageable, Page<GameSearchDocument>> reader) {
@@ -135,9 +118,7 @@ public class MeiliGameSearchService implements GameSearchService {
 
             if (batch.hasContent()) {
                 String action = "index batch of " + batch.getNumberOfElements() + " documents";
-                TaskInfo task = call(
-                        () -> index().addDocuments(jsonHandler.encode(batch.getContent()), PRIMARY_KEY), action);
-                awaitTaskOrThrow(task, action);
+                gateway.awaitTaskOrThrow(gateway.addDocuments(batch.getContent(), action), action);
                 pushed += batch.getNumberOfElements();
             }
             if (!batch.hasNext()) {
@@ -145,76 +126,6 @@ public class MeiliGameSearchService implements GameSearchService {
             }
             pageable = pageable.next();
         }
-    }
-
-    private void awaitTaskOrThrow(TaskInfo taskInfo, String action) {
-
-        if (!awaitTaskSucceeded(taskInfo, action)) {
-            throw new InfrastructureException(ErrorCode.SEARCH_FAILED);
-        }
-    }
-
-    private boolean awaitTaskSucceeded(TaskInfo taskInfo, String action) {
-
-        int taskUid = taskInfo.getTaskUid();
-
-        if (!waitUntilSettled(taskUid, action)) {
-            return false;
-        }
-
-        Task task = call(() -> index().getTask(taskUid), action);
-
-        if (task.getStatus() != TaskStatus.SUCCEEDED) {
-            log.error("Meili task {} ({}) finished with status {}: {}", taskUid, action, task.getStatus(),
-                    task.getError() != null ? task.getError().getMessage() : "no error details");
-
-            return false;
-        }
-        log.debug("Meili task {} ({}) succeeded", taskUid, action);
-
-        return true;
-    }
-
-    private boolean waitUntilSettled(int taskUid, String action) {
-
-        try {
-            index().waitForTask(taskUid, taskWaitTimeoutMillis, TASK_POLL_INTERVAL_MILLIS);
-
-            return true;
-        } catch (MeilisearchTimeoutException _) {
-            log.warn("Meili task {} ({}) did not settle within {} ms - status unknown, it may still complete",
-                    taskUid, action, taskWaitTimeoutMillis);
-
-            return false;
-        } catch (MeilisearchException e) {
-            throw failure(e, action);
-        }
-    }
-
-    public void ensureIndexSettings() {
-
-        call(() -> {
-            createIndexIfMissing();
-            index().updateSearchableAttributesSettings(SEARCHABLE_ATTRIBUTES);
-            return index().updateFilterableAttributesSettings(FILTERABLE_ATTRIBUTES);
-        }, "configure index " + indexUid);
-    }
-
-    private void createIndexIfMissing() {
-
-        try {
-            client.createIndex(indexUid, PRIMARY_KEY);
-        } catch (MeilisearchApiException e) {
-            if (!INDEX_ALREADY_EXISTS.equals(e.getCode())) {
-                throw e;
-            }
-            log.debug("Meili index {} already exists", indexUid);
-        }
-    }
-
-    private Index index() {
-
-        return client.index(indexUid);
     }
 
     private static String documentIds(List<GameSearchDocument> documents) {
@@ -232,32 +143,5 @@ public class MeiliGameSearchService implements GameSearchService {
             log.warn("Skipping malformed search hit {} - reindex to clean it up", hit.get("id"), e);
             return null;
         }
-    }
-
-    private <T> T call(MeiliCall<T> meiliCall, String action) {
-
-        try {
-            return meiliCall.execute();
-        } catch (MeilisearchException e) {
-            throw failure(e, action);
-        }
-    }
-
-    private InfrastructureException failure(MeilisearchException e, String action) {
-
-        if (e instanceof MeilisearchCommunicationException || e instanceof MeilisearchTimeoutException) {
-            log.error("Meilisearch unreachable while trying to {}", action, e);
-
-            return new InfrastructureException(ErrorCode.SEARCH_INDEX_UNAVAILABLE);
-        }
-        log.error("Meilisearch rejected request while trying to {}", action, e);
-
-        return new InfrastructureException(ErrorCode.SEARCH_FAILED);
-    }
-
-    @FunctionalInterface
-    private interface MeiliCall<T> {
-
-        T execute() throws MeilisearchException;
     }
 }
