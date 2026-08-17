@@ -15,7 +15,9 @@ import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
 import pl.m22.gamehive.game.search.config.MeiliProperties;
+import pl.m22.gamehive.game.search.dto.ContentReindexCounts;
 import pl.m22.gamehive.game.search.dto.ReindexResultDto;
+import pl.m22.gamehive.game.search.dto.TaxonomyReindexCounts;
 
 import java.time.Duration;
 import java.util.List;
@@ -32,6 +34,7 @@ class SearchReindexServiceTest {
     private static final String LOCK_KEY = SearchReindexService.REINDEX_LOCK_KEY;
 
     @Mock GameSearchService gameSearchService;
+    @Mock TaxonomySuggestService taxonomySuggestService;
     @Mock RedisTemplate<String, String> redisTemplate;
     @Mock ValueOperations<String, String> valueOperations;
 
@@ -45,7 +48,7 @@ class SearchReindexServiceTest {
         MeiliProperties properties = new MeiliProperties();
         properties.setReindexLockTtl(Duration.ofMinutes(15));
 
-        service = new SearchReindexService(gameSearchService, redisTemplate, properties);
+        service = new SearchReindexService(gameSearchService, taxonomySuggestService, redisTemplate, properties);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 
@@ -65,19 +68,21 @@ class SearchReindexServiceTest {
     }
 
     @Test
-    @DisplayName("wolna blokada -> reindeks leci, a klucz jest zwalniany po zakończeniu")
-    void reindex_acquiresLockAndReleasesIt() {
+    @DisplayName("wolna blokada -> przebudowa OBU indeksów pod jedną blokadą, klucz zwalniany po zakończeniu")
+    void reindex_rebuildsBothIndexesUnderOneLock() {
         stubLockFree();
-        when(gameSearchService.reindexAll()).thenReturn(new ReindexResultDto(3, 1));
+        when(gameSearchService.reindexAll()).thenReturn(new ContentReindexCounts(3, 1));
+        when(taxonomySuggestService.reindexAll()).thenReturn(new TaxonomyReindexCounts(5, 8));
 
-        assertThat(service.reindex()).isEqualTo(new ReindexResultDto(3, 1));
+        assertThat(service.reindex()).isEqualTo(new ReindexResultDto(3, 1, 5, 8));
 
         verify(gameSearchService).reindexAll();
+        verify(taxonomySuggestService).reindexAll();
         verifyReleasedWithOwnToken();
     }
 
     @Test
-    @DisplayName("zajęta blokada -> REINDEX_ALREADY_RUNNING (409) i ZERO ruchu w indeksie")
+    @DisplayName("zajęta blokada -> REINDEX_ALREADY_RUNNING (409) i ZERO ruchu w obu indeksach")
     void reindex_whenAlreadyRunning_throwsConflict() {
         when(valueOperations.setIfAbsent(eq(LOCK_KEY), anyString(), any(Duration.class))).thenReturn(false);
 
@@ -87,15 +92,30 @@ class SearchReindexServiceTest {
                 .isEqualTo(ErrorCode.REINDEX_ALREADY_RUNNING);
 
         verifyNoInteractions(gameSearchService);
+        verifyNoInteractions(taxonomySuggestService);
         verify(redisTemplate, never()).execute(any(RedisScript.class), anyList(), any());
     }
 
     @Test
-    @DisplayName("wyjątek w trakcie przebudowy nie zostawia zawieszonej blokady (finally)")
-    void reindex_whenReindexFails_stillReleasesLock() {
+    @DisplayName("awaria przebudowy treści przerywa całość, NIE rusza słowników, ale zwalnia blokadę")
+    void reindex_whenContentFails_skipsTaxonomyAndReleasesLock() {
         stubLockFree();
         when(gameSearchService.reindexAll())
                 .thenThrow(new InfrastructureException(ErrorCode.SEARCH_INDEX_UNAVAILABLE));
+
+        assertThatThrownBy(() -> service.reindex()).isInstanceOf(InfrastructureException.class);
+
+        verifyNoInteractions(taxonomySuggestService);
+        verifyReleasedWithOwnToken();
+    }
+
+    @Test
+    @DisplayName("awaria przebudowy słowników też nie zostawia zawieszonej blokady (finally)")
+    void reindex_whenTaxonomyFails_stillReleasesLock() {
+        stubLockFree();
+        when(gameSearchService.reindexAll()).thenReturn(new ContentReindexCounts(1, 0));
+        when(taxonomySuggestService.reindexAll())
+                .thenThrow(new InfrastructureException(ErrorCode.SEARCH_FAILED));
 
         assertThatThrownBy(() -> service.reindex()).isInstanceOf(InfrastructureException.class);
 
@@ -103,16 +123,18 @@ class SearchReindexServiceTest {
     }
 
     @Test
-    @DisplayName("Redis niedostępny -> fail-open: reindeks (narzędzie naprawcze) i tak rusza")
+    @DisplayName("Redis niedostępny -> fail-open: reindeks (narzędzie naprawcze) i tak rusza, oba indeksy")
     void reindex_whenRedisDown_proceedsWithoutLock() {
         when(valueOperations.setIfAbsent(eq(LOCK_KEY), anyString(), any(Duration.class)))
                 .thenThrow(new RedisConnectionFailureException("redis down"));
         when(redisTemplate.execute(any(RedisScript.class), anyList(), any()))
                 .thenThrow(new RedisConnectionFailureException("redis down"));
-        when(gameSearchService.reindexAll()).thenReturn(new ReindexResultDto(1, 0));
+        when(gameSearchService.reindexAll()).thenReturn(new ContentReindexCounts(1, 0));
+        when(taxonomySuggestService.reindexAll()).thenReturn(new TaxonomyReindexCounts(2, 3));
 
-        assertThat(service.reindex()).isEqualTo(new ReindexResultDto(1, 0));
+        assertThat(service.reindex()).isEqualTo(new ReindexResultDto(1, 0, 2, 3));
 
         verify(gameSearchService).reindexAll();
+        verify(taxonomySuggestService).reindexAll();
     }
 }

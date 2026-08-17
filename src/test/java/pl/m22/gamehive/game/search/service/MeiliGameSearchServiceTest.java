@@ -385,9 +385,9 @@ class MeiliGameSearchServiceTest {
             stubTaskStatus(taskUid, TaskStatus.SUCCEEDED);
         }
 
-        ReindexResultDto result = service.reindexAll();
+        ContentReindexCounts result = service.reindexAll();
 
-        assertThat(result).isEqualTo(new ReindexResultDto(3, 1));
+        assertThat(result).isEqualTo(new ContentReindexCounts(3, 1));
 
         InOrder order = inOrder(client, index);
         order.verify(client).createIndex(INDEX_UID, "id");
@@ -446,7 +446,7 @@ class MeiliGameSearchServiceTest {
         when(index.deleteAllDocuments()).thenReturn(clearTask);
         stubTaskStatus(1, TaskStatus.SUCCEEDED);
 
-        assertThat(service.reindexAll()).isEqualTo(new ReindexResultDto(0, 0));
+        assertThat(service.reindexAll()).isEqualTo(new ContentReindexCounts(0, 0));
 
         verify(index).deleteAllDocuments();
         verify(index, never()).addDocuments(anyString(), eq("id"));

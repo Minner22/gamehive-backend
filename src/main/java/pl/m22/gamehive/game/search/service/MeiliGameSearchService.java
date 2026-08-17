@@ -89,7 +89,7 @@ public class MeiliGameSearchService implements GameSearchService {
     }
 
     @Override
-    public ReindexResultDto reindexAll() {
+    public ContentReindexCounts reindexAll() {
 
         ensureIndexSettings();
 
@@ -101,7 +101,7 @@ public class MeiliGameSearchService implements GameSearchService {
 
         log.info("Reindexed {} games and {} expansions into {}", games, expansions, gateway.indexUid());
 
-        return new ReindexResultDto(games, expansions);
+        return new ContentReindexCounts(games, expansions);
     }
 
     public void ensureIndexSettings() {

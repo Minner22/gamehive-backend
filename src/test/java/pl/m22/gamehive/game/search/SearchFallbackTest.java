@@ -97,13 +97,15 @@ class SearchFallbackTest {
     }
 
     @Test
-    @DisplayName("POST /admin/search/reindex na fallbacku -> 200 i zerowe liczniki (nie próbuje łączyć się z Meili)")
+    @DisplayName("POST /admin/search/reindex na fallbacku -> 200 i zerowe liczniki OBU indeksów (bez łączenia z Meili)")
     void reindex_onFallback_returnsZeroCounters() throws Exception {
         mockMvc.perform(post("/api/v1/admin/search/reindex")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.games").value(0))
-                .andExpect(jsonPath("$.expansions").value(0));
+                .andExpect(jsonPath("$.expansions").value(0))
+                .andExpect(jsonPath("$.publishers").value(0))
+                .andExpect(jsonPath("$.authors").value(0));
     }
 
     @Test
