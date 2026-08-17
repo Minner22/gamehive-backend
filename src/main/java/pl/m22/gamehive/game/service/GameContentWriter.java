@@ -12,6 +12,7 @@ import pl.m22.gamehive.game.model.Publisher;
 import pl.m22.gamehive.game.model.TaxonomyStatus;
 import pl.m22.gamehive.game.repository.AuthorRepository;
 import pl.m22.gamehive.game.repository.PublisherRepository;
+import pl.m22.gamehive.game.search.service.TaxonomyIndexPublisher;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +27,7 @@ public class GameContentWriter {
     private final AuthorRepository authorRepository;
     private final PublisherRepository publisherRepository;
     private final TaxonomyResolver taxonomyResolver;
+    private final TaxonomyIndexPublisher taxonomyIndexPublisher;
 
     public void validateDomainRules(GameRequestDto request) {
 
@@ -44,13 +46,18 @@ public class GameContentWriter {
 
     public void applyAssociations(Game game, GameRequestDto request) {
 
-        resolvePublishers(request).forEach(game::addPublisher);
+        List<Publisher> createdPublishers = new ArrayList<>();
+        List<Author> createdAuthors = new ArrayList<>();
+
+        resolvePublishers(request, createdPublishers).forEach(game::addPublisher);
         taxonomyResolver.resolveCategories(request.categoryIds()).forEach(game::addCategory);
         taxonomyResolver.resolveMechanics(request.mechanicIds()).forEach(game::addMechanic);
-        resolveAuthors(request).forEach(game::addAuthor);
+        resolveAuthors(request, createdAuthors).forEach(game::addAuthor);
+
+        taxonomyIndexPublisher.publishUpsert(createdPublishers, createdAuthors);
     }
 
-    private List<Publisher> resolvePublishers(GameRequestDto request) {
+    private List<Publisher> resolvePublishers(GameRequestDto request, List<Publisher> created) {
 
         List<Publisher> publishers = new ArrayList<>(
                 findAllOrThrow(publisherRepository, request.publisherIds(), ErrorCode.PUBLISHER_NOT_FOUND));
@@ -58,13 +65,17 @@ public class GameContentWriter {
         for (String rawName : nullSafe(request.newPublisherNames())) {
             String name = rawName.trim();
             publishers.add(publisherRepository.findByName(name)
-                    .orElseGet(() -> publisherRepository.save(Publisher.of(name, TaxonomyStatus.PENDING))));
+                    .orElseGet(() -> {
+                        Publisher publisher = publisherRepository.save(Publisher.of(name, TaxonomyStatus.PENDING));
+                        created.add(publisher);
+                        return publisher;
+                    }));
         }
 
         return publishers;
     }
 
-    private List<Author> resolveAuthors(GameRequestDto request) {
+    private List<Author> resolveAuthors(GameRequestDto request, List<Author> created) {
 
         List<Author> authors = new ArrayList<>(
                 findAllOrThrow(authorRepository, request.authorIds(), ErrorCode.AUTHOR_NOT_FOUND));
@@ -74,7 +85,11 @@ public class GameContentWriter {
             String lastName = newAuthor.lastName().trim();
 
             authors.add(authorRepository.findByFirstNameAndLastName(firstName, lastName)
-                    .orElseGet(() -> authorRepository.save(Author.of(firstName, lastName, TaxonomyStatus.PENDING))));
+                    .orElseGet(() -> {
+                        Author author = authorRepository.save(Author.of(firstName, lastName, TaxonomyStatus.PENDING));
+                        created.add(author);
+                        return author;
+                    }));
         }
 
         return authors;

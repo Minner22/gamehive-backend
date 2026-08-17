@@ -8,6 +8,7 @@ import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.game.model.*;
 import pl.m22.gamehive.game.repository.*;
+import pl.m22.gamehive.game.search.service.TaxonomyIndexPublisher;
 
 import java.util.List;
 
@@ -21,6 +22,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
     private final PublisherRepository publisherRepository;
     private final GameRepository gameRepository;
     private final GameExpansionRepository gameExpansionRepository;
+    private final TaxonomyIndexPublisher taxonomyIndexPublisher;
 
     @Transactional(readOnly = true)
     @Override
@@ -145,6 +147,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
 
         Publisher publisher = Publisher.of(name, TaxonomyStatus.APPROVED);
         publisherRepository.save(publisher);
+        taxonomyIndexPublisher.publishUpsert(publisher);
 
         return publisher;
     }
@@ -159,6 +162,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
         if (publisher.getStatus() != TaxonomyStatus.APPROVED) {
             publisher.approve();
         }
+        taxonomyIndexPublisher.publishUpsert(publisher);
 
         return publisher;
     }
@@ -176,6 +180,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
         }
 
         publisherRepository.deleteById(id);
+        taxonomyIndexPublisher.publishRemoval(TaxonomyTargetType.PUBLISHER, id);
     }
 
     @Transactional(readOnly = true)
@@ -197,6 +202,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
 
         Author author = Author.of(firstName, lastName,  TaxonomyStatus.APPROVED);
         authorRepository.save(author);
+        taxonomyIndexPublisher.publishUpsert(author);
 
         return author;
     }
@@ -211,6 +217,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
         if (author.getStatus() != TaxonomyStatus.APPROVED) {
             author.approve();
         }
+        taxonomyIndexPublisher.publishUpsert(author);
 
         return author;
     }
@@ -228,6 +235,7 @@ public class TaxonomyServiceImpl implements TaxonomyService {
         }
 
         author.rename(firstName, lastName);
+        taxonomyIndexPublisher.publishUpsert(author);
 
         return author;
     }
@@ -245,5 +253,6 @@ public class TaxonomyServiceImpl implements TaxonomyService {
         }
 
         authorRepository.deleteById(id);
+        taxonomyIndexPublisher.publishRemoval(TaxonomyTargetType.AUTHOR, id);
     }
 }

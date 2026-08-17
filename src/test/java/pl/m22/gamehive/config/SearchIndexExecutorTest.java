@@ -9,6 +9,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import pl.m22.gamehive.common.logging.CorrelationIdFilter;
 import pl.m22.gamehive.game.search.event.SearchIndexEvent;
 import pl.m22.gamehive.game.search.event.SearchIndexListener;
+import pl.m22.gamehive.game.search.event.TaxonomyIndexEvent;
+import pl.m22.gamehive.game.search.event.TaxonomyIndexListener;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -119,6 +121,18 @@ class SearchIndexExecutorTest {
 
         Async async = SearchIndexListener.class
                 .getDeclaredMethod("onSearchIndex", SearchIndexEvent.class)
+                .getAnnotation(Async.class);
+
+        assertThat(async).isNotNull();
+        assertThat(async.value()).isEqualTo(AsyncConfig.SEARCH_INDEX_EXECUTOR);
+    }
+
+    @Test
+    @DisplayName("listener taksonomii dzieli TEN SAM jednowątkowy executor — kolejność zapisów do obu indeksów")
+    void taxonomyIndexListener_isAsyncOnSameSearchIndexExecutor() throws NoSuchMethodException {
+
+        Async async = TaxonomyIndexListener.class
+                .getDeclaredMethod("onTaxonomyIndex", TaxonomyIndexEvent.class)
                 .getAnnotation(Async.class);
 
         assertThat(async).isNotNull();

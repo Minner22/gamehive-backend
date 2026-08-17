@@ -17,8 +17,11 @@ import pl.m22.gamehive.game.model.*;
 import pl.m22.gamehive.game.repository.GameExpansionRepository;
 import pl.m22.gamehive.game.repository.GameRepository;
 import pl.m22.gamehive.game.search.service.GameSearchIndexPublisher;
+import pl.m22.gamehive.game.search.service.TaxonomyIndexPublisher;
 import pl.m22.gamehive.user.service.UserService;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -32,6 +35,7 @@ public class GameModerationServiceImpl implements GameModerationService {
     private final UserService userService;
     private final ContentModerationAuditPublisher auditPublisher;
     private final GameSearchIndexPublisher searchIndexPublisher;
+    private final TaxonomyIndexPublisher taxonomyIndexPublisher;
 
     @Transactional(readOnly = true)
     @Override
@@ -165,17 +169,24 @@ public class GameModerationServiceImpl implements GameModerationService {
     // approve gry zatwierdza również jej wydawców i autorów PENDING (w tej samej transakcji); APPROVED bez zmian
     private void approvePendingTaxonomy(Game game) {
 
+        List<Publisher> approvedPublishers = new ArrayList<>();
+        List<Author> approvedAuthors = new ArrayList<>();
+
         for (Publisher publisher : game.getPublishers()) {
             if (publisher.getStatus() != TaxonomyStatus.APPROVED) {
                 publisher.approve();
+                approvedPublishers.add(publisher);
             }
         }
 
         for (Author author : game.getAuthors()) {
             if (author.getStatus() != TaxonomyStatus.APPROVED) {
                 author.approve();
+                approvedAuthors.add(author);
             }
         }
+
+        taxonomyIndexPublisher.publishUpsert(approvedPublishers, approvedAuthors);
     }
 
     private void publishAudit(ContentModerationAction action, Long targetId, Email actor, String details) {
