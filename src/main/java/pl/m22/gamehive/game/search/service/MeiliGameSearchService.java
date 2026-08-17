@@ -5,7 +5,9 @@ import com.meilisearch.sdk.model.SearchResultPaginated;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import pl.m22.gamehive.game.model.ContentModerationTargetType;
 import pl.m22.gamehive.game.search.config.MeiliClientConfig;
@@ -15,7 +17,6 @@ import pl.m22.gamehive.game.search.dto.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -95,8 +96,8 @@ public class MeiliGameSearchService implements GameSearchService {
         String clearAction = "clear index " + gateway.indexUid();
         gateway.awaitTaskOrThrow(gateway.deleteAllDocuments(clearAction), clearAction);
 
-        long games = pushAll(documentReader::readGames);
-        long expansions = pushAll(documentReader::readExpansions);
+        long games = gateway.pushAll(reindexBatchSize, documentReader::readGames);
+        long expansions = gateway.pushAll(reindexBatchSize, documentReader::readExpansions);
 
         log.info("Reindexed {} games and {} expansions into {}", games, expansions, gateway.indexUid());
 
@@ -106,26 +107,6 @@ public class MeiliGameSearchService implements GameSearchService {
     public void ensureIndexSettings() {
 
         gateway.ensureIndexSettings(SEARCHABLE_ATTRIBUTES, FILTERABLE_ATTRIBUTES);
-    }
-
-    private long pushAll(Function<Pageable, Page<GameSearchDocument>> reader) {
-
-        long pushed = 0;
-        Pageable pageable = PageRequest.of(0, reindexBatchSize, Sort.by("id"));
-
-        while (true) {
-            Page<GameSearchDocument> batch = reader.apply(pageable);
-
-            if (batch.hasContent()) {
-                String action = "index batch of " + batch.getNumberOfElements() + " documents";
-                gateway.awaitTaskOrThrow(gateway.addDocuments(batch.getContent(), action), action);
-                pushed += batch.getNumberOfElements();
-            }
-            if (!batch.hasNext()) {
-                return pushed;
-            }
-            pageable = pageable.next();
-        }
     }
 
     private static String documentIds(List<GameSearchDocument> documents) {

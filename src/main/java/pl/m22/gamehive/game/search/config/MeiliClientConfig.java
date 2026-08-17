@@ -15,6 +15,8 @@ public class MeiliClientConfig {
 
     public static final String CONTENT_GATEWAY = "contentIndexGateway";
 
+    public static final String TAXONOMY_GATEWAY = "taxonomyIndexGateway";
+
     @Bean
     JsonHandler meiliJsonHandler() {
 
@@ -31,6 +33,13 @@ public class MeiliClientConfig {
     MeiliIndexGateway contentIndexGateway(Client client, JsonHandler jsonHandler, MeiliProperties properties) {
 
         return new MeiliIndexGateway(client, jsonHandler, properties.getIndexUid(),
+                properties.getTaskWaitTimeout());
+    }
+
+    @Bean(TAXONOMY_GATEWAY)
+    MeiliIndexGateway taxonomyIndexGateway(Client client, JsonHandler jsonHandler, MeiliProperties properties) {
+
+        return new MeiliIndexGateway(client, jsonHandler, properties.getTaxonomyIndexUid(),
                 properties.getTaskWaitTimeout());
     }
 }

@@ -13,11 +13,16 @@ import com.meilisearch.sdk.model.Task;
 import com.meilisearch.sdk.model.TaskInfo;
 import com.meilisearch.sdk.model.TaskStatus;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.function.Function;
 
 @Slf4j
 public class MeiliIndexGateway {
@@ -98,6 +103,26 @@ public class MeiliIndexGateway {
 
         if (!awaitTaskSucceeded(taskInfo, action)) {
             throw new InfrastructureException(ErrorCode.SEARCH_FAILED);
+        }
+    }
+
+    public long pushAll(int batchSize, Function<Pageable, Page<?>> reader) {
+
+        long pushed = 0;
+        Pageable pageable = PageRequest.of(0, batchSize, Sort.by("id"));
+
+        while (true) {
+            Page<?> batch = reader.apply(pageable);
+
+            if (batch.hasContent()) {
+                String action = "index batch of " + batch.getNumberOfElements() + " documents into " + indexUid;
+                awaitTaskOrThrow(addDocuments(batch.getContent(), action), action);
+                pushed += batch.getNumberOfElements();
+            }
+            if (!batch.hasNext()) {
+                return pushed;
+            }
+            pageable = pageable.next();
         }
     }
 
