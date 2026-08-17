@@ -25,6 +25,7 @@ import pl.m22.gamehive.game.mapper.CategoryMapper;
 import pl.m22.gamehive.game.mapper.MechanicMapper;
 import pl.m22.gamehive.game.mapper.PublisherMapper;
 import pl.m22.gamehive.game.model.TaxonomyStatus;
+import pl.m22.gamehive.game.search.service.TaxonomySuggestService;
 import pl.m22.gamehive.game.service.TaxonomyService;
 
 import java.util.List;
@@ -44,11 +45,15 @@ import java.util.List;
 })
 public class TaxonomyController {
 
+    private static final String DEFAULT_SUGGEST_LIMIT = "10";
+    private static final int MAX_SUGGEST_LIMIT = 50;
+
     private final AuthorMapper authorMapper;
     private final CategoryMapper categoryMapper;
     private final MechanicMapper mechanicMapper;
     private final PublisherMapper publisherMapper;
     private final TaxonomyService taxonomyService;
+    private final TaxonomySuggestService taxonomySuggestService;
 
     @Operation(summary = "Lista kategorii")
     @ApiResponse(responseCode = "200", description = "Lista kategorii",
@@ -90,4 +95,49 @@ public class TaxonomyController {
         return ResponseEntity.ok(authorMapper.toDtoList(taxonomyService.findAuthors(status)));
     }
 
+    @Operation(summary = "Podpowiedzi wydawców (autocomplete)",
+            description = "Zwraca do `limit` najlepszych trafień po fragmencie nazwy — w kolejności trafności "
+                    + "(Meilisearch) albo alfabetycznie (fallback bazodanowy), więc kolejność NIE jest częścią "
+                    + "kontraktu. Wynik obejmuje wpisy w KAŻDYM statusie, także PENDING: formularz zgłoszenia "
+                    + "reużywa istniejącą nazwę niezależnie od statusu, a ukrycie oczekującego wydawcy "
+                    + "prowokowałoby duplikat, który wpadłby w konflikt unikalności. Pole `status` pozwala "
+                    + "oznaczyć wpis jako oczekujący na akceptację. Brak lub pusta fraza zwraca początek listy. "
+                    + "`limit` poza zakresem 1–" + MAX_SUGGEST_LIMIT + " jest zaciskany, nie odrzucany. "
+                    + "Odpowiedź jest płaską listą — autocomplete nie stronicuje.")
+    @ApiResponse(responseCode = "200", description = "Lista podpowiedzi",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = PublisherDto.class))))
+    @ApiResponse(responseCode = "503", description = "Wyszukiwarka nieosiągalna (SEARCH_INDEX_UNAVAILABLE)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @GetMapping("/publishers/suggest")
+    public ResponseEntity<List<PublisherDto>> suggestPublishers(
+            @Parameter(description = "Fragment nazwy wydawcy; brak lub pusty = początek listy")
+            @RequestParam(required = false) String q,
+            @Parameter(description = "Maksymalna liczba podpowiedzi (1–" + MAX_SUGGEST_LIMIT + ", domyślnie 10)")
+            @RequestParam(defaultValue = DEFAULT_SUGGEST_LIMIT) int limit) {
+
+        return ResponseEntity.ok(taxonomySuggestService.suggestPublishers(q, clampLimit(limit)));
+    }
+
+    @Operation(summary = "Podpowiedzi autorów (autocomplete)",
+            description = "Jak podpowiedzi wydawców, ale fraza dopasowuje imię, nazwisko ORAZ pełne "
+                    + "„Imię Nazwisko\" — dopasowanie idzie po sklejonej nazwie, więc `uwe`, `rosenberg` "
+                    + "i `uwe rosen` trafiają w ten sam wpis. Wynik obejmuje autorów w każdym statusie.")
+    @ApiResponse(responseCode = "200", description = "Lista podpowiedzi",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = AuthorDto.class))))
+    @ApiResponse(responseCode = "503", description = "Wyszukiwarka nieosiągalna (SEARCH_INDEX_UNAVAILABLE)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @GetMapping("/authors/suggest")
+    public ResponseEntity<List<AuthorDto>> suggestAuthors(
+            @Parameter(description = "Fragment imienia, nazwiska lub pełnej nazwy autora")
+            @RequestParam(required = false) String q,
+            @Parameter(description = "Maksymalna liczba podpowiedzi (1–" + MAX_SUGGEST_LIMIT + ", domyślnie 10)")
+            @RequestParam(defaultValue = DEFAULT_SUGGEST_LIMIT) int limit) {
+
+        return ResponseEntity.ok(taxonomySuggestService.suggestAuthors(q, clampLimit(limit)));
+    }
+
+    private static int clampLimit(int limit) {
+
+        return Math.clamp(limit, 1, MAX_SUGGEST_LIMIT);
+    }
 }
