@@ -1,6 +1,8 @@
 package pl.m22.gamehive.game.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.common.exception.ApplicationException;
@@ -130,11 +132,9 @@ public class TaxonomyServiceImpl implements TaxonomyService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<Publisher> findPublishers(TaxonomyStatus status) {
+    public Page<Publisher> findPublishers(TaxonomyStatus status, String query, Pageable pageable) {
 
-        return status == null
-                ? publisherRepository.findAll()
-                : publisherRepository.findByStatus(status);
+        return publisherRepository.findAll(TaxonomySpecifications.publishers(status, query), pageable);
     }
 
     @Transactional
@@ -185,11 +185,9 @@ public class TaxonomyServiceImpl implements TaxonomyService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<Author> findAuthors(TaxonomyStatus status) {
+    public Page<Author> findAuthors(TaxonomyStatus status, String query, Pageable pageable) {
 
-        return status == null
-                ? authorRepository.findAll()
-                : authorRepository.findByStatus(status);
+        return authorRepository.findAll(TaxonomySpecifications.authors(status, query), pageable);
     }
 
     @Transactional

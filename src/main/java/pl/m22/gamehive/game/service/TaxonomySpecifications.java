@@ -4,11 +4,26 @@ import org.springframework.data.jpa.domain.Specification;
 import pl.m22.gamehive.common.persistence.Specifications;
 import pl.m22.gamehive.game.model.Author;
 import pl.m22.gamehive.game.model.Publisher;
+import pl.m22.gamehive.game.model.TaxonomyStatus;
 
 public final class TaxonomySpecifications {
 
     private TaxonomySpecifications() {
         throw new IllegalStateException("Utility class");
+    }
+
+    public static Specification<Publisher> publishers(TaxonomyStatus status, String query) {
+
+        return Specification.allOf(
+                Specifications.equalsIfPresent("status", status),
+                publisherNameLike(query));
+    }
+
+    public static Specification<Author> authors(TaxonomyStatus status, String query) {
+
+        return Specification.allOf(
+                Specifications.equalsIfPresent("status", status),
+                authorNameLike(query));
     }
 
     public static Specification<Publisher> publisherNameLike(String query) {

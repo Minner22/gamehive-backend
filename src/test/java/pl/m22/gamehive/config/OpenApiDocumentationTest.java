@@ -64,4 +64,16 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath("$.paths['/api/v1/taxonomy/publishers/suggest']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/taxonomy/authors/suggest']").exists());
     }
+
+    @Test
+    @DisplayName("Rosnące listy taksonomii są deprecated na rzecz /suggest, kuratorowane zostają bez zmian")
+    void apiDocs_marksGrowingTaxonomyListsDeprecated() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/publishers'].get.deprecated").value(true))
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/authors'].get.deprecated").value(true))
+                // kategorie i mechaniki są kuratorowane i bounded — świadomie NIE są oznaczone
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/categories'].get.deprecated").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/mechanics'].get.deprecated").doesNotExist());
+    }
 }

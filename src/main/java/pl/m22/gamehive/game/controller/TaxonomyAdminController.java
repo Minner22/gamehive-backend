@@ -11,6 +11,9 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -174,14 +177,21 @@ public class TaxonomyAdminController {
 
     // publisher
 
-    @Operation(summary = "Lista wydawców (opcjonalny filtr statusu)")
-    @ApiResponse(responseCode = "200", description = "Lista wydawców",
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = PublisherDto.class))))
+    @Operation(summary = "Lista wydawców (stronicowana, filtr statusu i frazy)",
+            description = "Odpowiedź jest stronicowana, bo lista wydawców rośnie wraz ze zgłoszeniami "
+                    + "użytkowników. Fraza `q` dopasowuje fragment nazwy bez względu na wielkość liter; razem "
+                    + "ze `status` działa koniunkcyjnie. Domyślnie 20 pozycji sortowanych po nazwie.")
+    @ApiResponse(responseCode = "200", description = "Strona wydawców",
+            content = @Content(schema = @Schema(implementation = PagePublisherDto.class)))
     @GetMapping("/publishers")
-    public ResponseEntity<List<PublisherDto>> listPublishers(
+    public ResponseEntity<Page<PublisherDto>> listPublishers(
             @Parameter(description = "Filtr po statusie (PENDING/APPROVED); brak = wszyscy")
-            @RequestParam(required = false) TaxonomyStatus status) {
-        return ResponseEntity.ok(publisherMapper.toDtoList(taxonomyService.findPublishers(status)));
+            @RequestParam(required = false) TaxonomyStatus status,
+            @Parameter(description = "Filtr: fragment nazwy wydawcy; brak lub pusty = bez filtra")
+            @RequestParam(required = false) String q,
+            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+
+        return ResponseEntity.ok(taxonomyService.findPublishers(status, q, pageable).map(publisherMapper::toDto));
     }
 
     @Operation(summary = "Utwórz wydawcę", description = "Tworzy wydawcę od razu ze statusem APPROVED.")
@@ -231,15 +241,21 @@ public class TaxonomyAdminController {
 
     // author
 
-    @Operation(summary = "Lista autorów (opcjonalny filtr statusu)")
-    @ApiResponse(responseCode = "200", description = "Lista autorów",
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = AuthorDto.class))))
+    @Operation(summary = "Lista autorów (stronicowana, filtr statusu i frazy)",
+            description = "Jak lista wydawców, ale fraza `q` dopasowuje imię, nazwisko ORAZ pełne "
+                    + "„Imię Nazwisko\" — po sklejonej nazwie, spójnie z endpointem podpowiedzi. "
+                    + "Domyślnie 20 pozycji sortowanych po nazwisku, potem imieniu.")
+    @ApiResponse(responseCode = "200", description = "Strona autorów",
+            content = @Content(schema = @Schema(implementation = PageAuthorDto.class)))
     @GetMapping("/authors")
-    public ResponseEntity<List<AuthorDto>> listAuthors(
+    public ResponseEntity<Page<AuthorDto>> listAuthors(
             @Parameter(description = "Filtr po statusie (PENDING/APPROVED); brak = wszyscy")
-            @RequestParam(required = false) TaxonomyStatus status) {
+            @RequestParam(required = false) TaxonomyStatus status,
+            @Parameter(description = "Filtr: fragment imienia, nazwiska lub pełnej nazwy; brak = bez filtra")
+            @RequestParam(required = false) String q,
+            @PageableDefault(size = 20, sort = {"lastName", "firstName"}) Pageable pageable) {
 
-        return ResponseEntity.ok(authorMapper.toDtoList(taxonomyService.findAuthors(status)));
+        return ResponseEntity.ok(taxonomyService.findAuthors(status, q, pageable).map(authorMapper::toDto));
     }
 
     @Operation(summary = "Utwórz autora", description = "Tworzy autora od razu ze statusem APPROVED.")

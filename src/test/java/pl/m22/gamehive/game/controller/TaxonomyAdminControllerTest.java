@@ -271,23 +271,62 @@ class TaxonomyAdminControllerTest {
     // ---------- PUBLISHERS: lista + filtr + create + approve + delete ----------
 
     @Test
-    @DisplayName("GET /publishers bez filtra -> 200 + wszyscy (>=3)")
+    @DisplayName("GET /publishers bez filtra -> 200 + strona wszystkich (>=3), domyślnie 20 pozycji od strony 0")
     void listPublishers_all_200() throws Exception {
         mockMvc.perform(get("/api/v1/admin/taxonomy/publishers")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(3))));
+                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(3))))
+                .andExpect(jsonPath("$.totalElements", greaterThanOrEqualTo(3)))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.number").value(0));
     }
 
     @Test
-    @DisplayName("GET /publishers?status=PENDING -> 200 + tylko PENDING")
+    @DisplayName("GET /publishers?status=PENDING -> 200 + tylko PENDING (kontrakt ?status= zachowany)")
     void listPublishers_filterPending_200() throws Exception {
         mockMvc.perform(get("/api/v1/admin/taxonomy/publishers")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
                         .param("status", "PENDING"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(1))))
-                .andExpect(jsonPath("$[*].status", everyItem(is("PENDING"))));
+                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$.content[*].status", everyItem(is("PENDING"))));
+    }
+
+    @Test
+    @DisplayName("GET /publishers?q=grande -> 200 + filtr po fragmencie nazwy")
+    void listPublishers_filterByQuery_200() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/taxonomy/publishers")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .param("q", "grande"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].name").value("Rio Grande Games"));
+    }
+
+    @Test
+    @DisplayName("GET /publishers?status=APPROVED&q=games -> filtry skladane koniunkcyjnie (bez Pending Games)")
+    void listPublishers_filtersCombine_200() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/taxonomy/publishers")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .param("status", "APPROVED")
+                        .param("q", "games"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[*].status", everyItem(is("APPROVED"))))
+                .andExpect(jsonPath("$.content[*].name", not(hasItem("Pending Games"))));
+    }
+
+    @Test
+    @DisplayName("GET /publishers?size=1 -> stronicowanie dziala, sa dalsze strony")
+    void listPublishers_paginates_200() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/taxonomy/publishers")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.last").value(false))
+                .andExpect(jsonPath("$.totalPages", greaterThanOrEqualTo(3)));
     }
 
     @Test
@@ -398,14 +437,15 @@ class TaxonomyAdminControllerTest {
     // ---------- AUTHORS: lista + tworzenie + edycja + usuwanie ----------
 
     @Test
-    @DisplayName("GET /authors jako MODERATOR -> 200 + lista (>=2)")
+    @DisplayName("GET /authors jako MODERATOR -> 200 + strona (>=2), sort po nazwisku")
     void listAuthors_asModerator_200() throws Exception {
         mockMvc.perform(get("/api/v1/admin/taxonomy/authors")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(2))))
-                .andExpect(jsonPath("$[0].firstName").exists())
-                .andExpect(jsonPath("$[0].lastName").exists());
+                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(2))))
+                .andExpect(jsonPath("$.content[0].firstName").exists())
+                .andExpect(jsonPath("$.content[0].lastName").value("Autor"))
+                .andExpect(jsonPath("$.size").value(20));
     }
 
     @Test
@@ -499,8 +539,30 @@ class TaxonomyAdminControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
                         .param("status", "PENDING"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(1))))
-                .andExpect(jsonPath("$[*].status", everyItem(is("PENDING"))));
+                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$.content[*].status", everyItem(is("PENDING"))));
+    }
+
+    @Test
+    @DisplayName("GET /authors?q=knizia -> filtr po nazwisku")
+    void listAuthors_filterByLastName_200() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/taxonomy/authors")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .param("q", "knizia"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].firstName").value("Reiner"));
+    }
+
+    @Test
+    @DisplayName("GET /authors?q=uwe rosen -> filtr po pelnej frazie, spojnie z /suggest")
+    void listAuthors_filterByFullName_200() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/taxonomy/authors")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .param("q", "uwe rosen"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].lastName").value("Rosenberg"));
     }
 
     @Test
