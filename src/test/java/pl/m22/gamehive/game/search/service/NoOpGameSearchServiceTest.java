@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageRequest;
 import pl.m22.gamehive.game.model.ContentModerationTargetType;
+import pl.m22.gamehive.game.search.dto.ContentReindexCounts;
 import pl.m22.gamehive.game.search.dto.GameSearchDocument;
 import pl.m22.gamehive.game.search.dto.GameSearchFilter;
 
@@ -38,5 +39,11 @@ class NoOpGameSearchServiceTest {
         assertThat(page).isEmpty();
         assertThat(page.getTotalElements()).isZero();
         assertThat(page.getSize()).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("reindeks na fallbacku oddaje zerowe liczniki, bez próby połączenia")
+    void reindexReturnsZeroCounts() {
+        assertThat(service.reindexAll()).isEqualTo(new ContentReindexCounts(0, 0));
     }
 }

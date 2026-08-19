@@ -1,5 +1,7 @@
 package pl.m22.gamehive.game.service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import pl.m22.gamehive.game.model.*;
 
 import java.util.List;
@@ -16,12 +18,12 @@ public interface TaxonomyService {
     Mechanic renameMechanic(Long id, String name);
     void deleteMechanic(Long id);
 
-    List<Publisher> findPublishers(TaxonomyStatus status); // status == null -> wszyscy
+    Page<Publisher> findPublishers(TaxonomyStatus status, String query, Pageable pageable);
     Publisher createPublisher(String name);
     Publisher approvePublisher(Long id);
     void deletePublisher(Long id);
 
-    List<Author> findAuthors(TaxonomyStatus status);
+    Page<Author> findAuthors(TaxonomyStatus status, String query, Pageable pageable);
     Author createAuthor(String firstName, String lastName);
     Author approveAuthor(Long id);
     Author updateAuthor(Long id, String firstName, String lastName);

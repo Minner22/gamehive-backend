@@ -8,6 +8,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 import pl.m22.gamehive.game.model.Author;
 import pl.m22.gamehive.game.model.TaxonomyStatus;
+import pl.m22.gamehive.game.service.TaxonomySpecifications;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,10 +48,12 @@ class AuthorRepositoryTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    // po GH-131 filtr statusu idzie Specification (findByStatus zniknął) — asercja pilnuje tego samego
+    // niezmiennika fixture: autor 3 jest JEDYNYM oczekującym, na czym opierają się testy taksonomii
     @Test
-    @DisplayName("findByStatus(PENDING) -> tylko autorzy oczekujący")
-    void findByStatus_pending() {
-        assertThat(authorRepository.findByStatus(TaxonomyStatus.PENDING))
+    @DisplayName("filtr statusu PENDING -> tylko autorzy oczekujący")
+    void filterByStatus_pending() {
+        assertThat(authorRepository.findAll(TaxonomySpecifications.authors(TaxonomyStatus.PENDING, null)))
                 .extracting(Author::getLastName)
                 .containsExactly("Autor");
     }

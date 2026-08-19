@@ -5,9 +5,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import pl.m22.gamehive.game.search.dto.ContentReindexCounts;
 import pl.m22.gamehive.game.search.dto.GameSearchDocument;
 import pl.m22.gamehive.game.search.dto.GameSearchFilter;
-import pl.m22.gamehive.game.search.dto.ReindexResultDto;
 import pl.m22.gamehive.game.search.dto.SearchResultDto;
 
 import java.util.List;
@@ -37,9 +37,9 @@ public class NoOpGameSearchService implements GameSearchService {
     }
 
     @Override
-    public ReindexResultDto reindexAll() {
+    public ContentReindexCounts reindexAll() {
 
         log.debug("Search disabled - skipping reindex");
-        return new ReindexResultDto(0, 0);
+        return new ContentReindexCounts(0, 0);
     }
 }

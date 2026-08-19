@@ -13,7 +13,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
-import pl.m22.gamehive.game.search.dto.ReindexResultDto;
+import pl.m22.gamehive.game.search.dto.ContentReindexCounts;
+import pl.m22.gamehive.game.search.dto.TaxonomyReindexCounts;
 
 import java.time.Duration;
 
@@ -35,11 +36,13 @@ class SearchReindexLockIntegrationTest {
     @Autowired RedisTemplate<String, String> redisTemplate;
 
     @MockitoBean GameSearchService gameSearchService;
+    @MockitoBean TaxonomySuggestService taxonomySuggestService;
     @MockitoBean JavaMailSender mailSender;
 
     @BeforeEach
     void setUp() {
         redisTemplate.delete(LOCK_KEY);
+        when(taxonomySuggestService.reindexAll()).thenReturn(new TaxonomyReindexCounts(0, 0));
     }
 
     @AfterEach
@@ -50,7 +53,7 @@ class SearchReindexLockIntegrationTest {
     @Test
     @DisplayName("udany reindeks zwalnia własną blokadę")
     void reindex_releasesOwnLock() {
-        when(gameSearchService.reindexAll()).thenReturn(new ReindexResultDto(2, 1));
+        when(gameSearchService.reindexAll()).thenReturn(new ContentReindexCounts(2, 1));
 
         searchReindexService.reindex();
 
@@ -77,7 +80,7 @@ class SearchReindexLockIntegrationTest {
     void reindex_doesNotDeleteLockTakenOverByAnotherRun() {
         when(gameSearchService.reindexAll()).thenAnswer(_ -> {
             redisTemplate.opsForValue().set(LOCK_KEY, "token-innej-instancji", Duration.ofMinutes(15));
-            return new ReindexResultDto(0, 0);
+            return new ContentReindexCounts(0, 0);
         });
 
         searchReindexService.reindex();

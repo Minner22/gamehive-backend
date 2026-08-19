@@ -64,8 +64,10 @@ class MeiliGameSearchServiceTest {
         properties.setIndexUid(INDEX_UID);
         properties.setReindexBatchSize(2);   // mały batch, żeby test reindeksu przeszedł przez dwie strony
 
-        service = new MeiliGameSearchService(client, new GsonJsonHandler(), new MeiliFilterBuilder(),
-                hydrator, documentReader, properties);
+        // brama budowana na tych samych mockach, więc asercje na index.* / client.* zostają bez zmian
+        MeiliIndexGateway gateway = new MeiliIndexGateway(client, new GsonJsonHandler(), INDEX_UID,
+                properties.getTaskWaitTimeout());
+        service = new MeiliGameSearchService(gateway, new MeiliFilterBuilder(), hydrator, documentReader, properties);
         lenient().when(client.index(INDEX_UID)).thenReturn(index);
     }
 
@@ -113,17 +115,20 @@ class MeiliGameSearchServiceTest {
         return taskInfo;
     }
 
-    /** Kryterium akceptacji mówi o TREŚCI ERROR-a (taskUid + id dokumentu), więc samo „nie rzuciło" nie wystarczy. */
+    /**
+     * Kryterium akceptacji mówi o TREŚCI ERROR-a (taskUid + id dokumentu), więc samo „nie rzuciło" nie wystarczy.
+     * Loguje MeiliIndexGateway — opis akcji (z id dokumentów) wciąż buduje serwis i przekazuje go bramie.
+     */
     private static ListAppender<ILoggingEvent> attachAppender() {
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
-        ((Logger) LoggerFactory.getLogger(MeiliGameSearchService.class)).addAppender(appender);
+        ((Logger) LoggerFactory.getLogger(MeiliIndexGateway.class)).addAppender(appender);
         return appender;
     }
 
     @AfterEach
     void detachAppenders() {
-        ((Logger) LoggerFactory.getLogger(MeiliGameSearchService.class)).detachAndStopAllAppenders();
+        ((Logger) LoggerFactory.getLogger(MeiliIndexGateway.class)).detachAndStopAllAppenders();
     }
 
     private void stubTaskStatus(int taskUid, TaskStatus status) {
@@ -380,9 +385,9 @@ class MeiliGameSearchServiceTest {
             stubTaskStatus(taskUid, TaskStatus.SUCCEEDED);
         }
 
-        ReindexResultDto result = service.reindexAll();
+        ContentReindexCounts result = service.reindexAll();
 
-        assertThat(result).isEqualTo(new ReindexResultDto(3, 1));
+        assertThat(result).isEqualTo(new ContentReindexCounts(3, 1));
 
         InOrder order = inOrder(client, index);
         order.verify(client).createIndex(INDEX_UID, "id");
@@ -441,7 +446,7 @@ class MeiliGameSearchServiceTest {
         when(index.deleteAllDocuments()).thenReturn(clearTask);
         stubTaskStatus(1, TaskStatus.SUCCEEDED);
 
-        assertThat(service.reindexAll()).isEqualTo(new ReindexResultDto(0, 0));
+        assertThat(service.reindexAll()).isEqualTo(new ContentReindexCounts(0, 0));
 
         verify(index).deleteAllDocuments();
         verify(index, never()).addDocuments(anyString(), eq("id"));

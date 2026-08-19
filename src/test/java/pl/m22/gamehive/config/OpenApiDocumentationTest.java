@@ -60,6 +60,29 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath("$.paths['/api/v1/collection/games']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/collection/expansions']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/admin/users/']").exists())
-                .andExpect(jsonPath("$.paths['/api/v1/admin/search/reindex']").exists());
+                .andExpect(jsonPath("$.paths['/api/v1/admin/search/reindex']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/publishers/suggest']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/authors/suggest']").exists());
+    }
+
+    @Test
+    @DisplayName("Rosnące listy taksonomii są deprecated na rzecz /suggest, kuratorowane zostają bez zmian")
+    void apiDocs_marksGrowingTaxonomyListsDeprecated() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/publishers'].get.deprecated").value(true))
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/authors'].get.deprecated").value(true))
+                // kategorie i mechaniki są kuratorowane i bounded — świadomie NIE są oznaczone
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/categories'].get.deprecated").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/mechanics'].get.deprecated").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Podpowiedzi dokumentują 400 — limit jest prymitywem, więc ?limit=abc realnie daje VALIDATION_ERROR")
+    void apiDocs_documentsBadRequestOnSuggest() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/publishers/suggest'].get.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/authors/suggest'].get.responses['400']").exists());
     }
 }

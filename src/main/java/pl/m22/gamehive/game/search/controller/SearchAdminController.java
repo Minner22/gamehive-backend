@@ -22,8 +22,8 @@ import pl.m22.gamehive.game.search.service.SearchReindexService;
 @PreAuthorize("hasAnyRole('MODERATOR','ADMIN')")
 @RequiredArgsConstructor
 @Tag(name = "Admin - Search",
-        description = "Utrzymanie indeksu wyszukiwania. Wymaga uwierzytelnienia JWT oraz roli "
-                + "ROLE_MODERATOR lub ROLE_ADMIN.")
+        description = "Utrzymanie indeksów wyszukiwania (treść biblioteki i słowniki). Wymaga uwierzytelnienia "
+                + "JWT oraz roli ROLE_MODERATOR lub ROLE_ADMIN.")
 @SecurityRequirement(name = "bearerAuth")
 @ApiResponses({
         @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
@@ -39,12 +39,16 @@ public class SearchAdminController {
 
     private final SearchReindexService searchReindexService;
 
-    @Operation(summary = "Przebuduj indeks wyszukiwania z bazy",
-            description = "Kasuje zawartość indeksu i wypycha ponownie wszystkie zatwierdzone gry i dodatki. "
+    @Operation(summary = "Przebuduj indeksy wyszukiwania z bazy",
+            description = "Przebudowuje OBA indeksy: treści biblioteki (zatwierdzone gry i dodatki) oraz słowników "
+                    + "wydawców i autorów zasilających podpowiedzi. Każdy indeks jest najpierw czyszczony, potem "
+                    + "wypychany partiami z bazy. Uwaga na asymetrię reguł: do indeksu treści wpadają wyłącznie "
+                    + "pozycje APPROVED, a do indeksu słowników wpisy we WSZYSTKICH statusach. "
                     + "Narzędzie naprawcze po awarii wyszukiwarki — indeksowanie bieżące dzieje się zdarzeniami "
-                    + "po decyzjach moderacyjnych. Na czas przebudowy indeks bywa chwilowo niekompletny. "
-                    + "Jednocześnie może biec tylko jedna przebudowa.")
-    @ApiResponse(responseCode = "200", description = "Indeks przebudowany, w ciele liczniki dokumentów",
+                    + "po decyzjach moderacyjnych i zmianach w słownikach. Na czas przebudowy indeksy bywają "
+                    + "chwilowo niekompletne. Jednocześnie może biec tylko jedna przebudowa, wspólna dla obu "
+                    + "indeksów. Niepowodzenie przy treści przerywa całość i nie rusza słowników.")
+    @ApiResponse(responseCode = "200", description = "Indeksy przebudowane, w ciele liczniki dokumentów",
             content = @Content(schema = @Schema(implementation = ReindexResultDto.class)))
     @ApiResponse(responseCode = "409", description = "Przebudowa indeksu już trwa (REINDEX_ALREADY_RUNNING)",
             content = @Content(schema = @Schema(implementation = ApiError.class)))

@@ -9,7 +9,9 @@ import org.springframework.stereotype.Service;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.game.search.config.MeiliProperties;
+import pl.m22.gamehive.game.search.dto.ContentReindexCounts;
 import pl.m22.gamehive.game.search.dto.ReindexResultDto;
+import pl.m22.gamehive.game.search.dto.TaxonomyReindexCounts;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,6 +28,7 @@ public class SearchReindexService {
             Long.class);
 
     private final GameSearchService gameSearchService;
+    private final TaxonomySuggestService taxonomySuggestService;
     private final RedisTemplate<String, String> redisTemplate;
     private final MeiliProperties properties;
 
@@ -38,7 +41,11 @@ public class SearchReindexService {
         }
 
         try {
-            return gameSearchService.reindexAll();
+            ContentReindexCounts content = gameSearchService.reindexAll();
+            TaxonomyReindexCounts taxonomy = taxonomySuggestService.reindexAll();
+
+            return new ReindexResultDto(content.games(), content.expansions(),
+                    taxonomy.publishers(), taxonomy.authors());
         } finally {
             release(token);
         }

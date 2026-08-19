@@ -19,6 +19,8 @@ public class MeiliProperties {
 
     private String indexUid = "gamehive_content";
 
+    private String taxonomyIndexUid = "gamehive_taxonomy";
+
     private int reindexBatchSize = 200;
 
     private Duration reindexLockTtl = Duration.ofMinutes(15);
