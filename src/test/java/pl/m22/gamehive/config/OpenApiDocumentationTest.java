@@ -76,4 +76,13 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath("$.paths['/api/v1/taxonomy/categories'].get.deprecated").doesNotExist())
                 .andExpect(jsonPath("$.paths['/api/v1/taxonomy/mechanics'].get.deprecated").doesNotExist());
     }
+
+    @Test
+    @DisplayName("Podpowiedzi dokumentują 400 — limit jest prymitywem, więc ?limit=abc realnie daje VALIDATION_ERROR")
+    void apiDocs_documentsBadRequestOnSuggest() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/publishers/suggest'].get.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/taxonomy/authors/suggest'].get.responses['400']").exists());
+    }
 }

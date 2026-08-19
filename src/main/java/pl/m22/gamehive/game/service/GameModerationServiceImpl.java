@@ -166,7 +166,6 @@ public class GameModerationServiceImpl implements GameModerationService {
         return game;
     }
 
-    // approve gry zatwierdza również jej wydawców i autorów PENDING (w tej samej transakcji); APPROVED bez zmian
     private void approvePendingTaxonomy(Game game) {
 
         List<Publisher> approvedPublishers = new ArrayList<>();

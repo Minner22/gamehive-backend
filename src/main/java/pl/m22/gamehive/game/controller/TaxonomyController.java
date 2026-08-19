@@ -41,9 +41,13 @@ import java.util.List;
                 + "źródło identyfikatorów dla zgłoszenia gry. Wymaga uwierzytelnienia JWT (dowolna rola).")
 @SecurityRequirement(name = "bearerAuth")
 @ApiResponses({
+        @ApiResponse(responseCode = "400", description = "Nieprawidłowa wartość parametru (VALIDATION_ERROR) — "
+                + "np. niecałkowity `limit` albo nieznany `status`",
+                content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
                 content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
+        @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera lub odrzucone zapytanie "
+                + "wyszukiwarki (SEARCH_FAILED)",
                 content = @Content(schema = @Schema(implementation = ApiError.class)))
 })
 public class TaxonomyController {

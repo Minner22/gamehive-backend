@@ -10,7 +10,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 import pl.m22.gamehive.game.dto.AuthorDto;
 import pl.m22.gamehive.game.dto.PublisherDto;
+import pl.m22.gamehive.game.model.Publisher;
 import pl.m22.gamehive.game.model.TaxonomyStatus;
+import pl.m22.gamehive.game.repository.PublisherRepository;
 import pl.m22.gamehive.game.search.dto.TaxonomyReindexCounts;
 
 import java.util.List;
@@ -27,6 +29,7 @@ import static org.assertj.core.api.Assertions.*;
 class DatabaseTaxonomySuggestServiceTest {
 
     @Autowired TaxonomySuggestService taxonomySuggestService;
+    @Autowired PublisherRepository publisherRepository;
     @MockitoBean JavaMailSender mailSender;
 
     @Test
@@ -133,6 +136,19 @@ class DatabaseTaxonomySuggestServiceTest {
         assertThat(taxonomySuggestService.suggestPublishers("_", 10)).isEmpty();
         assertThat(taxonomySuggestService.suggestPublishers("%games%", 10)).isEmpty();
         assertThat(taxonomySuggestService.suggestAuthors("_", 10)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("znak ucieczki jest podwajany JAKO PIERWSZY — fraza z backslashem dopasowuje się literalnie")
+    void suggest_escapesTheEscapeCharacterItself() {
+        // fixtures nie mają backslasha w nazwie, a bez tego wiersza mutacja usuwająca podwajanie
+        // przechodziłaby niezauważona: wzorzec "%\\%" też zwraca pusty wynik. Klasa jest
+        // @Transactional, więc wiersz nie wychodzi poza test.
+        publisherRepository.saveAndFlush(Publisher.of("Back\\Slash Games", TaxonomyStatus.APPROVED));
+
+        assertThat(taxonomySuggestService.suggestPublishers("back\\slash", 10))
+                .extracting(PublisherDto::name)
+                .containsExactly("Back\\Slash Games");
     }
 
     @Test

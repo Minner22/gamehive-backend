@@ -1,5 +1,6 @@
 package pl.m22.gamehive.game.controller;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,10 +15,17 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
+import pl.m22.gamehive.game.model.Publisher;
+import pl.m22.gamehive.game.model.TaxonomyStatus;
+import pl.m22.gamehive.game.repository.PublisherRepository;
+import pl.m22.gamehive.game.service.TaxonomySpecifications;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.IntStream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -28,9 +36,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 class TaxonomyControllerTest {
 
+    // prefiks sortujący się ZA wszystkimi zasianymi nazwami: gdyby cleanup kiedyś nie dobiegł,
+    // wyciek nie przestawiłby pierwszych pozycji, na których opierają się asercje innych klas
+    private static final String CAP_PREFIX = "zzz-cap-";
+    private static final int LIST_CAP = 200;
+
     @Autowired MockMvc mockMvc;
     @Autowired JwtService jwtService;
     @Autowired RedisTemplate<String, String> redisTemplate;
+    @Autowired PublisherRepository publisherRepository;
     @MockitoBean JavaMailSender mailSender;
 
     private String userToken;
@@ -39,6 +53,17 @@ class TaxonomyControllerTest {
     void setUp() {
         userToken = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
         Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().serverCommands().flushAll();
+    }
+
+    // klasa NIE jest @Transactional (zapisy muszą być widoczne dla endpointu), więc kasujemy własne wiersze
+    @AfterEach
+    void removeOverflowPublishers() {
+        List<Publisher> overflow =
+                publisherRepository.findAll(TaxonomySpecifications.publisherNameLike(CAP_PREFIX));
+
+        if (!overflow.isEmpty()) {
+            publisherRepository.deleteAll(overflow);
+        }
     }
 
     @Test
@@ -222,5 +247,22 @@ class TaxonomyControllerTest {
     void suggestAuthors_unauthenticated_401() throws Exception {
         mockMvc.perform(get("/api/v1/taxonomy/authors/suggest").param("q", "uwe"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("GET /taxonomy/publishers przy słowniku powyżej limitu -> UCIĘTE do 200 pozycji")
+    void listPublishers_isCappedAtListLimit() throws Exception {
+        long seeded = publisherRepository.count();
+        publisherRepository.saveAll(IntStream.rangeClosed(1, (int) (LIST_CAP - seeded + 1))
+                .mapToObj(i -> Publisher.of(CAP_PREFIX + "%04d".formatted(i), TaxonomyStatus.APPROVED))
+                .toList());
+
+        // bez tej asercji test mógłby przejść na słowniku mniejszym od limitu, gdzie limit jest niewidoczny
+        assertThat(publisherRepository.count()).isGreaterThan(LIST_CAP);
+
+        mockMvc.perform(get("/api/v1/taxonomy/publishers")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(LIST_CAP)));
     }
 }

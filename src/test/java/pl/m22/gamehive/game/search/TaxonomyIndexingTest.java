@@ -54,7 +54,8 @@ class TaxonomyIndexingTest {
 
     private static final List<String[]> OWN_AUTHORS = List.of(
             new String[]{"Nowy", "AutorWLocie"}, new String[]{"Stare", "Nazwisko"}, new String[]{"Nowe", "Imie"},
-            new String[]{"Do", "Usuniecia"}, new String[]{"Zaindeksowany", "Autor"});
+            new String[]{"Do", "Usuniecia"}, new String[]{"Zaindeksowany", "Autor"},
+            new String[]{"Do", "Zatwierdzenia"});
 
     @Autowired TaxonomyService taxonomyService;
     @Autowired GameSubmissionService gameSubmissionService;
@@ -188,6 +189,24 @@ class TaxonomyIndexingTest {
     }
 
     @Test
+    @DisplayName("approve autora -> upsert dokumentu ze statusem APPROVED (symetrycznie do wydawcy)")
+    void approveAuthor_indexesApprovedStatus() {
+        Long id = tx.execute(_ ->
+                authorRepository.save(Author.of("Do", "Zatwierdzenia", TaxonomyStatus.PENDING)).getId());
+        clearInvocations(taxonomySuggestService);
+
+        tx.executeWithoutResult(_ -> taxonomyService.approveAuthor(id));
+
+        ArgumentCaptor<List<TaxonomyDocument>> batch = documentBatchCaptor();
+        verify(taxonomySuggestService).index(batch.capture());
+        assertThat(batch.getValue()).singleElement().satisfies(document -> {
+            assertThat(document.id()).isEqualTo("author-" + id);
+            assertThat(document.name()).isEqualTo("Do Zatwierdzenia");
+            assertThat(document.status()).isEqualTo(TaxonomyStatus.APPROVED);
+        });
+    }
+
+    @Test
     @DisplayName("zmiana nazwy autora -> upsert z NOWĄ nazwą (bez tego podpowiedź zostałaby ze starą)")
     void updateAuthor_indexesNewName() {
         Long id = tx.execute(_ ->
@@ -306,13 +325,16 @@ class TaxonomyIndexingTest {
     }
 
     @Test
-    @DisplayName("awaria indeksu nie cofa akcji biznesowej — wydawca zostaje w bazie")
+    @DisplayName("awaria indeksu nie cofa akcji biznesowej — zdarzenie poszło, a wydawca został w bazie")
     void indexFailure_doesNotRollBackBusinessAction() {
         doThrow(new InfrastructureException(ErrorCode.SEARCH_INDEX_UNAVAILABLE))
                 .when(taxonomySuggestService).index(any());
 
         Long id = tx.execute(_ -> taxonomyService.createPublisher("Wydawca Mimo Awarii").getId());
 
+        // bez tego verify test przechodziłby także wtedy, gdyby publikacja wyparowała z createPublisher:
+        // stub nigdy by nie rzucił, a asercja poniżej mówiłaby tylko "create działa"
+        verify(taxonomySuggestService).index(any());
         assertThat(publisherRepository.findById(id)).isPresent();
     }
 }

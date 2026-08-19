@@ -4,6 +4,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
+/**
+ * Schemat dokumentacyjny stronicowanej odpowiedzi z autorami.
+ * Odwzorowuje płaski JSON {@code PageImpl} z wymaganymi polami — nie jest serializowany,
+ * służy wyłącznie do wygenerowania kontraktu OpenAPI.
+ */
 @Schema(description = "Stronicowana lista autorów.")
 public record PageAuthorDto(
 

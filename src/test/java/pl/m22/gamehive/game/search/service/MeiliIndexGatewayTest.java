@@ -17,10 +17,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -196,5 +201,51 @@ class MeiliIndexGatewayTest {
                 .isInstanceOf(InfrastructureException.class)
                 .hasMessage(ErrorCode.SEARCH_FAILED.getDefaultMessage())
                 .satisfies(exception -> assertThat(exception.getMessage()).doesNotContain(INDEX_UID));
+    }
+
+    @Test
+    @DisplayName("pushAll stronicuje od 0 po batchSize i SORTUJE po id — bez sortu paging byłby niestabilny")
+    void pushAll_pagesByBatchSizeSortedById() {
+        TaskInfo firstBatch = enqueuedTask(20);
+        TaskInfo secondBatch = enqueuedTask(21);
+        when(index.addDocuments(anyString(), eq("id"))).thenReturn(firstBatch, secondBatch);
+        stubTaskStatus(20, TaskStatus.SUCCEEDED);
+        stubTaskStatus(21, TaskStatus.SUCCEEDED);
+
+        List<Pageable> requested = new ArrayList<>();
+        long pushed = gateway.pushAll(2, pageable -> {
+            requested.add(pageable);
+            return requested.size() == 1
+                    ? new PageImpl<>(List.of(Map.of("id", "publisher-1"), Map.of("id", "publisher-2")), pageable, 3)
+                    : new PageImpl<>(List.of(Map.of("id", "publisher-3")), pageable, 3);
+        });
+
+        assertThat(pushed).isEqualTo(3);
+        assertThat(requested).containsExactly(
+                PageRequest.of(0, 2, Sort.by("id")),
+                PageRequest.of(1, 2, Sort.by("id")));
+        verify(index, times(2)).addDocuments(anyString(), eq("id"));
+    }
+
+    @Test
+    @DisplayName("nieudane zadanie w trakcie pushAll przerywa przebudowę — licznik nie może kłamać")
+    void pushAll_whenTaskFails_aborts() {
+        TaskInfo batch = enqueuedTask(22);
+        when(index.addDocuments(anyString(), eq("id"))).thenReturn(batch);
+        stubTaskStatus(22, TaskStatus.FAILED);
+
+        assertThatThrownBy(() -> gateway.pushAll(2, pageable ->
+                new PageImpl<>(List.of(Map.of("id", "publisher-1")), pageable, 1)))
+                .isInstanceOf(InfrastructureException.class)
+                .extracting(exception -> ((InfrastructureException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.SEARCH_FAILED);
+    }
+
+    @Test
+    @DisplayName("pusty słownik -> zero wywołań do Meili i licznik 0")
+    void pushAll_whenNoContent_doesNotCallMeili() {
+        assertThat(gateway.pushAll(2, pageable -> new PageImpl<>(List.of(), pageable, 0))).isZero();
+
+        verify(index, never()).addDocuments(anyString(), anyString());
     }
 }

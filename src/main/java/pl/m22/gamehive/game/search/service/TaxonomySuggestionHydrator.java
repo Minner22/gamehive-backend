@@ -50,6 +50,6 @@ public class TaxonomySuggestionHydrator {
 
         Map<Long, D> byId = finder.apply(targetIds).stream().collect(Collectors.toMap(id, toDto));
 
-        return targetIds.stream().map(byId::get).filter(Objects::nonNull).toList();
+        return targetIds.stream().distinct().map(byId::get).filter(Objects::nonNull).toList();
     }
 }

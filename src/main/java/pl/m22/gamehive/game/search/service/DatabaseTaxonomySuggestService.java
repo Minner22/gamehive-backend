@@ -3,7 +3,6 @@ package pl.m22.gamehive.game.search.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,20 +33,18 @@ public class DatabaseTaxonomySuggestService implements TaxonomySuggestService {
     @Override
     public List<PublisherDto> suggestPublishers(String query, int limit) {
 
-        return publisherMapper.toDtoList(publisherRepository
-                .findAll(TaxonomySpecifications.publisherNameLike(query),
-                        PageRequest.of(0, limit, Sort.by("name")))
-                .getContent());
+        return publisherMapper.toDtoList(publisherRepository.findBy(
+                TaxonomySpecifications.publisherNameLike(query),
+                suggestion -> suggestion.sortBy(Sort.by("name")).limit(limit).all()));
     }
 
     @Transactional(readOnly = true)
     @Override
     public List<AuthorDto> suggestAuthors(String query, int limit) {
 
-        return authorMapper.toDtoList(authorRepository
-                .findAll(TaxonomySpecifications.authorNameLike(query),
-                        PageRequest.of(0, limit, Sort.by("lastName", "firstName")))
-                .getContent());
+        return authorMapper.toDtoList(authorRepository.findBy(
+                TaxonomySpecifications.authorNameLike(query),
+                suggestion -> suggestion.sortBy(Sort.by("lastName", "firstName")).limit(limit).all()));
     }
 
     @Override
