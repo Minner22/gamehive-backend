@@ -500,7 +500,10 @@ class MeiliGameSearchServiceTest {
         when(index.search(any(SearchRequest.class)))
                 .thenThrow(new MeilisearchCommunicationException("connection refused"));
 
-        assertThatThrownBy(() -> service.search("sekretna fraza uzytkownika", emptyFilter(), PageRequest.of(0, 20)))
+        GameSearchFilter filter = emptyFilter();
+        PageRequest page = PageRequest.of(0, 20);
+
+        assertThatThrownBy(() -> service.search("sekretna fraza uzytkownika", filter, page))
                 .isInstanceOf(InfrastructureException.class)
                 .hasMessage(ErrorCode.SEARCH_INDEX_UNAVAILABLE.getDefaultMessage())
                 .satisfies(exception -> assertThat(exception.getMessage())
@@ -514,7 +517,10 @@ class MeiliGameSearchServiceTest {
         when(index.search(any(SearchRequest.class)))
                 .thenThrow(new MeilisearchCommunicationException("connection refused"));
 
-        assertThatThrownBy(() -> service.search("x", emptyFilter(), PageRequest.of(0, 20)))
+        GameSearchFilter filter = emptyFilter();
+        PageRequest page = PageRequest.of(0, 20);
+
+        assertThatThrownBy(() -> service.search("x", filter, page))
                 .isInstanceOf(InfrastructureException.class)
                 .extracting(exception -> ((InfrastructureException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.SEARCH_INDEX_UNAVAILABLE);
@@ -525,7 +531,10 @@ class MeiliGameSearchServiceTest {
     void otherMeiliFailure_mapsToSearchFailed() {
         when(index.search(any(SearchRequest.class))).thenThrow(new MeilisearchException("invalid filter"));
 
-        assertThatThrownBy(() -> service.search("x", emptyFilter(), PageRequest.of(0, 20)))
+        GameSearchFilter filter = emptyFilter();
+        PageRequest page = PageRequest.of(0, 20);
+
+        assertThatThrownBy(() -> service.search("x", filter, page))
                 .isInstanceOf(InfrastructureException.class)
                 .extracting(exception -> ((InfrastructureException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.SEARCH_FAILED);
@@ -537,7 +546,9 @@ class MeiliGameSearchServiceTest {
         doThrow(new MeilisearchCommunicationException("connection refused"))
                 .when(index).addDocuments(anyString(), eq("id"));
 
-        assertThatThrownBy(() -> service.index(List.of(gameDocument())))
+        List<GameSearchDocument> documents = List.of(gameDocument());
+
+        assertThatThrownBy(() -> service.index(documents))
                 .isInstanceOf(InfrastructureException.class)
                 .extracting(exception -> ((InfrastructureException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.SEARCH_INDEX_UNAVAILABLE);

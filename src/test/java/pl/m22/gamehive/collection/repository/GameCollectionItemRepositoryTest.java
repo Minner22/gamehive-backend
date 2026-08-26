@@ -89,9 +89,10 @@ class GameCollectionItemRepositoryTest {
     @DisplayName("duplikat (userId, gameId) -> naruszenie unikatu na poziomie bazy (druga linia obrony)")
     void duplicate_violatesUniqueConstraint() {
         Game agricola = gameRepository.findByTitle("Agricola").getFirst();
+        GameCollectionItem duplicate = new GameCollectionItem(SeededUsers.JANE_ID, agricola);
 
-        assertThatExceptionOfType(DataIntegrityViolationException.class).isThrownBy(() ->
-                collectionRepository.saveAndFlush(new GameCollectionItem(SeededUsers.JANE_ID, agricola)));
+        assertThatExceptionOfType(DataIntegrityViolationException.class)
+                .isThrownBy(() -> collectionRepository.saveAndFlush(duplicate));
     }
 
     @Test

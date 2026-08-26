@@ -325,7 +325,9 @@ class MeiliTaxonomySuggestServiceTest {
         doThrow(new MeilisearchCommunicationException("connection refused"))
                 .when(index).addDocuments(anyString(), eq("id"));
 
-        assertThatThrownBy(() -> service.index(List.of(publisherDocument("publisher-3", 3L, "Pending Games"))))
+        List<TaxonomyDocument> documents = List.of(publisherDocument("publisher-3", 3L, "Pending Games"));
+
+        assertThatThrownBy(() -> service.index(documents))
                 .isInstanceOf(InfrastructureException.class)
                 .extracting(exception -> ((InfrastructureException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.SEARCH_INDEX_UNAVAILABLE);

@@ -50,8 +50,9 @@ class PublisherRepositoryTest {
     @Test
     @DisplayName("duplikat name -> naruszenie unikalności")
     void duplicateName_violatesUnique() {
-        assertThatThrownBy(() ->
-                publisherRepository.saveAndFlush(Publisher.of("Rio Grande Games", TaxonomyStatus.APPROVED)))
+        Publisher duplicate = Publisher.of("Rio Grande Games", TaxonomyStatus.APPROVED);
+
+        assertThatThrownBy(() -> publisherRepository.saveAndFlush(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

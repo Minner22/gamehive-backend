@@ -201,9 +201,9 @@ class AuthServiceImplTest {
     @Test
     @DisplayName("login() złe hasło (aktywne konto) -> INVALID_CREDENTIALS")
     void login_wrongPassword_invalidCredentials() {
+        LoginDto credentials = new LoginDto("john.doe@example.com", "wrongpassword");
 
-        assertThatThrownBy(() ->
-                authService.login(new LoginDto("john.doe@example.com", "wrongpassword")))
+        assertThatThrownBy(() -> authService.login(credentials))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_CREDENTIALS);
@@ -212,9 +212,9 @@ class AuthServiceImplTest {
     @Test
     @DisplayName("login() nieistniejący e-mail -> IDENTYCZNIE INVALID_CREDENTIALS + atrapa hasha (anty-timing)")
     void login_nonExistingEmail_sameInvalidCredentials() {
+        LoginDto credentials = new LoginDto("nobody@test.com", "whatever123");
 
-        assertThatThrownBy(() ->
-                authService.login(new LoginDto("nobody@test.com", "whatever123")))
+        assertThatThrownBy(() -> authService.login(credentials))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_CREDENTIALS);
@@ -229,9 +229,9 @@ class AuthServiceImplTest {
 
         authService.register(new RegistrationDto("notact", NEW_USER_EMAIL, "password123"));
         clearInvocations(mailSender);
+        LoginDto credentials = new LoginDto(NEW_USER_EMAIL, "password123");
 
-        assertThatThrownBy(() ->
-                authService.login(new LoginDto(NEW_USER_EMAIL, "password123")))
+        assertThatThrownBy(() -> authService.login(credentials))
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
                 .isEqualTo(ErrorCode.USER_NOT_ACTIVATED);

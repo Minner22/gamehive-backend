@@ -42,9 +42,11 @@ class GameExpansionModerationServiceAuditTest {
     private static final Email MODERATOR = new Email("mark.moderator@example.com");
 
     private Long expansionId;
+    private TransactionTemplate tx;
 
     @BeforeEach
     void setUp() {
+        tx = new TransactionTemplate(txManager);
         auditRepository.deleteAll();
         GameExpansion expansion = GameExpansion.builder()
                 .baseGame(gameRepository.findByTitle("Carcassonne").getFirst())
@@ -78,7 +80,7 @@ class GameExpansionModerationServiceAuditTest {
     @Test
     @DisplayName("approve po committcie -> dokładnie jeden wpis APPROVE z targetType=EXPANSION")
     void approve_committed_writesSingleAuditEntry() {
-        new TransactionTemplate(txManager).executeWithoutResult(_ ->
+        tx.executeWithoutResult(_ ->
                 moderationService.approve(expansionId, MODERATOR));
 
         List<ContentModerationAuditLog> entries = auditFor(expansionId);
@@ -92,7 +94,7 @@ class GameExpansionModerationServiceAuditTest {
     @Test
     @DisplayName("reject po committcie -> jeden wpis REJECT, details = powód")
     void reject_committed_writesReasonInDetails() {
-        new TransactionTemplate(txManager).executeWithoutResult(_ ->
+        tx.executeWithoutResult(_ ->
                 moderationService.reject(expansionId, "Niepełny opis", MODERATOR));
 
         List<ContentModerationAuditLog> entries = auditFor(expansionId);
@@ -104,7 +106,6 @@ class GameExpansionModerationServiceAuditTest {
     @Test
     @DisplayName("unlock po committcie -> jeden wpis UNLOCK")
     void unlock_committed_writesUnlockEntry() {
-        TransactionTemplate tx = new TransactionTemplate(txManager);
         tx.executeWithoutResult(_ -> moderationService.reject(expansionId, "do poprawy", MODERATOR));
         auditRepository.deleteAll();
 
@@ -117,7 +118,7 @@ class GameExpansionModerationServiceAuditTest {
     @Test
     @DisplayName("audyt dodatku nie miesza się z audytem gry o tym samym id")
     void audit_isScopedByTargetType() {
-        new TransactionTemplate(txManager).executeWithoutResult(_ ->
+        tx.executeWithoutResult(_ ->
                 moderationService.approve(expansionId, MODERATOR));
 
         assertThat(auditRepository.findByTargetTypeAndTargetId(ContentModerationTargetType.GAME, expansionId))
@@ -127,7 +128,6 @@ class GameExpansionModerationServiceAuditTest {
     @Test
     @DisplayName("updateApprovedExpansion po committcie -> dokładnie jeden wpis EDIT, actor = moderator")
     void edit_committed_writesSingleEditEntry() {
-        TransactionTemplate tx = new TransactionTemplate(txManager);
         // przenieś zasiany dodatek PENDING do APPROVED przez encję (bez zdarzenia audytu)
         tx.executeWithoutResult(_ ->
                 expansionRepository.findById(expansionId).orElseThrow().approve(SeededUsers.MARK_ID));
@@ -143,7 +143,7 @@ class GameExpansionModerationServiceAuditTest {
     @Test
     @DisplayName("deleteExpansion po committcie -> jeden wpis DELETE, details = nazwa, wpis przeżywa hard-delete")
     void delete_committed_writesDeleteEntry_survivingHardDelete() {
-        new TransactionTemplate(txManager).executeWithoutResult(_ ->
+        tx.executeWithoutResult(_ ->
                 moderationService.deleteExpansion(expansionId, MODERATOR));   // PENDING -> kwalifikuje się (wariant C)
 
         assertThat(expansionRepository.findById(expansionId)).isEmpty();
@@ -157,7 +157,7 @@ class GameExpansionModerationServiceAuditTest {
     @DisplayName("rollback deleteExpansion -> brak wpisu audytu i dodatek nadal istnieje")
     void delete_rolledBack_noAuditEntry() {
         assertThatThrownBy(() ->
-                new TransactionTemplate(txManager).executeWithoutResult(_ -> {
+                tx.executeWithoutResult(_ -> {
                     moderationService.deleteExpansion(expansionId, MODERATOR);
                     throw new IllegalStateException("forced rollback after delete");
                 })
@@ -171,7 +171,7 @@ class GameExpansionModerationServiceAuditTest {
     @DisplayName("rollback approve -> brak wpisu audytu (AFTER_COMMIT nie odpala się na wycofanej transakcji)")
     void approve_rolledBack_noAuditEntry() {
         assertThatThrownBy(() ->
-                new TransactionTemplate(txManager).executeWithoutResult(_ -> {
+                tx.executeWithoutResult(_ -> {
                     moderationService.approve(expansionId, MODERATOR);
                     throw new IllegalStateException("forced rollback after approve");
                 })

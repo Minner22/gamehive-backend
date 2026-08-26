@@ -42,7 +42,8 @@ class SearchIndexEventTest {
         source.add(document("game-2"));
 
         assertThat(event.documents()).hasSize(1);
-        assertThatThrownBy(() -> event.documents().add(document("game-3")))
+        GameSearchDocument intruder = document("game-3");
+        assertThatThrownBy(() -> event.documents().add(intruder))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 

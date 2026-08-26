@@ -56,7 +56,8 @@ class TaxonomyIndexEventTest {
         source.add(publisher("publisher-2"));
 
         assertThat(event.documents()).hasSize(1);
-        assertThatThrownBy(() -> event.documents().add(publisher("publisher-3")))
+        TaxonomyDocument intruder = publisher("publisher-3");
+        assertThatThrownBy(() -> event.documents().add(intruder))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
