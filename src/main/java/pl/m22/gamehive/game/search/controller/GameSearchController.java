@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -33,17 +32,15 @@ import pl.m22.gamehive.game.search.service.GameSearchService;
                 + "z filtrami po wydawcy, kategorii, mechanice, autorze, liczbie graczy, czasie gry, roku i wieku. "
                 + "Wymaga uwierzytelnienia JWT (dowolna rola).")
 @SecurityRequirement(name = "bearerAuth")
-@ApiResponses({
-        @ApiResponse(responseCode = "400", description = "Nieprawidłowa wartość parametru (VALIDATION_ERROR) — "
-                + "np. nieznany targetType albo niecałkowita wartość filtra liczbowego",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera lub odrzucone zapytanie wyszukiwarki (SEARCH_FAILED)",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "503", description = "Wyszukiwarka nieosiągalna (SEARCH_INDEX_UNAVAILABLE)",
-                content = @Content(schema = @Schema(implementation = ApiError.class)))
-})
+@ApiResponse(responseCode = "400", description = "Nieprawidłowa wartość parametru (VALIDATION_ERROR) — "
+        + "np. nieznany targetType albo niecałkowita wartość filtra liczbowego",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera lub odrzucone zapytanie wyszukiwarki (SEARCH_FAILED)",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "503", description = "Wyszukiwarka nieosiągalna (SEARCH_INDEX_UNAVAILABLE)",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
 public class GameSearchController {
 
     private static final int MAX_PAGE_SIZE = 50;

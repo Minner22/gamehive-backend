@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -38,13 +37,11 @@ public class UserController {
     @Operation(
             summary = "Dane zalogowanego użytkownika",
             description = "Zwraca dane konta i profil aktualnie uwierzytelnionego użytkownika (na podstawie tokenu dostępowego).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Dane użytkownika"),
-            @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Dane użytkownika")
+    @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @GetMapping("/me")
     public ResponseEntity<UserResponseDto> me(Authentication authentication) {
 
@@ -57,15 +54,13 @@ public class UserController {
     @Operation(
             summary = "Aktualizacja profilu",
             description = "Częściowo aktualizuje profil zalogowanego użytkownika. Przesyłane są tylko pola do zmiany; pominięte pozostają bez zmian.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Profil zaktualizowany"),
-            @ApiResponse(responseCode = "400", description = "Błąd walidacji danych wejściowych",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Profil zaktualizowany")
+    @ApiResponse(responseCode = "400", description = "Błąd walidacji danych wejściowych",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PatchMapping("/me/profile")
     public ResponseEntity<UserProfileResponseDto> profile(Authentication authentication,
                                                           @Valid @RequestBody UserProfileUpdateDto userProfileUpdateDto) {
@@ -81,19 +76,17 @@ public class UserController {
             description = "Trwale (hard delete) usuwa konto zalogowanego użytkownika po potwierdzeniu hasłem. "
                     + "Operacja jest nieodwracalna: unieważnia wszystkie tokeny odświeżające i bieżący token dostępowy "
                     + "oraz czyści ciasteczko refreshToken. Ostatni administrator nie może usunąć własnego konta.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Konto usunięte; tokeny unieważnione, ciasteczko wyczyszczone"),
-            @ApiResponse(responseCode = "400", description = "Błąd walidacji danych wejściowych (brak hasła)",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "401",
-                    description = "Brak lub nieprawidłowy token dostępowy albo błędne hasło potwierdzenia (INVALID_PASSWORD)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409",
-                    description = "Ostatni administrator nie może usunąć własnego konta (CANNOT_REMOVE_LAST_ADMIN)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "204", description = "Konto usunięte; tokeny unieważnione, ciasteczko wyczyszczone")
+    @ApiResponse(responseCode = "400", description = "Błąd walidacji danych wejściowych (brak hasła)",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "401",
+            description = "Brak lub nieprawidłowy token dostępowy albo błędne hasło potwierdzenia (INVALID_PASSWORD)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409",
+            description = "Ostatni administrator nie może usunąć własnego konta (CANNOT_REMOVE_LAST_ADMIN)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @DeleteMapping("/me")
     public ResponseEntity<Void> deleteOwnAccount(Authentication authentication,
                                                  @Valid @RequestBody DeleteAccountDto dto) {

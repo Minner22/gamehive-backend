@@ -34,8 +34,9 @@ class MechanicRepositoryTest {
     @Test
     @DisplayName("duplikat name -> naruszenie unikalności")
     void duplicateName_violatesUnique() {
-        assertThatThrownBy(() ->
-                mechanicRepository.saveAndFlush(Mechanic.of("Worker Placement")))
+        Mechanic duplicate = Mechanic.of("Worker Placement");
+
+        assertThatThrownBy(() -> mechanicRepository.saveAndFlush(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -25,16 +24,14 @@ import pl.m22.gamehive.game.search.service.SearchReindexService;
         description = "Utrzymanie indeksów wyszukiwania (treść biblioteki i słowniki). Wymaga uwierzytelnienia "
                 + "JWT oraz roli ROLE_MODERATOR lub ROLE_ADMIN.")
 @SecurityRequirement(name = "bearerAuth")
-@ApiResponses({
-        @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "403", description = "Brak uprawnień (wymagana rola MODERATOR/ADMIN)",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera lub odrzucone żądanie wyszukiwarki (SEARCH_FAILED)",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "503", description = "Wyszukiwarka nieosiągalna (SEARCH_INDEX_UNAVAILABLE)",
-                content = @Content(schema = @Schema(implementation = ApiError.class)))
-})
+@ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "403", description = "Brak uprawnień (wymagana rola MODERATOR/ADMIN)",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera lub odrzucone żądanie wyszukiwarki (SEARCH_FAILED)",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "503", description = "Wyszukiwarka nieosiągalna (SEARCH_INDEX_UNAVAILABLE)",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
 public class SearchAdminController {
 
     private final SearchReindexService searchReindexService;

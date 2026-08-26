@@ -30,8 +30,8 @@ class ContentModerationAuditServiceTest {
     }
 
     @Test
-    @DisplayName("record() -> zapisuje wpis audytu moderacji z kompletem pól (REQUIRES_NEW commituje)")
-    void record_persistsEntry() {
+    @DisplayName("recordAudit() -> zapisuje wpis audytu moderacji z kompletem pól (REQUIRES_NEW commituje)")
+    void recordAudit_persistsEntry() {
 
         ContentModerationAuditEvent event = new ContentModerationAuditEvent(
                 ContentModerationAction.REJECT,
@@ -41,7 +41,7 @@ class ContentModerationAuditServiceTest {
                 "Duplikat istniejącej gry",
                 "corr-abc");
 
-        auditService.record(event);
+        auditService.recordAudit(event);
 
         List<ContentModerationAuditLog> entries = auditRepository.findByTargetId(2L);
         assertThat(entries).hasSize(1);

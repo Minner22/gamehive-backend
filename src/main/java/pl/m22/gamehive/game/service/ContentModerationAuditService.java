@@ -15,7 +15,7 @@ public class ContentModerationAuditService {
     private final ContentModerationAuditLogRepository contentModerationAuditLogRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void record(ContentModerationAuditEvent event) {
+    public void recordAudit(ContentModerationAuditEvent event) {
 
         contentModerationAuditLogRepository.save(ContentModerationAuditLog.of(
                 event.action(),

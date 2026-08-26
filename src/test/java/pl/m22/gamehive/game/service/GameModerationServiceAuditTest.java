@@ -44,9 +44,11 @@ class GameModerationServiceAuditTest {
     private static final Email MODERATOR = new Email("mark.moderator@example.com");
 
     private Long gameId;
+    private TransactionTemplate tx;
 
     @BeforeEach
     void setUp() {
+        tx = new TransactionTemplate(txManager);
         auditRepository.deleteAll();
         Game game = Game.builder()
                 .title("Cel audytu").description("Gra do decyzji moderacyjnej.")
@@ -76,7 +78,7 @@ class GameModerationServiceAuditTest {
     @Test
     @DisplayName("approve po committcie -> dokładnie jeden wpis APPROVE (bez FK do gry)")
     void approve_committed_writesSingleAuditEntry() {
-        new TransactionTemplate(txManager).executeWithoutResult(_ ->
+        tx.executeWithoutResult(_ ->
                 moderationService.approve(gameId, MODERATOR));
 
         List<ContentModerationAuditLog> entries = auditRepository.findByTargetId(gameId);
@@ -90,7 +92,7 @@ class GameModerationServiceAuditTest {
     @Test
     @DisplayName("reject po committcie -> jeden wpis REJECT, details = powód")
     void reject_committed_writesReasonInDetails() {
-        new TransactionTemplate(txManager).executeWithoutResult(_ ->
+        tx.executeWithoutResult(_ ->
                 moderationService.reject(gameId, "Niepełny opis", MODERATOR));
 
         List<ContentModerationAuditLog> entries = auditRepository.findByTargetId(gameId);
@@ -102,7 +104,6 @@ class GameModerationServiceAuditTest {
     @Test
     @DisplayName("updateApprovedGame po committcie -> dokładnie jeden wpis EDIT, actor = moderator")
     void edit_committed_writesSingleEditEntry() {
-        TransactionTemplate tx = new TransactionTemplate(txManager);
         // przenieś zasianą grę PENDING do APPROVED przez encję (bez zdarzenia audytu)
         tx.executeWithoutResult(_ -> gameRepository.findById(gameId).orElseThrow().approve(SeededUsers.MARK_ID));
 
@@ -118,7 +119,7 @@ class GameModerationServiceAuditTest {
     @Test
     @DisplayName("deleteGame po committcie -> jeden wpis DELETE, details = tytuł, wpis przeżywa hard-delete gry")
     void delete_committed_writesDeleteEntry_survivingHardDelete() {
-        new TransactionTemplate(txManager).executeWithoutResult(_ ->
+        tx.executeWithoutResult(_ ->
                 moderationService.deleteGame(gameId, MODERATOR));   // gra jest PENDING -> kwalifikuje się (wariant C)
 
         assertThat(gameRepository.findById(gameId)).isEmpty();      // twardy delete
@@ -132,7 +133,7 @@ class GameModerationServiceAuditTest {
     @DisplayName("rollback deleteGame -> brak wpisu audytu i gra nadal istnieje")
     void delete_rolledBack_noAuditEntry() {
         assertThatThrownBy(() ->
-                new TransactionTemplate(txManager).executeWithoutResult(_ -> {
+                tx.executeWithoutResult(_ -> {
                     moderationService.deleteGame(gameId, MODERATOR);
                     throw new IllegalStateException("forced rollback after delete");
                 })
@@ -146,7 +147,7 @@ class GameModerationServiceAuditTest {
     @DisplayName("rollback approve -> brak wpisu audytu (AFTER_COMMIT nie odpala się na wycofanej transakcji)")
     void approve_rolledBack_noAuditEntry() {
         assertThatThrownBy(() ->
-                new TransactionTemplate(txManager).executeWithoutResult(_ -> {
+                tx.executeWithoutResult(_ -> {
                     moderationService.approve(gameId, MODERATOR);
                     throw new IllegalStateException("forced rollback after approve");
                 })

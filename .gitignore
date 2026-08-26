@@ -89,6 +89,7 @@ nb-configuration.xml
 ##############################
 *.log
 secret.properties
+.mcp.json
 .scannerwork/
 .env
 docs/

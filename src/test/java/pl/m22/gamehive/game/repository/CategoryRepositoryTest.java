@@ -34,8 +34,9 @@ class CategoryRepositoryTest {
     @Test
     @DisplayName("duplikat name -> naruszenie unikalności")
     void duplicateName_violatesUnique() {
-        assertThatThrownBy(() ->
-                categoryRepository.saveAndFlush(Category.of("Strategy")))
+        Category duplicate = Category.of("Strategy");
+
+        assertThatThrownBy(() -> categoryRepository.saveAndFlush(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

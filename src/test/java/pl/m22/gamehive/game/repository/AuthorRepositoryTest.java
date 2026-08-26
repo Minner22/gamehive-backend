@@ -43,8 +43,9 @@ class AuthorRepositoryTest {
     @Test
     @DisplayName("duplikat pary firstName+lastName -> naruszenie unikalności")
     void duplicatePair_violatesUnique() {
-        assertThatThrownBy(() ->
-                authorRepository.saveAndFlush(Author.of("Uwe", "Rosenberg", TaxonomyStatus.APPROVED)))
+        Author duplicate = Author.of("Uwe", "Rosenberg", TaxonomyStatus.APPROVED);
+
+        assertThatThrownBy(() -> authorRepository.saveAndFlush(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 

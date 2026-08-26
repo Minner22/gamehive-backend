@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -35,12 +34,10 @@ import pl.m22.gamehive.game.service.GameSubmissionService;
         description = "Zgłaszanie gier do globalnej biblioteki: tworzenie (DRAFT/PENDING), przegląd i edycja "
                 + "własnych zgłoszeń, wysyłka do moderacji z limitem poprawek. Wymaga uwierzytelnienia JWT (dowolna rola).")
 @SecurityRequirement(name = "bearerAuth")
-@ApiResponses({
-        @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
-                content = @Content(schema = @Schema(implementation = ApiError.class)))
-})
+@ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
 public class GameController {
 
     private final GameSubmissionService gameSubmissionService;
@@ -78,15 +75,13 @@ public class GameController {
     @Operation(summary = "Utwórz zgłoszenie gry",
             description = "Tworzy zgłoszenie przypisane do zalogowanego użytkownika. "
                     + "Pole submit: true = od razu do moderacji (PENDING), false/brak = szkic (DRAFT).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Zgłoszenie utworzone"),
-            @ApiResponse(responseCode = "400",
-                    description = "Błąd walidacji (Bean Validation lub INVALID_PLAYER_COUNT / PUBLISHER_REQUIRED / CATEGORY_REQUIRED)",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "404",
-                    description = "Wskazany id nie istnieje (PUBLISHER_NOT_FOUND / CATEGORY_NOT_FOUND / MECHANIC_NOT_FOUND / AUTHOR_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "201", description = "Zgłoszenie utworzone")
+    @ApiResponse(responseCode = "400",
+            description = "Błąd walidacji (Bean Validation lub INVALID_PLAYER_COUNT / PUBLISHER_REQUIRED / CATEGORY_REQUIRED)",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "404",
+            description = "Wskazany id nie istnieje (PUBLISHER_NOT_FOUND / CATEGORY_NOT_FOUND / MECHANIC_NOT_FOUND / AUTHOR_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping
     public ResponseEntity<GameDto> createGame(
             Authentication authentication,
@@ -116,12 +111,10 @@ public class GameController {
     @Operation(summary = "Pobierz grę",
             description = "Zwraca grę APPROVED z biblioteki (widoczną dla każdego zalogowanego) albo własne "
                     + "zgłoszenie w dowolnym statusie. Cudze nie-APPROVED i nieistniejące są nierozróżnialne (404).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Znaleziono grę"),
-            @ApiResponse(responseCode = "404",
-                    description = "Gra nie istnieje albo jest cudzym zgłoszeniem spoza biblioteki (GAME_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Znaleziono grę")
+    @ApiResponse(responseCode = "404",
+            description = "Gra nie istnieje albo jest cudzym zgłoszeniem spoza biblioteki (GAME_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @GetMapping("/{id}")
     public ResponseEntity<GameDto> getGame(
             Authentication authentication,
@@ -136,18 +129,16 @@ public class GameController {
             description = "Dozwolone tylko dla własnego wpisu w statusie DRAFT lub REJECTED. Relacje "
                     + "(wydawcy/kategorie/mechaniki/autorzy) są zastępowane w całości. Pole submit jest "
                     + "ignorowane — status zmienia wyłącznie POST /{id}/submit.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Zgłoszenie zaktualizowane"),
-            @ApiResponse(responseCode = "400",
-                    description = "Błąd walidacji (Bean Validation lub INVALID_PLAYER_COUNT / PUBLISHER_REQUIRED / CATEGORY_REQUIRED)",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "404",
-                    description = "Zgłoszenie nie istnieje lub należy do innego użytkownika (GAME_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409",
-                    description = "Zgłoszenie nieedytowalne w bieżącym statusie (GAME_NOT_EDITABLE)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Zgłoszenie zaktualizowane")
+    @ApiResponse(responseCode = "400",
+            description = "Błąd walidacji (Bean Validation lub INVALID_PLAYER_COUNT / PUBLISHER_REQUIRED / CATEGORY_REQUIRED)",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "404",
+            description = "Zgłoszenie nie istnieje lub należy do innego użytkownika (GAME_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409",
+            description = "Zgłoszenie nieedytowalne w bieżącym statusie (GAME_NOT_EDITABLE)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PutMapping("/{id}")
     public ResponseEntity<GameDto> updateGame(
             Authentication authentication,
@@ -163,15 +154,13 @@ public class GameController {
             description = "DRAFT → PENDING (pierwsze wysłanie) albo REJECTED → PENDING (ponowne wysłanie: "
                     + "inkrementuje resubmissionCount i czyści powód odrzucenia). Liczbę ponownych wysyłek "
                     + "ogranicza limit gamehive.moderation.max-resubmissions.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Zgłoszenie wysłane do moderacji (PENDING)"),
-            @ApiResponse(responseCode = "404",
-                    description = "Zgłoszenie nie istnieje lub należy do innego użytkownika (GAME_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409",
-                    description = "Zły status (GAME_NOT_EDITABLE) albo wyczerpany limit poprawek (RESUBMISSION_LIMIT_EXCEEDED — status pozostaje REJECTED)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Zgłoszenie wysłane do moderacji (PENDING)")
+    @ApiResponse(responseCode = "404",
+            description = "Zgłoszenie nie istnieje lub należy do innego użytkownika (GAME_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409",
+            description = "Zły status (GAME_NOT_EDITABLE) albo wyczerpany limit poprawek (RESUBMISSION_LIMIT_EXCEEDED — status pozostaje REJECTED)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/{id}/submit")
     public ResponseEntity<GameDto> submitGame(
             Authentication authentication,

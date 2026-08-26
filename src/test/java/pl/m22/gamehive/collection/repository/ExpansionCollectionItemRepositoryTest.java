@@ -74,9 +74,10 @@ class ExpansionCollectionItemRepositoryTest {
     @DisplayName("duplikat (userId, expansionId) -> naruszenie unikatu na poziomie bazy")
     void duplicate_violatesUniqueConstraint() {
         GameExpansion rzeka = expansionRepository.findByName("Carcassonne: Rzeka").getFirst();
+        ExpansionCollectionItem duplicate = new ExpansionCollectionItem(SeededUsers.JANE_ID, rzeka);
 
-        assertThatExceptionOfType(DataIntegrityViolationException.class).isThrownBy(() ->
-                collectionRepository.saveAndFlush(new ExpansionCollectionItem(SeededUsers.JANE_ID, rzeka)));
+        assertThatExceptionOfType(DataIntegrityViolationException.class)
+                .isThrownBy(() -> collectionRepository.saveAndFlush(duplicate));
     }
 
     @Test

@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -33,12 +32,10 @@ import pl.m22.gamehive.common.exception.ApiError;
                 + "Tożsamość pochodzi z tokenu — nie da się odczytać ani zmienić cudzej kolekcji. "
                 + "Wymaga uwierzytelnienia JWT (dowolna rola).")
 @SecurityRequirement(name = "bearerAuth")
-@ApiResponses({
-        @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
-                content = @Content(schema = @Schema(implementation = ApiError.class)))
-})
+@ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
 public class CollectionController {
 
     private final CollectionService collectionService;
@@ -61,15 +58,13 @@ public class CollectionController {
     @Operation(summary = "Dodaj grę do kolekcji",
             description = "Dodaje grę APPROVED do kolekcji zalogowanego użytkownika ze statusem OWNED. "
                     + "Ta sama gra może być w kolekcjach wielu użytkowników — unikat obejmuje parę (użytkownik, gra).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Gra dodana do kolekcji"),
-            @ApiResponse(responseCode = "404", description = "Gra nie istnieje (GAME_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409",
-                    description = "Gra nie jest zatwierdzona (GAME_NOT_APPROVED) albo jest już w kolekcji "
-                            + "(ALREADY_IN_COLLECTION)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "201", description = "Gra dodana do kolekcji")
+    @ApiResponse(responseCode = "404", description = "Gra nie istnieje (GAME_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409",
+            description = "Gra nie jest zatwierdzona (GAME_NOT_APPROVED) albo jest już w kolekcji "
+                    + "(ALREADY_IN_COLLECTION)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/games/{gameId}")
     public ResponseEntity<GameCollectionItemDto> addGame(
             Authentication authentication,
@@ -84,12 +79,10 @@ public class CollectionController {
     @Operation(summary = "Usuń grę z kolekcji",
             description = "Usuwa wyłącznie własny wpis. Gra w bibliotece pozostaje nietknięta. "
                     + "Cudzy wpis jest nieodróżnialny od nieistniejącego (404).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Wpis usunięty z kolekcji"),
-            @ApiResponse(responseCode = "404",
-                    description = "Gry nie ma w Twojej kolekcji (COLLECTION_ITEM_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "204", description = "Wpis usunięty z kolekcji")
+    @ApiResponse(responseCode = "404",
+            description = "Gry nie ma w Twojej kolekcji (COLLECTION_ITEM_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @DeleteMapping("/games/{gameId}")
     public ResponseEntity<Void> removeGame(
             Authentication authentication,
@@ -119,15 +112,13 @@ public class CollectionController {
     @Operation(summary = "Dodaj dodatek do kolekcji",
             description = "Dodaje dodatek APPROVED do kolekcji ze statusem OWNED — niezależnie od tego, "
                     + "czy jego gra bazowa jest w kolekcji.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Dodatek dodany do kolekcji"),
-            @ApiResponse(responseCode = "404", description = "Dodatek nie istnieje (EXPANSION_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409",
-                    description = "Dodatek nie jest zatwierdzony (EXPANSION_NOT_APPROVED) albo jest już "
-                            + "w kolekcji (ALREADY_IN_COLLECTION)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "201", description = "Dodatek dodany do kolekcji")
+    @ApiResponse(responseCode = "404", description = "Dodatek nie istnieje (EXPANSION_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409",
+            description = "Dodatek nie jest zatwierdzony (EXPANSION_NOT_APPROVED) albo jest już "
+                    + "w kolekcji (ALREADY_IN_COLLECTION)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/expansions/{expansionId}")
     public ResponseEntity<ExpansionCollectionItemDto> addExpansion(
             Authentication authentication,
@@ -141,12 +132,10 @@ public class CollectionController {
 
     @Operation(summary = "Usuń dodatek z kolekcji",
             description = "Usuwa wyłącznie własny wpis. Dodatek w bibliotece pozostaje nietknięty.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Wpis usunięty z kolekcji"),
-            @ApiResponse(responseCode = "404",
-                    description = "Dodatku nie ma w Twojej kolekcji (COLLECTION_ITEM_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "204", description = "Wpis usunięty z kolekcji")
+    @ApiResponse(responseCode = "404",
+            description = "Dodatku nie ma w Twojej kolekcji (COLLECTION_ITEM_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @DeleteMapping("/expansions/{expansionId}")
     public ResponseEntity<Void> removeExpansion(
             Authentication authentication,

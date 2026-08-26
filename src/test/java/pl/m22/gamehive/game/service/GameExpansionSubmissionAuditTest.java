@@ -150,9 +150,10 @@ class GameExpansionSubmissionAuditTest {
     @DisplayName("rollback submitExpansion -> brak wpisu audytu (AFTER_COMMIT nie odpala się na wycofanej transakcji)")
     void submit_rolledBack_noAuditEntry() {
         Long id = persistExpansion(ModerationStatus.DRAFT);
+        TransactionTemplate tx = new TransactionTemplate(txManager);
 
         assertThatThrownBy(() ->
-                new TransactionTemplate(txManager).executeWithoutResult(_ -> {
+                tx.executeWithoutResult(_ -> {
                     submissionService.submitExpansion(id, JANE);
                     throw new IllegalStateException("forced rollback after submit");
                 })
