@@ -85,4 +85,25 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath("$.paths['/api/v1/taxonomy/publishers/suggest'].get.responses['400']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/taxonomy/authors/suggest'].get.responses['400']").exists());
     }
+
+    @Test
+    @DisplayName("Wspólne odpowiedzi deklarowane raz na poziomie klasy trafiają do każdej operacji")
+    void apiDocs_mergesClassLevelResponsesIntoOperations() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                // SearchAdminController: metodowo zadeklarowane są tylko 200 i 409...
+                .andExpect(jsonPath("$.paths['/api/v1/admin/search/reindex'].post.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/admin/search/reindex'].post.responses['409']").exists())
+                // ...a 401/403/500/503 pochodzą wyłącznie z adnotacji na klasie. 503 jest tu sondą
+                // rozstrzygającą: springdoc nie tworzy go z żadnego domyślnego mechanizmu, więc jego
+                // obecność dowodzi, że scalanie klasa -> metoda faktycznie działa.
+                .andExpect(jsonPath("$.paths['/api/v1/admin/search/reindex'].post.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/admin/search/reindex'].post.responses['403']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/admin/search/reindex'].post.responses['500']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/admin/search/reindex'].post.responses['503']").exists())
+                // AdminUserController — wzorzec opisany w CLAUDE.md, dotąd niepilnowany żadną asercją
+                .andExpect(jsonPath("$.paths['/api/v1/admin/users/'].get.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/admin/users/'].get.responses['403']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/admin/users/'].get.responses['500']").exists());
+    }
 }
