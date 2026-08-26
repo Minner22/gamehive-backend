@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -34,14 +33,12 @@ import pl.m22.gamehive.game.service.GameModerationService;
         description = "Kolejka zgłoszeń oczekujących i decyzje moderacyjne (approve/reject/unlock). "
                 + "Wymaga uwierzytelnienia JWT oraz roli ROLE_MODERATOR lub ROLE_ADMIN.")
 @SecurityRequirement(name = "bearerAuth")
-@ApiResponses({
-        @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "403", description = "Brak uprawnień (wymagana rola MODERATOR/ADMIN)",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
-                content = @Content(schema = @Schema(implementation = ApiError.class)))
-})
+@ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "403", description = "Brak uprawnień (wymagana rola MODERATOR/ADMIN)",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
 public class GameModerationController {
 
     private final GameModerationService gameModerationService;
@@ -60,13 +57,11 @@ public class GameModerationController {
     @Operation(summary = "Zatwierdź zgłoszenie",
             description = "PENDING → APPROVED, ustawia reviewedBy/reviewedAt. Zatwierdza również wszystkich "
                     + "wydawców i autorów gry o statusie PENDING (w tej samej transakcji).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Zgłoszenie zatwierdzone"),
-            @ApiResponse(responseCode = "404", description = "Gra nie istnieje (GAME_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Gra nie jest w kolejce PENDING (GAME_NOT_PENDING)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Zgłoszenie zatwierdzone")
+    @ApiResponse(responseCode = "404", description = "Gra nie istnieje (GAME_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Gra nie jest w kolejce PENDING (GAME_NOT_PENDING)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/{id}/approve")
     public ResponseEntity<GameModerationDto> approve(
             Authentication authentication,
@@ -79,15 +74,13 @@ public class GameModerationController {
 
     @Operation(summary = "Odrzuć zgłoszenie",
             description = "PENDING → REJECTED z wymaganym powodem (widocznym dla autora), ustawia reviewedBy/reviewedAt.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Zgłoszenie odrzucone"),
-            @ApiResponse(responseCode = "400", description = "Brak powodu odrzucenia (REJECTION_REASON_REQUIRED)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "404", description = "Gra nie istnieje (GAME_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Gra nie jest w kolejce PENDING (GAME_NOT_PENDING)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Zgłoszenie odrzucone")
+    @ApiResponse(responseCode = "400", description = "Brak powodu odrzucenia (REJECTION_REASON_REQUIRED)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "404", description = "Gra nie istnieje (GAME_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Gra nie jest w kolejce PENDING (GAME_NOT_PENDING)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/{id}/reject")
     public ResponseEntity<GameModerationDto> reject(
             Authentication authentication,
@@ -102,13 +95,11 @@ public class GameModerationController {
     @Operation(summary = "Odblokuj zgłoszenie po wyczerpaniu limitu poprawek",
             description = "REJECTED → DRAFT: zeruje resubmissionCount i czyści dane recenzji, pozwalając "
                     + "użytkownikowi ponownie edytować i wysłać zgłoszenie.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Zgłoszenie odblokowane (DRAFT)"),
-            @ApiResponse(responseCode = "404", description = "Gra nie istnieje (GAME_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Gra nie jest odrzucona (GAME_NOT_REJECTED)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Zgłoszenie odblokowane (DRAFT)")
+    @ApiResponse(responseCode = "404", description = "Gra nie istnieje (GAME_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Gra nie jest odrzucona (GAME_NOT_REJECTED)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/{id}/unlock")
     public ResponseEntity<GameModerationDto> unlock(
             Authentication authentication,
@@ -124,18 +115,16 @@ public class GameModerationController {
                     + "(min ≤ max, ≥1 wydawca, ≥1 kategoria); relacje (wydawcy/kategorie/mechaniki/autorzy) są "
                     + "zastępowane w całości. Nowi wydawcy/autorzy dodani przy edycji są od razu zatwierdzani. "
                     + "Pole submit jest ignorowane.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Gra zaktualizowana"),
-            @ApiResponse(responseCode = "400",
-                    description = "Błąd walidacji (Bean Validation lub INVALID_PLAYER_COUNT / PUBLISHER_REQUIRED / CATEGORY_REQUIRED)",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "404",
-                    description = "Gra nie istnieje (GAME_NOT_FOUND) lub wskazany id słownika nie istnieje "
-                            + "(PUBLISHER_NOT_FOUND / CATEGORY_NOT_FOUND / MECHANIC_NOT_FOUND / AUTHOR_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Gra nie jest zatwierdzona (GAME_NOT_APPROVED)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Gra zaktualizowana")
+    @ApiResponse(responseCode = "400",
+            description = "Błąd walidacji (Bean Validation lub INVALID_PLAYER_COUNT / PUBLISHER_REQUIRED / CATEGORY_REQUIRED)",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "404",
+            description = "Gra nie istnieje (GAME_NOT_FOUND) lub wskazany id słownika nie istnieje "
+                    + "(PUBLISHER_NOT_FOUND / CATEGORY_NOT_FOUND / MECHANIC_NOT_FOUND / AUTHOR_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Gra nie jest zatwierdzona (GAME_NOT_APPROVED)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PutMapping("/{id}")
     public ResponseEntity<GameModerationDto> updateApprovedGame(
             Authentication authentication,
@@ -152,14 +141,12 @@ public class GameModerationController {
                     + "niewidoczny → 404). Gry, do której istnieją dodatki, nie można usunąć — najpierw "
                     + "trzeba usunąć dodatki. Kaskadowo znikają powiązania słownikowe; wpis audytu DELETE "
                     + "przeżywa usunięcie. Operacja nieodwracalna.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Gra usunięta"),
-            @ApiResponse(responseCode = "404", description = "Gra nie istnieje lub jest szkicem (GAME_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409",
-                    description = "Gra ma dodatki i nie może zostać usunięta (GAME_HAS_EXPANSIONS)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "204", description = "Gra usunięta")
+    @ApiResponse(responseCode = "404", description = "Gra nie istnieje lub jest szkicem (GAME_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409",
+            description = "Gra ma dodatki i nie może zostać usunięta (GAME_HAS_EXPANSIONS)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteGame(
             Authentication authentication,

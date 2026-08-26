@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -38,14 +37,12 @@ import java.util.List;
         description = "Zarządzanie słownikami fazy Gry (kategorie, mechaniki, wydawcy, autorzy). "
                 + "Wymaga uwierzytelnienia JWT oraz roli ROLE_MODERATOR lub ROLE_ADMIN.")
 @SecurityRequirement(name = "bearerAuth")
-@ApiResponses({
-        @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "403", description = "Brak uprawnień (wymagana rola MODERATOR/ADMIN)",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
-                content = @Content(schema = @Schema(implementation = ApiError.class)))
-})
+@ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "403", description = "Brak uprawnień (wymagana rola MODERATOR/ADMIN)",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
 public class TaxonomyAdminController {
 
     private final AuthorMapper authorMapper;
@@ -66,13 +63,11 @@ public class TaxonomyAdminController {
     }
 
     @Operation(summary = "Utwórz kategorię")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Kategoria utworzona"),
-            @ApiResponse(responseCode = "400", description = "Błąd walidacji",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "409", description = "Nazwa zajęta (CATEGORY_NAME_EXISTS)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "201", description = "Kategoria utworzona")
+    @ApiResponse(responseCode = "400", description = "Błąd walidacji",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "409", description = "Nazwa zajęta (CATEGORY_NAME_EXISTS)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/categories")
     public ResponseEntity<CategoryDto> createCategory(@Valid @RequestBody TaxonomyItemRequestDto request) {
 
@@ -82,15 +77,13 @@ public class TaxonomyAdminController {
     }
 
     @Operation(summary = "Zmień nazwę kategorii")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Nazwa zmieniona"),
-            @ApiResponse(responseCode = "400", description = "Błąd walidacji / niepoprawne id",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "404", description = "Kategoria nie istnieje (CATEGORY_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Nazwa zajęta (CATEGORY_NAME_EXISTS)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Nazwa zmieniona")
+    @ApiResponse(responseCode = "400", description = "Błąd walidacji / niepoprawne id",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "404", description = "Kategoria nie istnieje (CATEGORY_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Nazwa zajęta (CATEGORY_NAME_EXISTS)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PutMapping("/categories/{id}")
     public ResponseEntity<CategoryDto> renameCategory(@PathVariable Long id,
                                                       @Valid @RequestBody TaxonomyItemRequestDto request) {
@@ -99,13 +92,11 @@ public class TaxonomyAdminController {
     }
 
     @Operation(summary = "Usuń kategorię")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Kategoria usunięta (brak treści)"),
-            @ApiResponse(responseCode = "404", description = "Kategoria nie istnieje (CATEGORY_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Kategoria używana przez grę (CATEGORY_IN_USE)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "204", description = "Kategoria usunięta (brak treści)")
+    @ApiResponse(responseCode = "404", description = "Kategoria nie istnieje (CATEGORY_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Kategoria używana przez grę (CATEGORY_IN_USE)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @DeleteMapping("/categories/{id}")
     public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
 
@@ -126,13 +117,11 @@ public class TaxonomyAdminController {
     }
 
     @Operation(summary = "Utwórz mechanikę")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Mechanika utworzona"),
-            @ApiResponse(responseCode = "400", description = "Błąd walidacji",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "409", description = "Nazwa zajęta (MECHANIC_NAME_EXISTS)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "201", description = "Mechanika utworzona")
+    @ApiResponse(responseCode = "400", description = "Błąd walidacji",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "409", description = "Nazwa zajęta (MECHANIC_NAME_EXISTS)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/mechanics")
     public ResponseEntity<MechanicDto> createMechanic(@Valid @RequestBody TaxonomyItemRequestDto request) {
 
@@ -142,15 +131,13 @@ public class TaxonomyAdminController {
     }
 
     @Operation(summary = "Zmień nazwę mechaniki")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Nazwa zmieniona"),
-            @ApiResponse(responseCode = "400", description = "Błąd walidacji / niepoprawne id",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "404", description = "Mechanika nie istnieje (MECHANIC_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Nazwa zajęta (MECHANIC_NAME_EXISTS)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Nazwa zmieniona")
+    @ApiResponse(responseCode = "400", description = "Błąd walidacji / niepoprawne id",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "404", description = "Mechanika nie istnieje (MECHANIC_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Nazwa zajęta (MECHANIC_NAME_EXISTS)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PutMapping("/mechanics/{id}")
     public ResponseEntity<MechanicDto> renameMechanic(@PathVariable Long id,
                                                       @Valid @RequestBody TaxonomyItemRequestDto request) {
@@ -159,13 +146,11 @@ public class TaxonomyAdminController {
     }
 
     @Operation(summary = "Usuń mechanikę")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Mechanika usunięta (brak treści)"),
-            @ApiResponse(responseCode = "404", description = "Mechanika nie istnieje (MECHANIC_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Mechanika używana przez grę (MECHANIC_IN_USE)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "204", description = "Mechanika usunięta (brak treści)")
+    @ApiResponse(responseCode = "404", description = "Mechanika nie istnieje (MECHANIC_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Mechanika używana przez grę (MECHANIC_IN_USE)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @DeleteMapping("/mechanics/{id}")
     public ResponseEntity<Void> deleteMechanic(@PathVariable Long id) {
 
@@ -195,13 +180,11 @@ public class TaxonomyAdminController {
     }
 
     @Operation(summary = "Utwórz wydawcę", description = "Tworzy wydawcę od razu ze statusem APPROVED.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Wydawca utworzony"),
-            @ApiResponse(responseCode = "400", description = "Błąd walidacji",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "409", description = "Nazwa zajęta (PUBLISHER_NAME_EXISTS)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "201", description = "Wydawca utworzony")
+    @ApiResponse(responseCode = "400", description = "Błąd walidacji",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "409", description = "Nazwa zajęta (PUBLISHER_NAME_EXISTS)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/publishers")
     public ResponseEntity<PublisherDto> createPublisher(@Valid @RequestBody TaxonomyItemRequestDto request) {
 
@@ -212,11 +195,9 @@ public class TaxonomyAdminController {
 
     @Operation(summary = "Zatwierdź wydawcę",
             description = "Zmienia status PENDING → APPROVED. Idempotentne: wydawca już APPROVED zwraca 200 bez zmian.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Wydawca zatwierdzony (lub już był APPROVED)"),
-            @ApiResponse(responseCode = "404", description = "Wydawca nie istnieje (PUBLISHER_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Wydawca zatwierdzony (lub już był APPROVED)")
+    @ApiResponse(responseCode = "404", description = "Wydawca nie istnieje (PUBLISHER_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/publishers/{id}/approve")
     public ResponseEntity<PublisherDto> approvePublisher(@PathVariable Long id) {
 
@@ -224,13 +205,11 @@ public class TaxonomyAdminController {
     }
 
     @Operation(summary = "Usuń wydawcę")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Wydawca usunięty (brak treści)"),
-            @ApiResponse(responseCode = "404", description = "Wydawca nie istnieje (PUBLISHER_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Wydawca używany przez grę (PUBLISHER_IN_USE)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "204", description = "Wydawca usunięty (brak treści)")
+    @ApiResponse(responseCode = "404", description = "Wydawca nie istnieje (PUBLISHER_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Wydawca używany przez grę (PUBLISHER_IN_USE)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @DeleteMapping("/publishers/{id}")
     public ResponseEntity<Void> deletePublisher(@PathVariable Long id) {
 
@@ -259,13 +238,11 @@ public class TaxonomyAdminController {
     }
 
     @Operation(summary = "Utwórz autora", description = "Tworzy autora od razu ze statusem APPROVED.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Autor utworzony"),
-            @ApiResponse(responseCode = "400", description = "Błąd walidacji",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "409", description = "Autor już istnieje (AUTHOR_NAME_EXISTS)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "201", description = "Autor utworzony")
+    @ApiResponse(responseCode = "400", description = "Błąd walidacji",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "409", description = "Autor już istnieje (AUTHOR_NAME_EXISTS)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/authors")
     public ResponseEntity<AuthorDto> createAuthor(@Valid @RequestBody AuthorRequestDto request) {
 
@@ -276,11 +253,9 @@ public class TaxonomyAdminController {
 
     @Operation(summary = "Zatwierdź autora",
             description = "Zmienia status PENDING → APPROVED. Idempotentne: autor już APPROVED zwraca 200 bez zmian.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Autor zatwierdzony (lub już był APPROVED)"),
-            @ApiResponse(responseCode = "404", description = "Autor nie istnieje (AUTHOR_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Autor zatwierdzony (lub już był APPROVED)")
+    @ApiResponse(responseCode = "404", description = "Autor nie istnieje (AUTHOR_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/authors/{id}/approve")
     public ResponseEntity<AuthorDto> approveAuthor(@PathVariable Long id) {
 
@@ -288,15 +263,13 @@ public class TaxonomyAdminController {
     }
 
     @Operation(summary = "Edytuj autora")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Autor zaktualizowany"),
-            @ApiResponse(responseCode = "400", description = "Błąd walidacji / niepoprawne id",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "404", description = "Autor nie istnieje (AUTHOR_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Para imię+nazwisko zajęta (AUTHOR_NAME_EXISTS)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Autor zaktualizowany")
+    @ApiResponse(responseCode = "400", description = "Błąd walidacji / niepoprawne id",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "404", description = "Autor nie istnieje (AUTHOR_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Para imię+nazwisko zajęta (AUTHOR_NAME_EXISTS)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PutMapping("/authors/{id}")
     public ResponseEntity<AuthorDto> updateAuthor(@PathVariable Long id,
                                                   @Valid @RequestBody AuthorRequestDto request) {
@@ -305,13 +278,11 @@ public class TaxonomyAdminController {
     }
 
     @Operation(summary = "Usuń autora")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Autor usunięty (brak treści)"),
-            @ApiResponse(responseCode = "404", description = "Autor nie istnieje (AUTHOR_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "409", description = "Autor używany przez grę (AUTHOR_IN_USE)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "204", description = "Autor usunięty (brak treści)")
+    @ApiResponse(responseCode = "404", description = "Autor nie istnieje (AUTHOR_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Autor używany przez grę (AUTHOR_IN_USE)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @DeleteMapping("/authors/{id}")
     public ResponseEntity<Void> deleteAuthor(@PathVariable Long id) {
 

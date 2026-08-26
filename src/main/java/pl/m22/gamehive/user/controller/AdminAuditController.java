@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -44,18 +43,16 @@ public class AdminAuditController {
     @Operation(
             summary = "Przeszukiwanie dziennika audytu",
             description = "Zwraca stronicowaną listę wpisów audytu z opcjonalnym filtrowaniem po użytkowniku, administratorze, rodzaju operacji i zakresie czasu. Domyślne sortowanie: createdAt malejąco.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Strona wyników z wpisami audytu",
-                    content = @Content(schema = @Schema(implementation = PageAuditLogResponseDto.class))),
-            @ApiResponse(responseCode = "400", description = "Nieprawidłowy parametr zapytania (np. zły UUID lub format daty)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Brak uprawnień (wymagana rola ROLE_ADMIN)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Strona wyników z wpisami audytu",
+            content = @Content(schema = @Schema(implementation = PageAuditLogResponseDto.class)))
+    @ApiResponse(responseCode = "400", description = "Nieprawidłowy parametr zapytania (np. zły UUID lub format daty)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "403", description = "Brak uprawnień (wymagana rola ROLE_ADMIN)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @GetMapping
     public ResponseEntity<Page<AuditLogResponseDto>> getAuditLog(
             @Parameter(description = "Filtr: identyfikator (UUID) użytkownika, którego dotyczą operacje")

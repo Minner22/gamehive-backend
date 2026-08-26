@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -34,14 +33,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Tag(name = "Admin - Users", description = "Zarządzanie kontami użytkowników. Wymaga uwierzytelnienia JWT oraz roli ROLE_ADMIN.")
 @SecurityRequirement(name = "bearerAuth")
-@ApiResponses({
-        @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "403", description = "Brak uprawnień (wymagana rola ROLE_ADMIN)",
-                content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
-                content = @Content(schema = @Schema(implementation = ApiError.class)))
-})
+@ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "403", description = "Brak uprawnień (wymagana rola ROLE_ADMIN)",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+@ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
 public class AdminUserController {
 
     private final UserService userService;
@@ -62,13 +59,11 @@ public class AdminUserController {
     }
 
     @Operation(summary = "Pobierz użytkownika po identyfikatorze")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Znaleziono użytkownika"),
-            @ApiResponse(responseCode = "400", description = "Nieprawidłowy format UUID",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Znaleziono użytkownika")
+    @ApiResponse(responseCode = "400", description = "Nieprawidłowy format UUID",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @GetMapping("/{id}")
     public ResponseEntity<UserResponseDto> getUserById(
             @Parameter(description = "Identyfikator użytkownika (UUID)", required = true) @PathVariable UUID id) {
@@ -79,11 +74,9 @@ public class AdminUserController {
     }
 
     @Operation(summary = "Pobierz użytkownika po nazwie użytkownika")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Znaleziono użytkownika"),
-            @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Znaleziono użytkownika")
+    @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @GetMapping("/by-username/{username}")
     public ResponseEntity<UserResponseDto> getUserByUsername(
             @Parameter(description = "Nazwa użytkownika", required = true) @PathVariable String username) {
@@ -96,11 +89,9 @@ public class AdminUserController {
     }
 
     @Operation(summary = "Pobierz użytkownika po adresie e-mail")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Znaleziono użytkownika"),
-            @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Znaleziono użytkownika")
+    @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @GetMapping("/by-email/{email}")
     public ResponseEntity<UserResponseDto> getUserByEmail(
             @Parameter(description = "Adres e-mail użytkownika", required = true) @PathVariable String email) {
@@ -115,13 +106,11 @@ public class AdminUserController {
     @Operation(
             summary = "Zmiana ról użytkownika",
             description = "Zastępuje role użytkownika podanym zestawem. Operacja audytowana (ROLE_CHANGE).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Role zaktualizowane"),
-            @ApiResponse(responseCode = "400", description = "Błąd walidacji lub niepoprawny UUID",
-                    content = @Content(schema = @Schema(implementation = ApiValidationError.class))),
-            @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Role zaktualizowane")
+    @ApiResponse(responseCode = "400", description = "Błąd walidacji lub niepoprawny UUID",
+            content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
+    @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PutMapping("/{id}/roles")
     public ResponseEntity<UserResponseDto> updateUserRoles(
             @Parameter(description = "Identyfikator użytkownika (UUID)", required = true) @PathVariable UUID id,
@@ -137,13 +126,11 @@ public class AdminUserController {
     @Operation(
             summary = "Dezaktywacja konta",
             description = "Wyłącza konto użytkownika i natychmiast unieważnia jego tokeny. Operacja audytowana (DEACTIVATE).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Konto dezaktywowane"),
-            @ApiResponse(responseCode = "400", description = "Nieprawidłowy format UUID",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Konto dezaktywowane")
+    @ApiResponse(responseCode = "400", description = "Nieprawidłowy format UUID",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PatchMapping("/{id}/deactivate")
     public ResponseEntity<UserResponseDto> deactivateUser(
             @Parameter(description = "Identyfikator użytkownika (UUID)", required = true) @PathVariable UUID id,
@@ -159,13 +146,11 @@ public class AdminUserController {
     @Operation(
             summary = "Aktywacja (reaktywacja) konta",
             description = "Ponownie włącza wcześniej dezaktywowane konto. Operacja audytowana (ACTIVATE). Uwaga: poprzednie sesje pozostają unieważnione — wymagane ponowne logowanie.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Konto aktywowane"),
-            @ApiResponse(responseCode = "400", description = "Nieprawidłowy format UUID",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "Konto aktywowane")
+    @ApiResponse(responseCode = "400", description = "Nieprawidłowy format UUID",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PatchMapping("/{id}/activate")
     public ResponseEntity<UserResponseDto> activateUser(
             @Parameter(description = "Identyfikator użytkownika (UUID)", required = true) @PathVariable UUID id,
@@ -181,13 +166,11 @@ public class AdminUserController {
     @Operation(
             summary = "Usunięcie konta",
             description = "Trwale usuwa konto użytkownika i unieważnia jego tokeny. Operacja audytowana (DELETE).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Konto usunięte (brak treści)"),
-            @ApiResponse(responseCode = "400", description = "Nieprawidłowy format UUID",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "204", description = "Konto usunięte (brak treści)")
+    @ApiResponse(responseCode = "400", description = "Nieprawidłowy format UUID",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @DeleteMapping("/{id}")
     public ResponseEntity<UserResponseDto> deleteUser(
             @Parameter(description = "Identyfikator użytkownika (UUID)", required = true) @PathVariable UUID id,
@@ -203,13 +186,11 @@ public class AdminUserController {
     @Operation(
             summary = "Wymuszenie wylogowania",
             description = "Unieważnia wszystkie aktywne sesje (tokeny) użytkownika bez zmiany stanu konta. Operacja audytowana (FORCE_LOGOUT).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Sesje unieważnione (brak treści)"),
-            @ApiResponse(responseCode = "400", description = "Nieprawidłowy format UUID",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
-    })
+    @ApiResponse(responseCode = "204", description = "Sesje unieważnione (brak treści)")
+    @ApiResponse(responseCode = "400", description = "Nieprawidłowy format UUID",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "404", description = "Użytkownik nie istnieje (USER_NOT_FOUND)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/{id}/force-logout")
     public ResponseEntity<Void> forceLogout(
             @Parameter(description = "Identyfikator użytkownika (UUID)", required = true) @PathVariable UUID id,
