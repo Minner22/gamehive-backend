@@ -78,6 +78,11 @@ public class TaxonomyController {
         return ResponseEntity.ok(mechanicMapper.toDtoList(taxonomyService.findAllMechanics()));
     }
 
+    /**
+     * @deprecated od GH-131 — użyj {@link #suggestPublishers(String, int)}. Lista wydawców rośnie wraz
+     *             ze zgłoszeniami użytkowników, więc odpowiedź jest ucinana do {@value #MAX_LIST_SIZE}
+     *             pozycji i powyżej tego progu nie jest kompletem danych.
+     */
     @Deprecated(since = "GH-131")
     @Operation(summary = "Lista wydawców (opcjonalny filtr statusu) — PRZESTARZAŁE",
             deprecated = true,
@@ -98,6 +103,11 @@ public class TaxonomyController {
                 .getContent()));
     }
 
+    /**
+     * @deprecated od GH-131 — użyj {@link #suggestAuthors(String, int)}. Lista autorów rośnie wraz
+     *             ze zgłoszeniami użytkowników, więc odpowiedź jest ucinana do {@value #MAX_LIST_SIZE}
+     *             pozycji i powyżej tego progu nie jest kompletem danych.
+     */
     @Deprecated(since = "GH-131")
     @Operation(summary = "Lista autorów (opcjonalny filtr statusu) — PRZESTARZAŁE",
             deprecated = true,
