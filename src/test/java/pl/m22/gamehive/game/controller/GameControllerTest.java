@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -184,46 +186,23 @@ class GameControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("CATEGORY_REQUIRED"));
     }
 
-    @Test
-    @DisplayName("POST /games nieistniejący publisherId -> 404 (PUBLISHER_NOT_FOUND)")
-    void createGame_unknownPublisherId_404() throws Exception {
+    @ParameterizedTest(name = "{0}=99999 -> 404 {1}")
+    @CsvSource({
+            "publisherIds,PUBLISHER_NOT_FOUND",
+            "categoryIds,CATEGORY_NOT_FOUND",
+            "authorIds,AUTHOR_NOT_FOUND"
+    })
+    @DisplayName("POST /games z nieistniejącym id słownika -> 404 z kodem właściwym dla tego słownika")
+    void createGame_unknownTaxonomyId_404(String field, String errorCode) throws Exception {
         Map<String, Object> body = validRequest(false);
-        body.put("publisherIds", List.of(99999));
+        body.put(field, List.of(99999));
 
         mockMvc.perform(post("/api/v1/games")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(body)))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("PUBLISHER_NOT_FOUND"));
-    }
-
-    @Test
-    @DisplayName("POST /games nieistniejący categoryId -> 404 (CATEGORY_NOT_FOUND)")
-    void createGame_unknownCategoryId_404() throws Exception {
-        Map<String, Object> body = validRequest(false);
-        body.put("categoryIds", List.of(99999));
-
-        mockMvc.perform(post("/api/v1/games")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(body)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("CATEGORY_NOT_FOUND"));
-    }
-
-    @Test
-    @DisplayName("POST /games nieistniejący authorId -> 404 (AUTHOR_NOT_FOUND)")
-    void createGame_unknownAuthorId_404() throws Exception {
-        Map<String, Object> body = validRequest(false);
-        body.put("authorIds", List.of(99999));
-
-        mockMvc.perform(post("/api/v1/games")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(body)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("AUTHOR_NOT_FOUND"));
+                .andExpect(jsonPath("$.errorCode").value(errorCode));
     }
 
     // ---------- POST /api/v1/games: wydawcy i autorzy w locie ----------
