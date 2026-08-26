@@ -19,7 +19,7 @@ class ContentModerationAuditListenerTest {
     @InjectMocks ContentModerationAuditListener listener;
 
     @Test
-    @DisplayName("onContentModerationAudit() -> deleguje zdarzenie do ContentModerationAuditService.record()")
+    @DisplayName("onContentModerationAudit() -> deleguje zdarzenie do ContentModerationAuditService.recordAudit()")
     void onContentModerationAudit_delegatesToService() {
 
         ContentModerationAuditEvent event = new ContentModerationAuditEvent(
@@ -32,6 +32,6 @@ class ContentModerationAuditListenerTest {
 
         listener.onContentModerationAudit(event);
 
-        verify(auditService).record(event);
+        verify(auditService).recordAudit(event);
     }
 }
