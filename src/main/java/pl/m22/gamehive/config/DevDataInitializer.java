@@ -17,6 +17,7 @@ import pl.m22.gamehive.user.model.UserRole;
 import pl.m22.gamehive.user.repository.UserRepository;
 import pl.m22.gamehive.user.repository.UserRoleRepository;
 
+import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -28,18 +29,24 @@ public class DevDataInitializer implements ApplicationRunner {
     private final UserRepository userRepository;
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final DevGameSeeder devGameSeeder;
 
     @Override
     @Transactional
     public void run(@NonNull ApplicationArguments args) {
-        createDevUser("john_doe", "john.doe@example.com", "password123", Set.of("ROLE_ADMIN", "ROLE_USER"));
-        createDevUser("jane_smith", "jane.smith@example.com", "password123", Set.of("ROLE_USER"));
+        AppUser admin = createDevUser("john_doe", "john.doe@example.com", "password123", Set.of("ROLE_ADMIN", "ROLE_USER"));
+        AppUser user = createDevUser("jane_smith", "jane.smith@example.com", "password123", Set.of("ROLE_USER"));
         log.info("Dev users initialized");
+
+        // wołane wprost, a nie jako osobny ApplicationRunner z @Order: gry potrzebują UUID-ów
+        // powyższych kont, więc zależność ma być widoczna w kodzie, a nie ukryta w adnotacji
+        devGameSeeder.seed(admin.getId(), user.getId());
     }
 
-    private void createDevUser(String username, String email, String password, Set<String> roleNames) {
-        if (userRepository.existsByEmail(email)) {
-            return;
+    private AppUser createDevUser(String username, String email, String password, Set<String> roleNames) {
+        Optional<AppUser> existing = userRepository.findByEmail(email);
+        if (existing.isPresent()) {
+            return existing.get();
         }
 
         Set<UserRole> roles = new java.util.HashSet<>();
@@ -54,6 +61,6 @@ public class DevDataInitializer implements ApplicationRunner {
             user.assignRole(role);
         }
 
-        userRepository.save(user);
+        return userRepository.save(user);
     }
 }
