@@ -168,7 +168,7 @@ class GameModerationControllerTest {
     @DisplayName("GET /moderation/games?status=REJECTED -> 200, same REJECTED (m.in. Odrzucona Gra, Limit Jane)")
     void queue_statusRejected_200() throws Exception {
         // size=50, bo sort to id DESC, a odrzucone fixtury mają niskie id — przy domyślnej
-        // dwudziestce wypadłyby z pierwszej strony, gdyby testy dorzuciły nowsze odrzucenia
+        // dziesiątce (@PageableDefault bez size) wypadłyby z pierwszej strony, gdyby testy dorzuciły nowsze odrzucenia
         mockMvc.perform(get("/api/v1/moderation/games")
                         .param("status", "REJECTED")
                         .param("size", "50")
@@ -190,25 +190,46 @@ class GameModerationControllerTest {
                         .param("size", "50")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isOk())
+                // not(hasItem(...)) jest prawdą dla pustej tablicy, więc bez tych dwóch asercji test
+                // przechodziłby także na kolejce PENDING i na wersji bez filtra — czyli na niczego nie dowodził
+                .andExpect(jsonPath("$.content", hasSize(greaterThan(0))))
+                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("REJECTED"))))
                 .andExpect(jsonPath("$.content[*].title", not(hasItem("Szkic Jane"))))  // DRAFT zostaje prywatny
                 .andExpect(jsonPath("$.content[*].title", not(hasItem("Agricola"))));   // APPROVED = biblioteka
     }
 
     @Test
-    @DisplayName("GET /moderation/games?status=PENDING zwraca to samo, co brak parametru")
+    @DisplayName("GET /moderation/games bez parametru == ?status=PENDING i naprawdę zwraca PENDING")
     void queue_statusPending_sameAsDefault_200() throws Exception {
+        // samo porównanie obu odpowiedzi nie przypina wartości domyślnej (przy defaulcie zmienionym
+        // na REJECTED obie strony zmieniłyby się razem), więc najpierw asercja na statusie
+        String withoutParam = mockMvc.perform(get("/api/v1/moderation/games")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(greaterThan(0))))
+                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("PENDING"))))
+                .andReturn().getResponse().getContentAsString();
+
         String withParam = mockMvc.perform(get("/api/v1/moderation/games")
                         .param("status", "PENDING")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        String withoutParam = mockMvc.perform(get("/api/v1/moderation/games")
+        // porównanie po id, nie po surowym JSON-ie: kolejność list słownikowych w DTO wynika z HashSet
+        // i jest stabilna tylko przez przypadek (AbstractEntity.hashCode() to stała per klasa)
+        assertThat(JsonPath.<List<Integer>>read(withParam, "$.content[*].id"))
+                .isEqualTo(JsonPath.<List<Integer>>read(withoutParam, "$.content[*].id"));
+    }
+
+    @Test
+    @DisplayName("GET /moderation/games?status= (puste) -> 200, defaultValue podstawia PENDING przed konwersją")
+    void queue_statusEmpty_fallsBackToDefault_200() throws Exception {
+        mockMvc.perform(get("/api/v1/moderation/games")
+                        .param("status", "")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        assertThat(withParam).isEqualTo(withoutParam);
+                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("PENDING"))));
     }
 
     @ParameterizedTest

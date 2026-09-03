@@ -45,7 +45,8 @@ public class GameModerationController {
 
     private final GameModerationService gameModerationService;
 
-    @Operation(summary = "Kolejka zgłoszeń (stronicowana)",
+    @Operation(operationId = "getGameModerationQueue",
+            summary = "Kolejka zgłoszeń (stronicowana)",
             description = "Domyślnie gry w statusie PENDING. Parametr status pozwala przejść na zgłoszenia "
                     + "REJECTED — bez tego odrzuconego zgłoszenia nie da się odnaleźć, a POST /{id}/unlock "
                     + "jest nieosiągalny z interfejsu. APPROVED (biblioteka) i DRAFT (prywatny szkic autora) "

@@ -2,7 +2,6 @@ package pl.m22.gamehive.game.model;
 
 import pl.m22.gamehive.common.persistence.ModerationStatus;
 
-
 public enum ModerationQueueStatus {
 
     PENDING(ModerationStatus.PENDING),

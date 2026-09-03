@@ -45,7 +45,8 @@ public class GameExpansionModerationController {
 
     private final GameExpansionModerationService gameExpansionModerationService;
 
-    @Operation(summary = "Kolejka zgłoszeń dodatków (stronicowana)",
+    @Operation(operationId = "getExpansionModerationQueue",
+            summary = "Kolejka zgłoszeń dodatków (stronicowana)",
             description = "Domyślnie dodatki w statusie PENDING. Parametr status pozwala przejść na zgłoszenia "
                     + "REJECTED — bez tego odrzuconego zgłoszenia nie da się odnaleźć, a POST /{id}/unlock "
                     + "jest nieosiągalny z interfejsu. APPROVED (biblioteka) i DRAFT (prywatny szkic autora) "

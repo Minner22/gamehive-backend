@@ -1,6 +1,7 @@
 package pl.m22.gamehive.game.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -154,26 +155,34 @@ class GameExpansionModerationControllerTest {
                         .param("size", "50")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isOk())
+                // not(hasItem(...)) jest prawdą dla pustej tablicy — bez tych dwóch asercji test
+                // przechodziłby także na kolejce PENDING i na wersji bez filtra
+                .andExpect(jsonPath("$.content", hasSize(greaterThan(0))))
+                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("REJECTED"))))
                 .andExpect(jsonPath("$.content[*].name", not(hasItem("Szkic Dodatku Jane"))))   // DRAFT Jane
                 .andExpect(jsonPath("$.content[*].name", not(hasItem("Szkic Dodatku Johna"))))  // DRAFT Johna
                 .andExpect(jsonPath("$.content[*].name", not(hasItem("Carcassonne: Rzeka"))));  // APPROVED
     }
 
     @Test
-    @DisplayName("GET /moderation/expansions?status=PENDING zwraca to samo, co brak parametru")
+    @DisplayName("GET /moderation/expansions bez parametru == ?status=PENDING i naprawdę zwraca PENDING")
     void queue_statusPending_sameAsDefault_200() throws Exception {
+        // porównanie obu odpowiedzi samo w sobie nie przypina wartości domyślnej — stąd asercja na statusie
+        String withoutParam = mockMvc.perform(get("/api/v1/moderation/expansions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(greaterThan(0))))
+                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("PENDING"))))
+                .andReturn().getResponse().getContentAsString();
+
         String withParam = mockMvc.perform(get("/api/v1/moderation/expansions")
                         .param("status", "PENDING")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        String withoutParam = mockMvc.perform(get("/api/v1/moderation/expansions")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        assertThat(withParam).isEqualTo(withoutParam);
+        assertThat(JsonPath.<List<Integer>>read(withParam, "$.content[*].id"))
+                .isEqualTo(JsonPath.<List<Integer>>read(withoutParam, "$.content[*].id"));
     }
 
     @ParameterizedTest

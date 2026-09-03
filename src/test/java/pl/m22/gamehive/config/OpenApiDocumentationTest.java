@@ -48,6 +48,20 @@ class OpenApiDocumentationTest {
     }
 
     @Test
+    @DisplayName("Kolejki moderacji mają jawne operationId — springdoc wyprowadza je z nazwy metody")
+    void moderationQueues_pinOperationIds() throws Exception {
+        // bez @Operation(operationId=...) id brałoby się z nazwy metody Javy (a duplikaty dostają sufiks
+        // _1 w kolejności przetwarzania), więc rename metody po cichu przemianowałby metody w klientach
+        // generowanych ze spec — dla frontu to zmiana łamiąca, niewidoczna w żadnym teście HTTP
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/v1/moderation/games'].get.operationId")
+                        .value("getGameModerationQueue"))
+                .andExpect(jsonPath("$.paths['/api/v1/moderation/expansions'].get.operationId")
+                        .value("getExpansionModerationQueue"));
+    }
+
+    @Test
     @DisplayName("Dokument zawiera schemat bezpieczeństwa bearerAuth")
     void apiDocs_containsBearerAuthSecurityScheme() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
