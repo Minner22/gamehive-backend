@@ -5,6 +5,8 @@ import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -158,6 +160,66 @@ class GameModerationControllerTest {
                 .andExpect(jsonPath("$.content", hasSize(1)))
                 .andExpect(jsonPath("$.size").value(1))
                 .andExpect(jsonPath("$.totalElements", greaterThanOrEqualTo(1)));
+    }
+
+    // ---------- GET /moderation/games?status= : filtr statusu (GH-138) ----------
+
+    @Test
+    @DisplayName("GET /moderation/games?status=REJECTED -> 200, same REJECTED (m.in. Odrzucona Gra, Limit Jane)")
+    void queue_statusRejected_200() throws Exception {
+        // size=50, bo sort to id DESC, a odrzucone fixtury mają niskie id — przy domyślnej
+        // dwudziestce wypadłyby z pierwszej strony, gdyby testy dorzuciły nowsze odrzucenia
+        mockMvc.perform(get("/api/v1/moderation/games")
+                        .param("status", "REJECTED")
+                        .param("size", "50")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("REJECTED"))))
+                .andExpect(jsonPath("$.content[*].title", hasItem("Odrzucona Gra")))
+                .andExpect(jsonPath("$.content[*].title", hasItem("Limit Jane")))
+                // bez powodu i licznika poprawek moderator nie ma na czym oprzeć decyzji o unlocku
+                .andExpect(jsonPath("$.content[*].rejectionReason", everyItem(notNullValue())))
+                .andExpect(jsonPath("$.content[*].resubmissionCount", everyItem(notNullValue())));
+    }
+
+    @Test
+    @DisplayName("GET /moderation/games?status=REJECTED nie pokazuje szkiców ani biblioteki")
+    void queue_statusRejected_hidesDraftsAndLibrary() throws Exception {
+        mockMvc.perform(get("/api/v1/moderation/games")
+                        .param("status", "REJECTED")
+                        .param("size", "50")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].title", not(hasItem("Szkic Jane"))))  // DRAFT zostaje prywatny
+                .andExpect(jsonPath("$.content[*].title", not(hasItem("Agricola"))));   // APPROVED = biblioteka
+    }
+
+    @Test
+    @DisplayName("GET /moderation/games?status=PENDING zwraca to samo, co brak parametru")
+    void queue_statusPending_sameAsDefault_200() throws Exception {
+        String withParam = mockMvc.perform(get("/api/v1/moderation/games")
+                        .param("status", "PENDING")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String withoutParam = mockMvc.perform(get("/api/v1/moderation/games")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(withParam).isEqualTo(withoutParam);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"DRAFT", "APPROVED", "REJECTD"})
+    @DisplayName("GET /moderation/games?status=<niedozwolony> -> 400 VALIDATION_ERROR")
+    void queue_statusUnsupported_400(String status) throws Exception {
+        mockMvc.perform(get("/api/v1/moderation/games")
+                        .param("status", status)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
     }
 
     // ---------- POST /moderation/games/{id}/approve ----------

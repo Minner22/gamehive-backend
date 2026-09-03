@@ -1,6 +1,7 @@
 package pl.m22.gamehive.game.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -45,14 +46,21 @@ public class GameExpansionModerationController {
     private final GameExpansionModerationService gameExpansionModerationService;
 
     @Operation(summary = "Kolejka zgłoszeń dodatków (stronicowana)",
-            description = "Dodatki w statusie PENDING oczekujące na decyzję. Parametry stronicowania: page, size, sort.")
+            description = "Domyślnie dodatki w statusie PENDING. Parametr status pozwala przejść na zgłoszenia "
+                    + "REJECTED — bez tego odrzuconego zgłoszenia nie da się odnaleźć, a POST /{id}/unlock "
+                    + "jest nieosiągalny z interfejsu. APPROVED (biblioteka) i DRAFT (prywatny szkic autora) "
+                    + "nie są obsługiwane — inna wartość kończy się 400. Parametry stronicowania: page, size, sort.")
     @ApiResponse(responseCode = "200", description = "Strona wyników z kolejką moderacji",
             content = @Content(schema = @Schema(implementation = PageGameExpansionModerationDto.class)))
+    @ApiResponse(responseCode = "400", description = "Nieobsługiwana wartość parametru status (VALIDATION_ERROR)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @GetMapping
-    public ResponseEntity<Page<GameExpansionModerationDto>> pendingQueue(
+    public ResponseEntity<Page<GameExpansionModerationDto>> queue(
+            @Parameter(description = "Filtr statusu kolejki: PENDING (domyślnie) albo REJECTED.")
+            @RequestParam(defaultValue = "PENDING") ModerationQueueStatus status,
             @PageableDefault(sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
 
-        return ResponseEntity.ok(gameExpansionModerationService.findQueue(ModerationQueueStatus.PENDING, pageable));
+        return ResponseEntity.ok(gameExpansionModerationService.findQueue(status, pageable));
     }
 
     @Operation(summary = "Zatwierdź zgłoszenie dodatku",
