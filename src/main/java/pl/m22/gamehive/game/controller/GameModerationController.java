@@ -23,6 +23,7 @@ import pl.m22.gamehive.game.dto.GameModerationDto;
 import pl.m22.gamehive.game.dto.GameRequestDto;
 import pl.m22.gamehive.game.dto.PageGameModerationDto;
 import pl.m22.gamehive.game.dto.RejectContentRequestDto;
+import pl.m22.gamehive.game.model.ModerationQueueStatus;
 import pl.m22.gamehive.game.service.GameModerationService;
 
 @RestController
@@ -51,7 +52,7 @@ public class GameModerationController {
     public ResponseEntity<Page<GameModerationDto>> pendingQueue(
             @PageableDefault(sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
 
-        return ResponseEntity.ok(gameModerationService.findPendingGames(pageable));
+        return ResponseEntity.ok(gameModerationService.findQueue(ModerationQueueStatus.PENDING, pageable));
     }
 
     @Operation(summary = "Zatwierdź zgłoszenie",

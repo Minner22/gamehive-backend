@@ -23,6 +23,7 @@ import pl.m22.gamehive.game.dto.GameExpansionModerationDto;
 import pl.m22.gamehive.game.dto.GameExpansionRequestDto;
 import pl.m22.gamehive.game.dto.PageGameExpansionModerationDto;
 import pl.m22.gamehive.game.dto.RejectContentRequestDto;
+import pl.m22.gamehive.game.model.ModerationQueueStatus;
 import pl.m22.gamehive.game.service.GameExpansionModerationService;
 
 @RestController
@@ -51,7 +52,7 @@ public class GameExpansionModerationController {
     public ResponseEntity<Page<GameExpansionModerationDto>> pendingQueue(
             @PageableDefault(sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
 
-        return ResponseEntity.ok(gameExpansionModerationService.findPendingExpansions(pageable));
+        return ResponseEntity.ok(gameExpansionModerationService.findQueue(ModerationQueueStatus.PENDING, pageable));
     }
 
     @Operation(summary = "Zatwierdź zgłoszenie dodatku",
