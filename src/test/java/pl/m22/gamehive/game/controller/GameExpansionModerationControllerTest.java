@@ -1,9 +1,12 @@
 package pl.m22.gamehive.game.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -124,6 +127,73 @@ class GameExpansionModerationControllerTest {
                 .andExpect(jsonPath("$.content", hasSize(1)))
                 .andExpect(jsonPath("$.size").value(1))
                 .andExpect(jsonPath("$.totalElements", greaterThanOrEqualTo(1)));
+    }
+
+    // ---------- GET /moderation/expansions?status= : filtr statusu (GH-138) ----------
+
+    @Test
+    @DisplayName("GET /moderation/expansions?status=REJECTED -> 200, same REJECTED z powodem odrzucenia")
+    void queue_statusRejected_200() throws Exception {
+        // size=50 z tego samego powodu, co po stronie gier: sort id DESC, a fixtury mają niskie id
+        mockMvc.perform(get("/api/v1/moderation/expansions")
+                        .param("status", "REJECTED")
+                        .param("size", "50")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("REJECTED"))))
+                .andExpect(jsonPath("$.content[*].name", hasItem("Odrzucony Dodatek Jane")))
+                .andExpect(jsonPath("$.content[*].name", hasItem("Limit Dodatku Jane")))
+                .andExpect(jsonPath("$.content[*].rejectionReason", everyItem(notNullValue())))
+                .andExpect(jsonPath("$.content[*].resubmissionCount", everyItem(notNullValue())));
+    }
+
+    @Test
+    @DisplayName("GET /moderation/expansions?status=REJECTED nie pokazuje szkiców ani biblioteki")
+    void queue_statusRejected_hidesDraftsAndLibrary() throws Exception {
+        mockMvc.perform(get("/api/v1/moderation/expansions")
+                        .param("status", "REJECTED")
+                        .param("size", "50")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                // not(hasItem(...)) jest prawdą dla pustej tablicy — bez tych dwóch asercji test
+                // przechodziłby także na kolejce PENDING i na wersji bez filtra
+                .andExpect(jsonPath("$.content", hasSize(greaterThan(0))))
+                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("REJECTED"))))
+                .andExpect(jsonPath("$.content[*].name", not(hasItem("Szkic Dodatku Jane"))))   // DRAFT Jane
+                .andExpect(jsonPath("$.content[*].name", not(hasItem("Szkic Dodatku Johna"))))  // DRAFT Johna
+                .andExpect(jsonPath("$.content[*].name", not(hasItem("Carcassonne: Rzeka"))));  // APPROVED
+    }
+
+    @Test
+    @DisplayName("GET /moderation/expansions bez parametru == ?status=PENDING i naprawdę zwraca PENDING")
+    void queue_statusPending_sameAsDefault_200() throws Exception {
+        // porównanie obu odpowiedzi samo w sobie nie przypina wartości domyślnej — stąd asercja na statusie
+        String withoutParam = mockMvc.perform(get("/api/v1/moderation/expansions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(greaterThan(0))))
+                .andExpect(jsonPath("$.content[*].moderationStatus", everyItem(is("PENDING"))))
+                .andReturn().getResponse().getContentAsString();
+
+        String withParam = mockMvc.perform(get("/api/v1/moderation/expansions")
+                        .param("status", "PENDING")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(JsonPath.<List<Integer>>read(withParam, "$.content[*].id"))
+                .isEqualTo(JsonPath.<List<Integer>>read(withoutParam, "$.content[*].id"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"DRAFT", "APPROVED", "REJECTD"})
+    @DisplayName("GET /moderation/expansions?status=<niedozwolony> -> 400 VALIDATION_ERROR")
+    void queue_statusUnsupported_400(String status) throws Exception {
+        mockMvc.perform(get("/api/v1/moderation/expansions")
+                        .param("status", status)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
     }
 
     // ---------- POST /moderation/expansions/{id}/approve ----------

@@ -3,9 +3,13 @@ package pl.m22.gamehive.common.exception;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.core.PropertyReferenceException;
+import org.springframework.data.core.TypeInformation;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,6 +25,17 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().errorCode()).isEqualTo("DATA_CONFLICT");
+    }
+
+    @Test
+    @DisplayName("PropertyReferenceException -> 400 VALIDATION_ERROR (nieznane pole w ?sort=, nie awaria serwera)")
+    void unknownSortProperty_mapsTo400ValidationError() {
+        var response = handler.handleUnknownSortProperty(
+                new PropertyReferenceException("nosuchfield", TypeInformation.of(Object.class), List.of()));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().errorCode()).isEqualTo("VALIDATION_ERROR");
     }
 
     @Test

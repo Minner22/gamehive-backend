@@ -5,10 +5,11 @@ import org.springframework.data.domain.Pageable;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.game.dto.GameExpansionModerationDto;
 import pl.m22.gamehive.game.dto.GameExpansionRequestDto;
+import pl.m22.gamehive.game.model.ModerationQueueStatus;
 
 public interface GameExpansionModerationService {
 
-    Page<GameExpansionModerationDto> findPendingExpansions(Pageable pageable);
+    Page<GameExpansionModerationDto> findQueue(ModerationQueueStatus status, Pageable pageable);
 
     GameExpansionModerationDto approve(Long expansionId, Email moderatorEmail);
 

@@ -1,6 +1,7 @@
 package pl.m22.gamehive.game.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -23,6 +24,7 @@ import pl.m22.gamehive.game.dto.GameModerationDto;
 import pl.m22.gamehive.game.dto.GameRequestDto;
 import pl.m22.gamehive.game.dto.PageGameModerationDto;
 import pl.m22.gamehive.game.dto.RejectContentRequestDto;
+import pl.m22.gamehive.game.model.ModerationQueueStatus;
 import pl.m22.gamehive.game.service.GameModerationService;
 
 @RestController
@@ -43,15 +45,23 @@ public class GameModerationController {
 
     private final GameModerationService gameModerationService;
 
-    @Operation(summary = "Kolejka zgłoszeń oczekujących (stronicowana)",
-            description = "Gry w statusie PENDING oczekujące na decyzję. Parametry stronicowania: page, size, sort.")
+    @Operation(operationId = "getGameModerationQueue",
+            summary = "Kolejka zgłoszeń (stronicowana)",
+            description = "Domyślnie gry w statusie PENDING. Parametr status pozwala przejść na zgłoszenia "
+                    + "REJECTED — bez tego odrzuconego zgłoszenia nie da się odnaleźć, a POST /{id}/unlock "
+                    + "jest nieosiągalny z interfejsu. APPROVED (biblioteka) i DRAFT (prywatny szkic autora) "
+                    + "nie są obsługiwane — inna wartość kończy się 400. Parametry stronicowania: page, size, sort.")
     @ApiResponse(responseCode = "200", description = "Strona wyników z kolejką moderacji",
             content = @Content(schema = @Schema(implementation = PageGameModerationDto.class)))
+    @ApiResponse(responseCode = "400", description = "Nieobsługiwana wartość parametru status (VALIDATION_ERROR)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @GetMapping
-    public ResponseEntity<Page<GameModerationDto>> pendingQueue(
+    public ResponseEntity<Page<GameModerationDto>> queue(
+            @Parameter(description = "Filtr statusu kolejki: PENDING (domyślnie) albo REJECTED.")
+            @RequestParam(defaultValue = "PENDING") ModerationQueueStatus status,
             @PageableDefault(sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
 
-        return ResponseEntity.ok(gameModerationService.findPendingGames(pageable));
+        return ResponseEntity.ok(gameModerationService.findQueue(status, pageable));
     }
 
     @Operation(summary = "Zatwierdź zgłoszenie",

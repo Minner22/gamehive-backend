@@ -39,9 +39,9 @@ public class GameModerationServiceImpl implements GameModerationService {
 
     @Transactional(readOnly = true)
     @Override
-    public Page<GameModerationDto> findPendingGames(Pageable pageable) {
+    public Page<GameModerationDto> findQueue(ModerationQueueStatus status, Pageable pageable) {
 
-        return gameRepository.findByModerationStatus(ModerationStatus.PENDING, pageable)
+        return gameRepository.findByModerationStatus(status.toModerationStatus(), pageable)
                 .map(gameMapper::toModerationDto);
     }
 

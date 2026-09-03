@@ -16,6 +16,7 @@ import pl.m22.gamehive.game.mapper.GameExpansionMapper;
 import pl.m22.gamehive.game.model.ContentModerationAction;
 import pl.m22.gamehive.game.model.ContentModerationTargetType;
 import pl.m22.gamehive.game.model.GameExpansion;
+import pl.m22.gamehive.game.model.ModerationQueueStatus;
 import pl.m22.gamehive.game.repository.GameExpansionRepository;
 import pl.m22.gamehive.game.search.service.GameSearchIndexPublisher;
 import pl.m22.gamehive.user.service.UserService;
@@ -35,9 +36,9 @@ public class GameExpansionModerationServiceImpl implements GameExpansionModerati
 
     @Transactional(readOnly = true)
     @Override
-    public Page<GameExpansionModerationDto> findPendingExpansions(Pageable pageable) {
+    public Page<GameExpansionModerationDto> findQueue(ModerationQueueStatus status, Pageable pageable) {
 
-        return expansionRepository.findByModerationStatus(ModerationStatus.PENDING, pageable)
+        return expansionRepository.findByModerationStatus(status.toModerationStatus(), pageable)
                 .map(expansionMapper::toModerationDto);
     }
 
