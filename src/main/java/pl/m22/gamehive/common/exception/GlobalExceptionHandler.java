@@ -2,6 +2,7 @@ package pl.m22.gamehive.common.exception;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -100,6 +101,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError>  handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
 
         log.warn("Path/param type mismatch: {}", ex.getMessage());
+
+        ApiError apiError = new ApiError(
+                ErrorCode.VALIDATION_ERROR.name(),
+                ErrorCode.VALIDATION_ERROR.getDefaultMessage()
+        );
+
+        return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus()).body(apiError);
+    }
+
+    // nieznana właściwość w ?sort= (Spring Data rzuca to dopiero przy wykonaniu zapytania). To błąd wejścia
+    // klienta, nie awaria serwera: bez tego handlera literówka w parametrze wpadała w handleOtherExceptions,
+    // czyli 500 + ERROR ze stack trace'em w logach. Dotyczy każdego stronicowanego endpointu w projekcie.
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<ApiError> handleUnknownSortProperty(PropertyReferenceException ex) {
+
+        log.warn("Unknown sort property: {}", ex.getMessage());
 
         ApiError apiError = new ApiError(
                 ErrorCode.VALIDATION_ERROR.name(),

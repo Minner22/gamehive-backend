@@ -243,6 +243,18 @@ class GameModerationControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
     }
 
+    @Test
+    @DisplayName("GET /moderation/games?sort=<nieznane pole> -> 400 VALIDATION_ERROR, nie 500")
+    void queue_unknownSortProperty_400() throws Exception {
+        // sort jest reklamowany w @Operation i w CLAUDE.md, więc literówka jest realna; Spring Data
+        // rzuca PropertyReferenceException dopiero przy wykonaniu zapytania, poza wiązaniem argumentów
+        mockMvc.perform(get("/api/v1/moderation/games")
+                        .param("sort", "nosuchfield,desc")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + moderatorToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+    }
+
     // ---------- POST /moderation/games/{id}/approve ----------
 
     @Test
