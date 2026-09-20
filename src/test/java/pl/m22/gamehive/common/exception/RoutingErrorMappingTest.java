@@ -116,6 +116,29 @@ class RoutingErrorMappingTest {
     }
 
     @Test
+    @DisplayName("405 przy Accept: application/xml nadal niesie ciało ApiError, nie samo status + Allow")
+    void unsupportedMethodWithXmlAccept_keepsApiErrorBody() throws Exception {
+        // bez wymuszonego Content-Type zapis ciała przegrywał negocjację treści, Spring wołał
+        // response.sendError(...), a kontener zamieniał to na dispatch ERROR na /error -> 401
+        mockMvc.perform(put("/api/v1/admin/taxonomy/publishers/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .accept(MediaType.APPLICATION_XML))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(header().string(HttpHeaders.ALLOW, containsString("DELETE")))
+                .andExpect(jsonPath("$.errorCode").value("METHOD_NOT_ALLOWED"));
+    }
+
+    @Test
+    @DisplayName("Błąd domenowy przy Accept: application/xml też niesie ApiError (dotyczy buildResponse, nie tylko routingu)")
+    void domainErrorWithXmlAccept_keepsApiErrorBody() throws Exception {
+        mockMvc.perform(get("/api/v1/games/99999")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .accept(MediaType.APPLICATION_XML))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("GAME_NOT_FOUND"));
+    }
+
+    @Test
     @DisplayName("Bez tokena nadal 401 — security biegnie przed dispatcherem (kontrakt bez zmian)")
     void unsupportedMethodWithoutToken_stillReturns401() throws Exception {
         mockMvc.perform(put("/api/v1/admin/taxonomy/publishers/1"))
