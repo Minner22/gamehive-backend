@@ -5,8 +5,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -162,6 +164,21 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(ErrorCode.RESOURCE_NOT_FOUND.getHttpStatus()).body(apiError);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    public ResponseEntity<ApiError> handleNotAcceptable(HttpMediaTypeNotAcceptableException ex) {
+
+        log.warn("No acceptable representation: {}", ex.getMessage());
+
+        ApiError apiError = new ApiError(
+                ErrorCode.NOT_ACCEPTABLE.name(),
+                ErrorCode.NOT_ACCEPTABLE.getDefaultMessage()
+        );
+
+        return ResponseEntity.status(ErrorCode.NOT_ACCEPTABLE.getHttpStatus())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(apiError);
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)

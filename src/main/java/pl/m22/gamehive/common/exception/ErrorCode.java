@@ -88,6 +88,7 @@ public enum ErrorCode {
     DATA_CONFLICT(HttpStatus.CONFLICT, "Concurrent data modification conflict"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "HTTP method not supported for this endpoint"),
+    NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE, "No acceptable representation for the requested media type"),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found"),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported media type"),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Validation failed");

@@ -98,6 +98,16 @@ class RoutingErrorMappingTest {
     }
 
     @Test
+    @DisplayName("Accept: application/xml -> 406 z ciałem ApiError (nie 401 z forwardu na /error)")
+    void unacceptableAcceptHeader_returns406WithApiError() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/taxonomy/categories")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .accept(MediaType.APPLICATION_XML))
+                .andExpect(status().isNotAcceptable())
+                .andExpect(jsonPath("$.errorCode").value("NOT_ACCEPTABLE"));
+    }
+
+    @Test
     @DisplayName("Bez tokena nadal 401 — security biegnie przed dispatcherem (kontrakt bez zmian)")
     void unsupportedMethodWithoutToken_stillReturns401() throws Exception {
         mockMvc.perform(put("/api/v1/admin/taxonomy/publishers/1"))

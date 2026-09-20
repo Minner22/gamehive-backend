@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -74,6 +75,19 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().errorCode()).isEqualTo("RESOURCE_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("HttpMediaTypeNotAcceptableException -> 406 NOT_ACCEPTABLE z wymuszonym Content-Type: application/json")
+    void notAcceptable_mapsTo406WithForcedJsonContentType() {
+        var response = handler.handleNotAcceptable(
+                new HttpMediaTypeNotAcceptableException(List.of(MediaType.APPLICATION_JSON)));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_ACCEPTABLE);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().errorCode()).isEqualTo("NOT_ACCEPTABLE");
+        // bez jawnego Content-Type zapis ciała rozbiłby się o negocjację treści i poleciałby na /error
+        assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
     }
 
     @Test
