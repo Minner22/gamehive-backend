@@ -1,17 +1,29 @@
 package pl.m22.gamehive.common.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.core.PropertyReferenceException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.MissingRequestCookieException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @RestControllerAdvice
@@ -35,7 +47,7 @@ public class GlobalExceptionHandler {
                 fieldErrors
         );
 
-        return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus()).body(apiError);
+        return errorBuilder(ErrorCode.VALIDATION_ERROR).body(apiError);
     }
 
     @ExceptionHandler(org.springframework.security.authorization.AuthorizationDeniedException.class)
@@ -43,13 +55,7 @@ public class GlobalExceptionHandler {
 
         log.warn("Access denied (method security): {}", ex.getMessage());
 
-        ApiError apiError = new ApiError(
-                ErrorCode.ACCESS_DENIED.name(),
-                ErrorCode.ACCESS_DENIED.getDefaultMessage()
-        );
-
-        return ResponseEntity.status(ErrorCode.ACCESS_DENIED.getHttpStatus())
-                .body(apiError);
+        return error(ErrorCode.ACCESS_DENIED);
     }
 
     // backstop dla wyścigów: find-or-create wydawcy/autora (UNIQUE) i TOCTOU guardów *_IN_USE (FK RESTRICT)
@@ -58,9 +64,7 @@ public class GlobalExceptionHandler {
 
         log.warn("Data integrity conflict: {}", ex.getMessage());
 
-        ApiError apiError = new ApiError(ErrorCode.DATA_CONFLICT.name(), ErrorCode.DATA_CONFLICT.getDefaultMessage());
-
-        return ResponseEntity.status(ErrorCode.DATA_CONFLICT.getHttpStatus()).body(apiError);
+        return error(ErrorCode.DATA_CONFLICT);
     }
 
     @ExceptionHandler(Exception.class)
@@ -68,9 +72,7 @@ public class GlobalExceptionHandler {
 
         log.error("An unexpected error occurred: {}", ex.getMessage(), ex);
 
-        ApiError apiError = new ApiError(ErrorCode.INTERNAL_ERROR.name(), ErrorCode.INTERNAL_ERROR.getDefaultMessage());
-
-        return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.getHttpStatus()).body(apiError);
+        return error(ErrorCode.INTERNAL_ERROR);
     }
 
     @ExceptionHandler(DomainException.class)
@@ -102,12 +104,7 @@ public class GlobalExceptionHandler {
 
         log.warn("Path/param type mismatch: {}", ex.getMessage());
 
-        ApiError apiError = new ApiError(
-                ErrorCode.VALIDATION_ERROR.name(),
-                ErrorCode.VALIDATION_ERROR.getDefaultMessage()
-        );
-
-        return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus()).body(apiError);
+        return error(ErrorCode.VALIDATION_ERROR);
     }
 
     // nieznana właściwość w ?sort= (Spring Data rzuca to dopiero przy wykonaniu zapytania). To błąd wejścia
@@ -118,12 +115,51 @@ public class GlobalExceptionHandler {
 
         log.warn("Unknown sort property: {}", ex.getMessage());
 
-        ApiError apiError = new ApiError(
-                ErrorCode.VALIDATION_ERROR.name(),
-                ErrorCode.VALIDATION_ERROR.getDefaultMessage()
-        );
+        return error(ErrorCode.VALIDATION_ERROR);
+    }
 
-        return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus()).body(apiError);
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+
+        log.warn("Unsupported HTTP method {} for {} (supported: {})",
+                request.getMethod(), request.getRequestURI(), ex.getSupportedHttpMethods());
+
+        HttpHeaders headers = new HttpHeaders();
+        Set<HttpMethod> supported = ex.getSupportedHttpMethods();
+        if (supported != null) {
+            headers.setAllow(supported);
+        }
+
+        return errorBuilder(ErrorCode.METHOD_NOT_ALLOWED)
+                .headers(headers)
+                .body(apiError(ErrorCode.METHOD_NOT_ALLOWED));
+    }
+
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<ApiError> handleNotFound(Exception ex) {
+
+        log.warn("No resource for request: {}", ex.getMessage());
+
+        return error(ErrorCode.RESOURCE_NOT_FOUND);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    public ResponseEntity<ApiError> handleNotAcceptable(HttpMediaTypeNotAcceptableException ex, HttpServletRequest request) {
+
+        log.warn("No acceptable representation for {} {} (Accept: {}, supported: {})",
+                request.getMethod(), request.getRequestURI(),
+                request.getHeader(HttpHeaders.ACCEPT), ex.getSupportedMediaTypes());
+
+        return error(ErrorCode.NOT_ACCEPTABLE);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiError> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
+
+        log.warn("Unsupported Content-Type {} for {} {}",
+                ex.getContentType(), request.getMethod(), request.getRequestURI());
+
+        return error(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
     }
 
     // brakujące / nieczytelne ciało żądania (pusty body, zły JSON) — bez tego wpada w handleOtherExceptions -> 500
@@ -132,12 +168,23 @@ public class GlobalExceptionHandler {
 
         log.warn("Unreadable request body: {}", ex.getMessage());
 
-        ApiError apiError = new ApiError(
-                ErrorCode.VALIDATION_ERROR.name(),
-                ErrorCode.VALIDATION_ERROR.getDefaultMessage()
-        );
+        return error(ErrorCode.VALIDATION_ERROR);
+    }
 
-        return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus()).body(apiError);
+    @ExceptionHandler(MissingPathVariableException.class)
+    public ResponseEntity<ApiError> handleMissingPathVariable(MissingPathVariableException ex) {
+
+        log.error("Missing path variable (mapping defect): {}", ex.getMessage(), ex);
+
+        return error(ErrorCode.INTERNAL_ERROR);
+    }
+
+    @ExceptionHandler(ServletRequestBindingException.class)
+    public ResponseEntity<ApiError> handleRequestBinding(ServletRequestBindingException ex) {
+
+        log.warn("Request binding failure: {}", ex.getMessage());
+
+        return error(ErrorCode.VALIDATION_ERROR);
     }
 
     @ExceptionHandler(MissingRequestCookieException.class)
@@ -145,18 +192,27 @@ public class GlobalExceptionHandler {
 
         log.warn("Required cookie missing: {}", ex.getCookieName());
 
-        ApiError apiError = new ApiError(
-                ErrorCode.REFRESH_TOKEN_MISSING.name(),
-                ErrorCode.REFRESH_TOKEN_MISSING.getDefaultMessage()
-        );
-
-        return ResponseEntity.status(ErrorCode.REFRESH_TOKEN_MISSING.getHttpStatus()).body(apiError);
+        return error(ErrorCode.REFRESH_TOKEN_MISSING);
     }
 
     private ResponseEntity<ApiError> buildResponse(BaseException ex) {
 
-        ApiError apiError = new ApiError(ex.getErrorCode().name(), ex.getMessage());
+        return errorBuilder(ex.getErrorCode()).body(new ApiError(ex.getErrorCode().name(), ex.getMessage()));
+    }
 
-        return ResponseEntity.status(ex.getErrorCode().getHttpStatus()).body(apiError);
+    private static ResponseEntity<ApiError> error(ErrorCode errorCode) {
+
+        return errorBuilder(errorCode).body(apiError(errorCode));
+    }
+
+    private static ApiError apiError(ErrorCode errorCode) {
+
+        return new ApiError(errorCode.name(), errorCode.getDefaultMessage());
+    }
+
+
+    private static ResponseEntity.BodyBuilder errorBuilder(ErrorCode errorCode) {
+
+        return ResponseEntity.status(errorCode.getHttpStatus()).contentType(MediaType.APPLICATION_JSON);
     }
 }
