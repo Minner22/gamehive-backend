@@ -5,9 +5,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.data.core.TypeInformation;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 
@@ -36,6 +41,50 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().errorCode()).isEqualTo("VALIDATION_ERROR");
+    }
+
+    @Test
+    @DisplayName("HttpRequestMethodNotSupportedException -> 405 METHOD_NOT_ALLOWED + nagłówek Allow")
+    void methodNotSupported_mapsTo405WithAllowHeader() {
+        var response = handler.handleMethodNotSupported(
+                new HttpRequestMethodNotSupportedException("PUT", List.of("GET", "DELETE")));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().errorCode()).isEqualTo("METHOD_NOT_ALLOWED");
+        assertThat(response.getHeaders().getAllow())
+                .containsExactlyInAnyOrder(HttpMethod.GET, HttpMethod.DELETE);
+    }
+
+    @Test
+    @DisplayName("HttpRequestMethodNotSupportedException bez listy metod -> 405 bez Allow (getSupportedHttpMethods() jest @Nullable)")
+    void methodNotSupportedWithoutSupportedMethods_omitsAllowHeader() {
+        var response = handler.handleMethodNotSupported(new HttpRequestMethodNotSupportedException("PUT"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(response.getHeaders().getAllow()).isEmpty();   // bez strażnika setAllow(null) rzuciłoby NPE
+    }
+
+    @Test
+    @DisplayName("NoResourceFoundException -> 404 RESOURCE_NOT_FOUND (nie ma takiej ścieżki, nie: nie ma takiej encji)")
+    void noResourceFound_mapsTo404ResourceNotFound() {
+        var response = handler.handleNoResourceFound(
+                new NoResourceFoundException(HttpMethod.GET, "/api/v1/admin/taxonomy/nope", "No static resource"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().errorCode()).isEqualTo("RESOURCE_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("HttpMediaTypeNotSupportedException -> 415 UNSUPPORTED_MEDIA_TYPE")
+    void unsupportedMediaType_mapsTo415() {
+        var response = handler.handleUnsupportedMediaType(
+                new HttpMediaTypeNotSupportedException(MediaType.TEXT_PLAIN, List.of(MediaType.APPLICATION_JSON)));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().errorCode()).isEqualTo("UNSUPPORTED_MEDIA_TYPE");
     }
 
     @Test

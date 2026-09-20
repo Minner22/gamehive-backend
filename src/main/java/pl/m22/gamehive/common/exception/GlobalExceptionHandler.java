@@ -3,15 +3,21 @@ package pl.m22.gamehive.common.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.core.PropertyReferenceException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestCookieException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @RestControllerAdvice
@@ -124,6 +130,51 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus()).body(apiError);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+
+        log.warn("Unsupported HTTP method: {}", ex.getMessage());
+
+        HttpHeaders headers = new HttpHeaders();
+        Set<HttpMethod> supported = ex.getSupportedHttpMethods();
+        if (supported != null) {                 // @Nullable: konstruktor 1-argumentowy zostawia null
+            headers.setAllow(supported);
+        }
+
+        ApiError apiError = new ApiError(
+                ErrorCode.METHOD_NOT_ALLOWED.name(),
+                ErrorCode.METHOD_NOT_ALLOWED.getDefaultMessage()
+        );
+
+        return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.getHttpStatus()).headers(headers).body(apiError);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResourceFound(NoResourceFoundException ex) {
+
+        log.warn("No resource for path: {}", ex.getResourcePath());
+
+        ApiError apiError = new ApiError(
+                ErrorCode.RESOURCE_NOT_FOUND.name(),
+                ErrorCode.RESOURCE_NOT_FOUND.getDefaultMessage()
+        );
+
+        return ResponseEntity.status(ErrorCode.RESOURCE_NOT_FOUND.getHttpStatus()).body(apiError);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiError> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex) {
+
+        log.warn("Unsupported Content-Type: {}", ex.getMessage());
+
+        ApiError apiError = new ApiError(
+                ErrorCode.UNSUPPORTED_MEDIA_TYPE.name(),
+                ErrorCode.UNSUPPORTED_MEDIA_TYPE.getDefaultMessage()
+        );
+
+        return ResponseEntity.status(ErrorCode.UNSUPPORTED_MEDIA_TYPE.getHttpStatus()).body(apiError);
     }
 
     // brakujące / nieczytelne ciało żądania (pusty body, zły JSON) — bez tego wpada w handleOtherExceptions -> 500
