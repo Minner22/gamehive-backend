@@ -108,6 +108,14 @@ class RoutingErrorMappingTest {
     }
 
     @Test
+    @DisplayName("GET /auth/activate bez ?token= -> 400 VALIDATION_ERROR (było 500); ścieżka publiczna, więc bez tokena")
+    void missingRequiredRequestParam_returns400() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/activate"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     @DisplayName("Bez tokena nadal 401 — security biegnie przed dispatcherem (kontrakt bez zmian)")
     void unsupportedMethodWithoutToken_stillReturns401() throws Exception {
         mockMvc.perform(put("/api/v1/admin/taxonomy/publishers/1"))
