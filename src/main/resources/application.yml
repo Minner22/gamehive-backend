@@ -24,6 +24,12 @@ spring:
           hibernate:
               default_batch_fetch_size: 20
 
+server:
+    compression:
+        enabled: true
+        mime-types: application/json,text/plain,text/css,text/javascript,application/javascript
+        min-response-size: 2KB
+
 springdoc:
     swagger-ui:
         path: /swagger-ui.html

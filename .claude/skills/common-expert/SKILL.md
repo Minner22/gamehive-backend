@@ -19,6 +19,7 @@ Zasada nadrzędna: **`common` nie zależy od żadnego modułu domenowego** (dlat
 | Mail | `email/service/MailServiceImpl`, `email/config/MailProperties` | linki prowadzą na front (`spring.mail.activationAddress`/`passwordResetAddress`); w testach `@MockitoBean JavaMailSender` |
 | Async | `config/AsyncConfig` | `authEmailExecutor`: 2–5 wątków, kolejka 100, **`CallerRunsPolicy`** (backpressure, mail może poczekać na wątku żądania); `searchIndexExecutor`: **1 wątek** (porządek FIFO), kolejka 500, **odrzuć + log ERROR**. Oba z `MdcTaskDecorator`, `waitForTasksToCompleteOnShutdown` + 30 s; oba `@Profile("!test")` |
 | Cache | `config/CacheConfig` | Caffeine, jeden cache `userAuthState` (60 s, 10 000 wpisów), lokalny dla instancji |
+| HTTP | `server.compression` w `application.yml` (GH-143) | gzip w konektorze Tomcata; `min-response-size` działa tylko dla odpowiedzi o znanej długości (entry point Security, zasoby statyczne), a odpowiedzi MVC idą chunked i są kompresowane zawsze — świadoma decyzja, szczegóły i uzasadnienie (BREACH) w CLAUDE.md |
 | Dev | `config/DevDataInitializer` → `DevGameSeeder` | tylko profil `dev`; szczegóły w skillu `verify-dev` |
 | OpenAPI | `config/OpenApiConfig` | `@OpenAPIDefinition` + schemat `bearerAuth` |
 
