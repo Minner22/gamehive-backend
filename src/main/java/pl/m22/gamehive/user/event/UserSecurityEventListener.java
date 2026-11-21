@@ -54,6 +54,7 @@ public class UserSecurityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void onUserCredentialsChanged(UserCredentialsChangedEvent event) {
 
+        sessionEpochStore.invalidatePasswordResetNow(event.email());
         revoke(event.email());
     }
 

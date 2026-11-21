@@ -11,8 +11,11 @@ import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.common.email.service.MailService;
+import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.exception.InfrastructureException;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -114,5 +117,36 @@ class AuthEmailEventListenerTest {
         doThrow(new RuntimeException("SMTP down")).when(mailService).sendActivationEmail(eq(EMAIL), any());
 
         assertDoesNotThrow(() -> listener.onActivationEmailResendRequested(new ActivationEmailResendRequestedEvent(EMAIL)));
+    }
+
+    // ---------- GH-145: epoka resetu hasła przy każdym żądaniu ----------
+
+    @Test
+    @DisplayName("onPasswordResetRequested() -> ustawia epokę resetu PRZED tokenem, potem wysyła mail (GH-145)")
+    void onPasswordResetRequested_invalidatesOlderLinksThenSends() {
+
+        when(jwtService.generateToken(EMAIL, JwtTokenType.PASSWORD_RESET, null)).thenReturn("reset-token");
+
+        listener.onPasswordResetRequested(new PasswordResetRequestedEvent(EMAIL));
+
+        // epoka -> token -> mail: świeży token ma iat >= epoki, więc przechodzi; każdy starszy link już nie
+        InOrder inOrder = inOrder(sessionEpochStore, jwtService, mailService);
+        inOrder.verify(sessionEpochStore).invalidatePasswordResetNow(EMAIL);
+        inOrder.verify(jwtService).generateToken(EMAIL, JwtTokenType.PASSWORD_RESET, null);
+        inOrder.verify(mailService).sendPasswordResetEmail(EMAIL, "reset-token");
+    }
+
+    @Test
+    @DisplayName("onPasswordResetRequested() przy Redis down -> brak tokena i maila (fail-closed, GH-145)")
+    void onPasswordResetRequested_redisDown_failsClosed() {
+
+        doThrow(new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "down"))
+                .when(sessionEpochStore).invalidatePasswordResetNow(EMAIL);
+
+        // wyjątek wychodzi z listenera (AFTER_COMMIT + @Async, więc endpoint i tak odpowiedział już 200),
+        // a nowy link nie powstaje, skoro nie dało się unieważnić starszych
+        assertThrows(InfrastructureException.class,
+                () -> listener.onPasswordResetRequested(new PasswordResetRequestedEvent(EMAIL)));
+        verifyNoInteractions(jwtService, mailService);
     }
 }

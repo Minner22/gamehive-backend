@@ -34,6 +34,7 @@ public class AuthEmailEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPasswordResetRequested(PasswordResetRequestedEvent event) {
 
+        sessionEpochStore.invalidatePasswordResetNow(event.email());
         dispatch(event.email(), JwtTokenType.PASSWORD_RESET, mailService::sendPasswordResetEmail, "password reset");
     }
 
