@@ -32,7 +32,7 @@ Jak pracować: odpowiadaj z kodu (`plik:linia`). Szczegóły audytu i GH-63 są 
 | delete przez admina | własne konto, ostatni admin | `UserDeletedEvent(email, userId)` (revoke + sprzątanie kolekcji) | `DELETE` |
 | usunięcie własnego konta | poprawne hasło (`INVALID_PASSWORD`), ostatni admin | `UserDeletedEvent` | `DELETE` (aktor = cel) |
 | force-logout | własne konto | `UserForceLoggedOutEvent` (revoke) | `FORCE_LOGOUT` |
-| reset hasła (w `auth/`) | — | `UserCredentialsChangedEvent` (revoke) | `PASSWORD_CHANGE` |
+| reset hasła (w `auth/`) | — | `UserCredentialsChangedEvent` (epoka resetu hasła — unieważnia pozostałe linki, GH-145 — potem revoke) | `PASSWORD_CHANGE` |
 
 **Nowy moduł z danymi per-user** (jak `collection/`): UUID bez FK + listener na `UserDeletedEvent` (AFTER_COMMIT → osobny bean `REQUIRES_NEW`, bulk `@Modifying` delete). `UserDeletedEvent` niesie `userId`, bo po commicie wiersza już nie ma.
 
