@@ -93,3 +93,9 @@ secret.properties
 .scannerwork/
 .env
 docs/
+
+##############################
+## Claude Code
+##############################
+# lokalne uprawnienia Claude Code (per maszyna); .claude/skills/ jest commitowane
+.claude/settings.local.json

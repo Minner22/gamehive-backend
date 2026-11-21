@@ -1,0 +1,55 @@
+---
+name: testing-expert
+description: Ekspert infrastruktury i wzorców testów GameHive — profil test (H2 PostgreSQL-mode bez Flyway, embedded Redis 16379, SyncTaskExecutor, wyłączone wyszukiwanie), tokeny w testach przez JwtService, MockMvc, testy AFTER_COMMIT bez @Transactional z własnymi danymi i sprzątaniem, ListAppender do logów, flush/clear przy kaskadach, czego suita nie dowodzi. Użyj przy pisaniu lub review testów, gdy test jest niestabilny albo zależy od kolejności, gdy coś przechodzi lokalnie, a pada w CI, przy pytaniach "jak przetestować X" oraz przy planowaniu sekcji "Testy" w planie issue.
+---
+
+# Ekspert: testy
+
+Powiązane: `fixture-guard` (niezmienniki `data.sql`), `verify-dev` (to, czego testy nie dowodzą).
+
+## Środowisko profilu `test` (`src/test/resources/application-test.yml`)
+- **H2** `jdbc:h2:mem:testdb;MODE=PostgreSQL`, `ddl-auto: create-drop`, **Flyway wyłączony**. Schemat generuje Hibernate z encji, a `data.sql` ładuje się po nim (`defer-datasource-initialization`). `src/test/resources/schema.sql` **jest martwy** (do usunięcia w #150) — `schema-locations: []` wyłącza jego uruchamianie, a nic go nie referuje. Nie edytuj go w przekonaniu, że coś zmienisz.
+- **Embedded Redis** na porcie 16379 (`config/EmbeddedRedisConfig`; startuje tylko wtedy, gdy port jest wolny, więc współdzielą go równoległe konteksty).
+- `TestAsyncConfig`: oba executory to `SyncTaskExecutor`, więc `@Async` wykonuje się inline i `verify(...)` zaraz po wywołaniu jest deterministyczne.
+- `gamehive.search.enabled: false` uruchamia fallbacki (`NoOpGameSearchService`, `DatabaseTaxonomySuggestService`). Wyjątek: `MeiliWiringTest`, który włącza wyszukiwanie i pisze ustawienia do lokalnego Meili, jeśli ten działa.
+- JWT: ACCESS i ACTIVATION są ważne **2 s**, dlatego tokeny generuje się w `@BeforeEach`, a nie w `@BeforeAll` — token z początku klasy nie przeżyje dłuższego testu. Jedyne `Thread.sleep(1100)` (`AuthControllerTest`) służą przekroczeniu granicy pełnej sekundy przy epoce aktywacji (`iat` jest ucinany do sekund, porównanie jest ostre) — w przyszłych testach epok rób tak samo. Limit resubmisji = **2**.
+
+## Wzorzec testu kontrolera
+```java
+@SpringBootTest @AutoConfigureMockMvc @ActiveProfiles("test")
+class XControllerTest {
+    @Autowired MockMvc mockMvc; @Autowired JwtService jwtService;
+    @Autowired RedisTemplate<String, String> redisTemplate;
+    @MockitoBean JavaMailSender mailSender;
+    @BeforeEach void setUp() {
+        token = jwtService.generateToken("jane.smith@example.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
+        redisTemplate.getConnectionFactory().getConnection().serverCommands().flushAll();
+    }
+}
+```
+- Tokeny generuj wprost przez `JwtService` dla seedowanych e-maili (john = ADMIN, jane = USER, mark.moderator = MODERATOR). Uprawnienia i tak pochodzą z bazy, nie z claimu.
+- Asertuj `$.errorCode`, nie tylko status. Anonim = `isUnauthorized()`.
+- Klasy z inną kombinacją `@MockitoBean` dostają **osobny kontekst Springa** (wolniej, więcej instancji). Przy nowej klasie trzymaj się zestawu mocków sąsiednich klas.
+
+## Testy AFTER_COMMIT (audyt, indeks, sprzątanie, unieważnianie sesji)
+- Klasa **bez `@Transactional`** — inaczej commit nie nastąpi i listener nie odpali.
+- Dane **własne**, nie seedowane. Śledź utworzone id i sprzątaj w `@AfterEach`: dodatki przed grami, `existsById` przed delete (test mógł już skasować wiersz), `TransactionTemplate` wokół `delete(entity)` dla encji odłączonych, `auditRepository.deleteAll()`.
+- Wzorce: `GameModerationServiceAuditTest`, `GameSubmissionAuditTest`, `GameSearchIndexingTest`, `TaxonomyIndexingTest`, `CollectionUserCleanupTest`.
+- Klucze Redis z długim TTL (np. `search_reindex_lock`, 15 min) usuwaj w `@AfterEach`, bo przeciekną do klas, które nie robią `flushAll`.
+
+## Pułapki, które już kosztowały
+- **Auto-flush Hibernate obejmuje tylko przestrzeń zapytań danego statementu**: `SELECT` na tabeli B nie wypchnie oczekującego `DELETE` na tabeli A. Przy teście kaskady w jednej transakcji zrób jawne `em.flush(); em.clear();` (`CollectionControllerTest`).
+- Asercja `isEmpty()` nie wykryje brakującego escapowania `\` — testuj **trafienie** w wiersz z backslashem, a nie brak wyników (`DatabaseTaxonomySuggestServiceTest`).
+- Mock `TaskInfo` buduj **przed** `when(...)`, inaczej Mockito zgłosi `UnfinishedStubbing`.
+- Logi asertuje się przez Logback `ListAppender` na **właściwym** loggerze (wyniki zadań Meili loguje `MeiliIndexGateway`, a nie serwis) i odpina w `@AfterEach`.
+- Wybór handlera wyjątku przez Springa da się udowodnić tylko end-to-end (MockMvc), nie bezpośrednim wywołaniem metody handlera.
+- MockMvc nie ma kontenera, więc nie wykona ERROR dispatch do `/error` (GH-140 da się potwierdzić tylko na `dev`).
+- Sort `id DESC` + domyślny rozmiar strony może wypchnąć stare fixture'y poza pierwszą stronę — przy asercjach na fixture'ach podawaj `size=50`.
+- Adnotacji, której działanie zależy od proxy (`@Async`), nie da się przetestować behawioralnie przy executorze inline — pinuje ją asercja na adnotacji + `AopUtils.isAopProxy` (`SearchIndexExecutorTest`, `SearchFallbackTest`).
+- Zielono lokalnie, czerwono w CI: CI buduje **merge commit z `master`** — najpierw zrób rebase.
+
+## Czego suita nie dowodzi (→ `verify-dev`)
+Migracji Flyway i wszystkiego, co jest tylko w SQL (DEFAULT-y, indeksy, `ON DELETE` bez `@OnDelete`), Meilisearch, prawdziwej puli `@Async` i propagacji MDC, ERROR dispatch, zachowania specyficznego dla PostgreSQL (tryb zgodności H2 nie jest pełny: collation, `LIKE`, typy, plany zapytań).
+
+## Uruchamianie
+`mvn -Dtest=Klasa test`, `mvn -Dtest=Klasa#metoda test`. Po każdej zmianie `data.sql` albo współdzielonej infrastruktury puść **pełny** `mvn test` — zależności są międzyklasowe.
