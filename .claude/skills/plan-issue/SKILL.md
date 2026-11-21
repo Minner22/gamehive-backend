@@ -7,7 +7,7 @@ description: Tworzy plan implementacji issue GameHive (GH-xxx) dopasowany do kon
 
 ## Zasady pracy z tym użytkownikiem (z pamięci — obowiązują bezwzględnie)
 - **Najpierw plan, potem akceptacja** ("tak") — dopiero potem cokolwiek dalej.
-- **Użytkownik koduje sam.** Ten skill kończy się na planie. Kod aplikacji piszesz tylko na wyraźną prośbę. CLAUDE.md i skille w `.claude/skills/` edytujesz sam (carve-out).
+- **Użytkownik koduje sam kod produkcyjny, Claude pisze testy** (od GH-142). Plan ma postać **kroków per commit**: „Ty:” — co i jak zaimplementować (krótkie fragmenty tam, gdzie pomagają, nie gotowa implementacja), „Claude (testy):” — przypadki testowe, które Claude dopisze po zgłoszeniu ukończenia kroku i uruchomi przed commitem, oraz **„Commit:” — proponowany commit message** (`GH-<nr> <opis po polsku>`) z listą plików do `git add`. Po zielonych testach danego kroku Claude podaje gotowy commit message jeszcze raz, z faktyczną listą plików. CLAUDE.md i skille w `.claude/skills/` Claude edytuje sam (carve-out, ostatni commit `GH-<nr> dokumentacja: …`).
 - Komunikacja po polsku; identyfikatory i nazwy techniczne w oryginale.
 
 ## Kroki
