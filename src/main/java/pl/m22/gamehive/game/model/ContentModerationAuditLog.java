@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import pl.m22.gamehive.common.logging.CorrelationIdFilter;
 import pl.m22.gamehive.common.persistence.LongEntity;
 
 @Entity
@@ -31,7 +32,7 @@ public class ContentModerationAuditLog extends LongEntity {
     @Column(columnDefinition = "text")
     private String details;
 
-    @Column(length = 64)
+    @Column(length = CorrelationIdFilter.MAX_CORRELATION_ID_LENGTH)
     private String correlationId;
 
     private ContentModerationAuditLog(ContentModerationAction action, ContentModerationTargetType targetType,
