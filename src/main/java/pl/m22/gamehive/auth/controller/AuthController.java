@@ -31,6 +31,7 @@ import pl.m22.gamehive.user.service.UserService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.function.Function;
 
 @Slf4j
 @RestController
@@ -40,6 +41,8 @@ import java.util.Objects;
 public class AuthController {
 
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String ACTIVATION_LABEL = "Activation";
+    private static final String PASSWORD_RESET_LABEL = "Password reset";
 
     private final AuthService authService;
     private final JwtService jwtService;
@@ -80,19 +83,7 @@ public class AuthController {
             @Parameter(description = "Token aktywacyjny (JWT) z linku w wiadomości e-mail", required = true)
             @RequestParam("token") String token) {
 
-        jwtService.validateToken(token, JwtTokenType.ACTIVATION);
-
-        if (tokenBlacklistService.isBlacklisted(jwtService.extractJtiFromToken(token))) {
-            throw new ApplicationException(ErrorCode.JWT_BLACKLISTED, "Activation token has already been used or is invalid.");
-        }
-
-        Email email = new Email(jwtService.extractEmailFromToken(token));
-
-        Instant issuedAt = jwtService.extractIssuedAtFromToken(token);
-        Long invalidAfter = sessionEpochStore.getActivationInvalidAfter(email.value());
-        if (invalidAfter != null && issuedAt != null && issuedAt.toEpochMilli() < invalidAfter) {
-            throw new ApplicationException(ErrorCode.TOKEN_REVOKED, "Activation token has been suspended by a newer one");
-        }
+        Email email = validateOneTimeToken(token, JwtTokenType.ACTIVATION, sessionEpochStore::getActivationInvalidAfter, ACTIVATION_LABEL);
 
         authService.activateUser(email);
 
@@ -207,11 +198,11 @@ public class AuthController {
 
     @Operation(
             summary = "Potwierdzenie resetu hasła",
-            description = "Ustawia nowe hasło na podstawie jednorazowego tokenu resetu (JWT). Po użyciu token jest unieważniany, a istniejące sesje użytkownika odwoływane.")
+            description = "Ustawia nowe hasło na podstawie jednorazowego tokenu resetu (JWT). Po użyciu token jest unieważniany, a istniejące sesje użytkownika odwoływane. Każde nowe żądanie resetu oraz każdy udany reset unieważnia wcześniej wysłane linki.")
     @ApiResponse(responseCode = "200", description = "Hasło zmienione")
     @ApiResponse(responseCode = "400", description = "Błąd walidacji danych wejściowych",
             content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
-    @ApiResponse(responseCode = "401", description = "Token nieprawidłowy, wygasły lub już użyty (JWT_BLACKLISTED)",
+    @ApiResponse(responseCode = "401", description = "Token nieprawidłowy, wygasły, już użyty (JWT_BLACKLISTED) lub unieważniony nowszym linkiem albo udanym resetem (TOKEN_REVOKED)",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
@@ -219,13 +210,7 @@ public class AuthController {
     public ResponseEntity<Void> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmDto confirmDto) {
 
         String token = confirmDto.token();
-        jwtService.validateToken(token, JwtTokenType.PASSWORD_RESET);
-
-        if (tokenBlacklistService.isBlacklisted(jwtService.extractJtiFromToken(token))) {
-            throw new ApplicationException(ErrorCode.JWT_BLACKLISTED, "Activation token has already been used or is invalid.");
-        }
-
-        Email email = new Email(jwtService.extractEmailFromToken(token));
+        Email email = validateOneTimeToken(token, JwtTokenType.PASSWORD_RESET, sessionEpochStore::getPasswordResetInvalidAfter, PASSWORD_RESET_LABEL);
 
         authService.confirmPasswordReset(email, confirmDto.newPassword());
 
@@ -268,5 +253,27 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                 .body(new AccessTokenResponseDto(loginResponse.accessToken()));
+    }
+
+    private Email validateOneTimeToken(String token, JwtTokenType type, Function<String, Long> epochLookup, String tokenLabel) {
+
+        jwtService.validateToken(token, type);
+
+        if (tokenBlacklistService.isBlacklisted(jwtService.extractJtiFromToken(token))) {
+            throw new ApplicationException(ErrorCode.JWT_BLACKLISTED,
+                    tokenLabel + " token has already been used or is invalid.");
+        }
+
+        Email email = new Email(jwtService.extractEmailFromToken(token));
+
+        Instant issuedAt = jwtService.extractIssuedAtFromToken(token);
+        Long invalidAfter = epochLookup.apply(email.value());
+
+        if (invalidAfter != null && issuedAt != null && issuedAt.toEpochMilli() < invalidAfter) {
+            throw new ApplicationException(ErrorCode.TOKEN_REVOKED,
+                    tokenLabel + " token has been suspended and is no longer valid");
+        }
+
+        return email;
     }
 }
