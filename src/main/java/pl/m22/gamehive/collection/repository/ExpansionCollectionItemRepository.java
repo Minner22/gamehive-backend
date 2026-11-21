@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import pl.m22.gamehive.collection.model.ExpansionCollectionItem;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,4 +25,7 @@ public interface ExpansionCollectionItemRepository extends JpaRepository<Expansi
     @Modifying
     @Query("delete from ExpansionCollectionItem c where c.userId = :userId")
     void deleteByUserId(@Param("userId") UUID userId);
+
+    @Query("select c.expansion.id from ExpansionCollectionItem c where c.userId = :userId order by c.expansion.id")
+    List<Long> findExpansionIdsByUserId(@Param("userId") UUID userId);
 }
