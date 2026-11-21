@@ -70,10 +70,26 @@ class HttpCompressionTest {
     }
 
     @Test
-    @DisplayName("Odpowiedź poniżej progu 2 KB (401 ApiError) -> bez kompresji mimo Accept-Encoding: gzip")
-    void smallResponse_belowThreshold_isNotGzipped() throws Exception {
-        // Ten sam próg trzyma poza kompresją odpowiedzi /auth/login i /auth/refresh z tokenem w treści
-        // (ochrona przed BREACH) — gdyby min-response-size przestał działać, ten test to pokaże.
+    @DisplayName("Mała odpowiedź kontrolera (ApiError z GlobalExceptionHandler) -> TEŻ skompresowana: próg jej nie dotyczy")
+    void smallMvcResponse_isGzippedDespiteThreshold() throws Exception {
+        // Świadoma decyzja GH-143: Spring MVC flushuje odpowiedź przed jej końcem, więc idzie ona jako
+        // Transfer-Encoding: chunked bez Content-Length, a Tomcat stosuje min-response-size tylko przy znanej
+        // długości. Każda odpowiedź kontrolera jest więc kompresowana, także ta z tokenem z /auth/login
+        // (BREACH tu nie działa: login nie odbija danych atakującego, cookie refresh jest SameSite=Strict).
+        // Gdyby ktoś "naprawił" próg (np. filtrem ustawiającym Content-Length), ten test o tym przypomni.
+        HttpResponse<byte[]> response = post("/api/v1/auth/login",
+                "{\"email\":\"nobody@example.com\",\"password\":\"whatever123\"}");
+
+        assertThat(response.statusCode()).isEqualTo(401);
+        assertThat(response.headers().firstValue("Content-Encoding")).hasValue(GZIP);
+        assertThat(gunzip(response.body())).contains("\"errorCode\":\"INVALID_CREDENTIALS\"");
+    }
+
+    @Test
+    @DisplayName("Mała odpowiedź o znanej długości (401 z entry pointu Security) -> bez kompresji, próg działa")
+    void smallResponseWithKnownLength_belowThreshold_isNotGzipped() throws Exception {
+        // Entry point pisze całe ciało naraz do bufora, więc Tomcat zna Content-Length i próg 2 KB działa.
+        // To jedyna klasa odpowiedzi (obok zasobów statycznych), na którą min-response-size ma wpływ.
         HttpResponse<byte[]> response = get("/api/v1/collection/games/ids", true);
 
         assertThat(response.statusCode()).isEqualTo(401);
@@ -88,6 +104,15 @@ class HttpCompressionTest {
             request.header("Accept-Encoding", GZIP);
         }
         return client.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
+    }
+
+    private HttpResponse<byte[]> post(String path, String json) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                .header("Content-Type", "application/json")
+                .header("Accept-Encoding", GZIP)
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+        return client.send(request, HttpResponse.BodyHandlers.ofByteArray());
     }
 
     private static String gunzip(byte[] compressed) throws IOException {
