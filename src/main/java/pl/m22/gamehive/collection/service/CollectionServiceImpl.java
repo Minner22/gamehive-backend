@@ -23,6 +23,7 @@ import pl.m22.gamehive.game.repository.GameExpansionRepository;
 import pl.m22.gamehive.game.repository.GameRepository;
 import pl.m22.gamehive.user.service.UserService;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -80,6 +81,15 @@ public class CollectionServiceImpl implements CollectionService {
                 .map(collectionMapper::toDto);
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public List<Long> findMyGameIds(Email owner) {
+
+        UUID userId = userService.findUserIdByEmail(owner);
+
+        return gameCollectionRepository.findGameIdsByUserId(userId);
+    }
+
     @Transactional
     @Override
     public ExpansionCollectionItemDto addExpansion(Long expansionId, Email owner) {
@@ -124,5 +134,14 @@ public class CollectionServiceImpl implements CollectionService {
 
         return expansionCollectionRepository.findByUserId(userId, pageable)
                 .map(collectionMapper::toDto);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<Long> findMyExpansionIds(Email owner) {
+
+        UUID userId = userService.findUserIdByEmail(owner);
+
+        return expansionCollectionRepository.findExpansionIdsByUserId(userId);
     }
 }

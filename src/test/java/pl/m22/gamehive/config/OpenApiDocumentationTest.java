@@ -119,6 +119,28 @@ class OpenApiDocumentationTest {
     }
 
     @Test
+    @DisplayName("GH-142: odczyt id kolekcji — przypięte operationId i schemat 200 jako tablica int64")
+    void collectionIdEndpoints_documented() throws Exception {
+        // front generuje typy z tej specyfikacji (npm run gen:api), więc kontrakt musi być jawny
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/v1/collection/games/ids'].get.operationId")
+                        .value("getMyCollectionGameIds"))
+                .andExpect(jsonPath("$.paths['/api/v1/collection/expansions/ids'].get.operationId")
+                        .value("getMyCollectionExpansionIds"))
+                .andExpect(jsonPath("$.paths['/api/v1/collection/games/ids'].get.responses['200']"
+                        + ".content['*/*'].schema.type").value("array"))
+                .andExpect(jsonPath("$.paths['/api/v1/collection/games/ids'].get.responses['200']"
+                        + ".content['*/*'].schema.items.type").value("integer"))
+                .andExpect(jsonPath("$.paths['/api/v1/collection/games/ids'].get.responses['200']"
+                        + ".content['*/*'].schema.items.format").value("int64"))
+                .andExpect(jsonPath("$.paths['/api/v1/collection/expansions/ids'].get.responses['200']"
+                        + ".content['*/*'].schema.items.format").value("int64"))
+                // 401 dziedziczone z poziomu klasy CollectionController
+                .andExpect(jsonPath("$.paths['/api/v1/collection/games/ids'].get.responses['401']").exists());
+    }
+
+    @Test
     @DisplayName("Wspólne odpowiedzi deklarowane raz na poziomie klasy trafiają do każdej operacji")
     void apiDocs_mergesClassLevelResponsesIntoOperations() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
