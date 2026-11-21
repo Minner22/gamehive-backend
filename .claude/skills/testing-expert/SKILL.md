@@ -37,6 +37,9 @@ class XControllerTest {
 - Wzorce: `GameModerationServiceAuditTest`, `GameSubmissionAuditTest`, `GameSearchIndexingTest`, `TaxonomyIndexingTest`, `CollectionUserCleanupTest`.
 - Klucze Redis z długim TTL (np. `search_reindex_lock`, 15 min) usuwaj w `@AfterEach`, bo przeciekną do klas, które nie robią `flushAll`.
 
+## Testowanie kształtu zapytania, nie tylko wyniku
+Gdy wymaganiem jest **jak** baza jest odpytywana (projekcja bez JOIN-a, jedno zapytanie zamiast N+1), wynik tego nie pokaże — te same id wyjdą też z JOIN-a. Wzorzec z GH-142: `support/CapturingStatementInspector` podpięty przez `@DataJpaTest(properties = "spring.jpa.properties.hibernate.session_factory.statement_inspector=pl.m22.gamehive.support.CapturingStatementInspector")` w **osobnej klasie** (zmienia `EntityManagerFactory`, a więc kontekst), `em.clear()` + `CapturingStatementInspector.clear()` w `@BeforeEach`, potem asercje na liczbie instrukcji i treści SQL (`doesNotContain(" join ")`). Przykład: `collection/repository/CollectionIdProjectionSqlTest`. Statystyki Hibernate (`entityLoadCount`) są tu za słabe: zapytanie skalarne z JOIN-em też nie ładuje żadnej encji.
+
 ## Pułapki, które już kosztowały
 - **Auto-flush Hibernate obejmuje tylko przestrzeń zapytań danego statementu**: `SELECT` na tabeli B nie wypchnie oczekującego `DELETE` na tabeli A. Przy teście kaskady w jednej transakcji zrób jawne `em.flush(); em.clear();` (`CollectionControllerTest`).
 - Asercja `isEmpty()` nie wykryje brakującego escapowania `\` — testuj **trafienie** w wiersz z backslashem, a nie brak wyników (`DatabaseTaxonomySuggestServiceTest`).

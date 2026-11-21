@@ -1,6 +1,7 @@
 package pl.m22.gamehive.collection.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -22,6 +23,8 @@ import pl.m22.gamehive.collection.dto.PageGameCollectionItemDto;
 import pl.m22.gamehive.collection.service.CollectionService;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.exception.ApiError;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/collection")
@@ -53,6 +56,22 @@ public class CollectionController {
         Email email = new Email(authentication.getName());
 
         return ResponseEntity.ok(collectionService.findMyGames(email, pageable));
+    }
+
+    @Operation(summary = "Moje gry (same ID)",
+            description = "Identyfikatory wszystkich gier w kolekcji zalogowanego użytkownika — lekka "
+                    + "odpowiedź do oznaczania „mam / nie mam” na kartach. Bez stronicowania (zawsze cała "
+                    + "kolekcja), posortowane rosnąco; pusta kolekcja zwraca [] (nie 404). "
+                    + "Pełne dane gier: GET /api/v1/collection/games.",
+            operationId = "getMyCollectionGameIds")
+    @ApiResponse(responseCode = "200", description = "Rosnąca lista ID gier w kolekcji (może być pusta)",
+            content = @Content(array = @ArraySchema(schema = @Schema(type = "integer", format = "int64"))))
+    @GetMapping("/games/ids")
+    public ResponseEntity<List<Long>> getMyGamesIds(Authentication authentication) {
+
+        Email email = new Email(authentication.getName());
+
+        return ResponseEntity.ok(collectionService.findMyGameIds(email));
     }
 
     @Operation(summary = "Dodaj grę do kolekcji",
@@ -107,6 +126,22 @@ public class CollectionController {
         Email email = new Email(authentication.getName());
 
         return ResponseEntity.ok(collectionService.findMyExpansions(email, pageable));
+    }
+
+    @Operation(summary = "Moje dodatki (same ID)",
+            description = "Identyfikatory wszystkich dodatków w kolekcji zalogowanego użytkownika — lekka "
+                    + "odpowiedź do oznaczania „mam / nie mam” na kartach. Bez stronicowania (zawsze cała "
+                    + "kolekcja), posortowane rosnąco; pusta kolekcja zwraca [] (nie 404). "
+                    + "Pełne dane dodatków: GET /api/v1/collection/expansions.",
+            operationId = "getMyCollectionExpansionIds")
+    @ApiResponse(responseCode = "200", description = "Rosnąca lista ID dodatków w kolekcji (może być pusta)",
+            content = @Content(array = @ArraySchema(schema = @Schema(type = "integer", format = "int64"))))
+    @GetMapping("/expansions/ids")
+    public ResponseEntity<List<Long>> getMyExpansionsIds(Authentication authentication) {
+
+        Email email = new Email(authentication.getName());
+
+        return ResponseEntity.ok(collectionService.findMyExpansionIds(email));
     }
 
     @Operation(summary = "Dodaj dodatek do kolekcji",

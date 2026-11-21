@@ -344,4 +344,94 @@ class CollectionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
+
+    // ---------- GH-142: GET /api/v1/collection/{games,expansions}/ids ----------
+
+    @Test
+    @DisplayName("GET /collection/games/ids -> 200, goła tablica id własnych gier")
+    void myGameIds_returnsOwnIds_200() throws Exception {
+        mockMvc.perform(get("/api/v1/collection/games/ids")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$", contains(1)));
+    }
+
+    @Test
+    @DisplayName("GET /collection/games/ids -> kolekcja Johna nie zawiera id Jane (izolacja)")
+    void myGameIds_isolatedBetweenUsers_200() throws Exception {
+        mockMvc.perform(get("/api/v1/collection/games/ids")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + johnToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", contains(7)));
+    }
+
+    @Test
+    @DisplayName("GET /collection/games/ids dla pustej kolekcji -> 200 i [] (nie 404)")
+    void myGameIds_empty_200() throws Exception {
+        mockMvc.perform(get("/api/v1/collection/games/ids")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + markToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    @DisplayName("GET /collection/games/ids bez tokena -> 401 ACCESS_DENIED")
+    void myGameIds_unauthenticated_401() throws Exception {
+        mockMvc.perform(get("/api/v1/collection/games/ids"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("GET /collection/games/ids po dodaniu gry -> nowe id w liście, rosnąco")
+    void myGameIds_reflectsAddedGame_sorted_200() throws Exception {
+        mockMvc.perform(post("/api/v1/collection/games/7")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/collection/games/ids")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", contains(1, 7)));
+    }
+
+    @Test
+    @DisplayName("GET /collection/expansions/ids -> 200, goła tablica id własnych dodatków")
+    void myExpansionIds_returnsOwnIds_200() throws Exception {
+        mockMvc.perform(get("/api/v1/collection/expansions/ids")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + janeToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$", contains(1)));
+    }
+
+    @Test
+    @DisplayName("GET /collection/expansions/ids -> John ma gry, ale nie dodatki: [] (izolacja per typ)")
+    void myExpansionIds_isolatedBetweenUsers_200() throws Exception {
+        mockMvc.perform(get("/api/v1/collection/expansions/ids")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + johnToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    @DisplayName("GET /collection/expansions/ids dla pustej kolekcji -> 200 i [] (nie 404)")
+    void myExpansionIds_empty_200() throws Exception {
+        mockMvc.perform(get("/api/v1/collection/expansions/ids")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + markToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    @DisplayName("GET /collection/expansions/ids bez tokena -> 401 ACCESS_DENIED")
+    void myExpansionIds_unauthenticated_401() throws Exception {
+        mockMvc.perform(get("/api/v1/collection/expansions/ids"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+    }
 }

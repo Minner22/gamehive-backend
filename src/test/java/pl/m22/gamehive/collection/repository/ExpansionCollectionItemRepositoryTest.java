@@ -106,4 +106,32 @@ class ExpansionCollectionItemRepositoryTest {
 
         assertThat(collectionRepository.findByUserId(SeededUsers.JANE_ID, Pageable.unpaged())).isEmpty();
     }
+
+    // GH-142: lekki odczyt identyfikatorów kolekcji
+
+    @Test
+    @DisplayName("findExpansionIdsByUserId -> same id dodatków, tylko danego użytkownika (izolacja kolekcji)")
+    void findExpansionIdsByUserId_isolatesUsers() {
+        assertThat(collectionRepository.findExpansionIdsByUserId(SeededUsers.JANE_ID)).containsExactly(1L);
+        assertThat(collectionRepository.findExpansionIdsByUserId(SeededUsers.JOHN_ID)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findExpansionIdsByUserId -> pusta kolekcja daje pustą listę, nie null")
+    void findExpansionIdsByUserId_emptyCollection() {
+        assertThat(collectionRepository.findExpansionIdsByUserId(SeededUsers.MARK_ID)).isNotNull().isEmpty();
+    }
+
+    @Test
+    @DisplayName("findExpansionIdsByUserId -> rosnąco po id dodatku, niezależnie od kolejności dodania")
+    void findExpansionIdsByUserId_sortedAscending() {
+        // Repozytorium nie sprawdza statusu (robi to serwis), więc PENDING dodatek 2 wystarcza do testu kolejności.
+        GameExpansion pending = expansionRepository.findById(2L).orElseThrow();
+        GameExpansion approved = expansionRepository.findById(1L).orElseThrow();
+        collectionRepository.saveAndFlush(new ExpansionCollectionItem(SeededUsers.MARK_ID, pending));
+        collectionRepository.saveAndFlush(new ExpansionCollectionItem(SeededUsers.MARK_ID, approved));
+        em.clear();
+
+        assertThat(collectionRepository.findExpansionIdsByUserId(SeededUsers.MARK_ID)).containsExactly(1L, 2L);
+    }
 }

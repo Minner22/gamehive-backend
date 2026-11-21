@@ -135,4 +135,32 @@ class GameCollectionItemRepositoryTest {
         assertThat(collectionRepository.findByUserId(SeededUsers.JANE_ID, Pageable.unpaged())).isEmpty();
         assertThat(collectionRepository.findByUserId(SeededUsers.JOHN_ID, Pageable.unpaged())).hasSize(1);
     }
+
+    // GH-142: lekki odczyt identyfikatorów kolekcji
+
+    @Test
+    @DisplayName("findGameIdsByUserId -> same id gier, tylko danego użytkownika (izolacja kolekcji)")
+    void findGameIdsByUserId_isolatesUsers() {
+        assertThat(collectionRepository.findGameIdsByUserId(SeededUsers.JANE_ID)).containsExactly(1L);
+        assertThat(collectionRepository.findGameIdsByUserId(SeededUsers.JOHN_ID)).containsExactly(7L);
+    }
+
+    @Test
+    @DisplayName("findGameIdsByUserId -> pusta kolekcja daje pustą listę, nie null")
+    void findGameIdsByUserId_emptyCollection() {
+        assertThat(collectionRepository.findGameIdsByUserId(SeededUsers.MARK_ID)).isNotNull().isEmpty();
+    }
+
+    @Test
+    @DisplayName("findGameIdsByUserId -> rosnąco po id gry, niezależnie od kolejności dodania")
+    void findGameIdsByUserId_sortedAscending() {
+        // Najpierw wyższe id, potem niższe — bez ORDER BY H2 oddałby kolejność wstawienia (7, 1).
+        Game carcassonne = gameRepository.findById(7L).orElseThrow();
+        Game agricola = gameRepository.findById(1L).orElseThrow();
+        collectionRepository.saveAndFlush(new GameCollectionItem(SeededUsers.MARK_ID, carcassonne));
+        collectionRepository.saveAndFlush(new GameCollectionItem(SeededUsers.MARK_ID, agricola));
+        em.clear();
+
+        assertThat(collectionRepository.findGameIdsByUserId(SeededUsers.MARK_ID)).containsExactly(1L, 7L);
+    }
 }

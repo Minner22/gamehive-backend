@@ -6,6 +6,8 @@ import pl.m22.gamehive.collection.dto.ExpansionCollectionItemDto;
 import pl.m22.gamehive.collection.dto.GameCollectionItemDto;
 import pl.m22.gamehive.common.domain.Email;
 
+import java.util.List;
+
 public interface CollectionService {
 
     GameCollectionItemDto addGame(Long gameId, Email owner);
@@ -19,4 +21,9 @@ public interface CollectionService {
     void removeExpansion(Long expansionId, Email owner);
 
     Page<ExpansionCollectionItemDto> findMyExpansions(Email owner, Pageable pageable);
+
+    List<Long> findMyGameIds(Email owner);
+
+    List<Long> findMyExpansionIds(Email owner);
+
 }
