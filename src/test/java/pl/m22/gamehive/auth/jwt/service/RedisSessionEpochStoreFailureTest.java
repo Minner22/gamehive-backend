@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import pl.m22.gamehive.auth.jwt.config.AccessTokenProperties;
 import pl.m22.gamehive.auth.jwt.config.ActivationTokenProperties;
+import pl.m22.gamehive.auth.jwt.config.PasswordResetTokenProperties;
 import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 
@@ -30,14 +31,15 @@ class RedisSessionEpochStoreFailureTest {
     @Mock ValueOperations<String, String> valueOps;
     @Mock AccessTokenProperties accessProps;
     @Mock ActivationTokenProperties activationProps;
+    @Mock PasswordResetTokenProperties passwordResetProps;
 
     private RedisSessionEpochStore store;
 
     @BeforeEach
     void setUp() {
-        // konstrukcja ręczna zamiast @InjectMocks: dzięki temu accessProps/activationProps są
+        // konstrukcja ręczna zamiast @InjectMocks: dzięki temu accessProps/activationProps/passwordResetProps są
         // jawnie odczytane jako argumenty konstruktora (inaczej analiza widzi je jako nieużywane)
-        store = new RedisSessionEpochStore(redisTemplate, accessProps, activationProps);
+        store = new RedisSessionEpochStore(redisTemplate, accessProps, activationProps, passwordResetProps);
     }
 
     @Test
@@ -62,5 +64,29 @@ class RedisSessionEpochStoreFailureTest {
         when(valueOps.get(anyString())).thenThrow(new RedisConnectionFailureException("down"));
 
         assertThat(store.getInvalidAfter("user@test.com")).isNull();
+    }
+
+    @Test
+    @DisplayName("invalidatePasswordResetNow przy awarii Redis -> REDIS_UNAVAILABLE (podstawa fail-closed żądania resetu, GH-145)")
+    void invalidatePasswordResetNow_redisDown_throws() {
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        doThrow(new RedisConnectionFailureException("down"))
+                .when(valueOps).set(anyString(), anyString(), any(Duration.class));
+
+        assertThatThrownBy(() -> store.invalidatePasswordResetNow("user@test.com"))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.REDIS_UNAVAILABLE);
+    }
+
+    @Test
+    @DisplayName("getPasswordResetInvalidAfter przy awarii Redis -> null (fail-open, jak epoka aktywacji)")
+    void getPasswordResetInvalidAfter_redisDown_returnsNull() {
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get(anyString())).thenThrow(new RedisConnectionFailureException("down"));
+
+        assertThat(store.getPasswordResetInvalidAfter("user@test.com")).isNull();
     }
 }

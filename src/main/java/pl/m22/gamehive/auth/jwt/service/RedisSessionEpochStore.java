@@ -7,6 +7,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import pl.m22.gamehive.auth.jwt.config.AccessTokenProperties;
 import pl.m22.gamehive.auth.jwt.config.ActivationTokenProperties;
+import pl.m22.gamehive.auth.jwt.config.PasswordResetTokenProperties;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
 import pl.m22.gamehive.common.logging.LoggingUtils;
@@ -22,10 +23,12 @@ public class RedisSessionEpochStore {
 
     private static final String SESSION_PREFIX = "token_invalid_after:";
     private static final String ACTIVATION_PREFIX = "activation_invalid_after:";
+    private static final String PASSWORD_RESET_PREFIX = "password_reset_invalid_after:";
 
     private final RedisTemplate<String, String> redisTemplate;
     private final AccessTokenProperties accessProps;
     private final ActivationTokenProperties activationProps;
+    private final PasswordResetTokenProperties passwordResetProps;
 
     public void invalidateNow(String email) {
 
@@ -55,6 +58,20 @@ public class RedisSessionEpochStore {
     public Long getActivationInvalidAfter(String email) {
 
         return getEpoch(ACTIVATION_PREFIX, email);
+    }
+
+    public void invalidatePasswordResetNow(String email) {
+
+        setEpoch(PASSWORD_RESET_PREFIX,
+                email,
+                Instant.now().truncatedTo(ChronoUnit.SECONDS).toEpochMilli(),
+                passwordResetProps.getValidityInSeconds()
+        );
+    }
+
+    public Long getPasswordResetInvalidAfter(String email) {
+
+        return getEpoch(PASSWORD_RESET_PREFIX, email);
     }
 
     private void setEpoch(String prefix, String email, long epochMillis, long ttlSeconds) {

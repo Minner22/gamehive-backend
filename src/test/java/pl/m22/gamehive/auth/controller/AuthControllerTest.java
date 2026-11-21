@@ -16,6 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
@@ -25,6 +26,7 @@ import pl.m22.gamehive.user.repository.UserRepository;
 import java.util.Set;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -53,6 +55,10 @@ class AuthControllerTest {
         userRepository.findByEmail("ctrl_resend@test.com").ifPresent(userRepository::delete);
         userRepository.findByEmail("ctrl_resend_active@test.com").ifPresent(userRepository::delete);
         userRepository.findByEmail("ctrl_resend_stale@test.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("ctrl_pwr_two@test.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("ctrl_pwr_after@test.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("ctrl_pwr_reuse@test.com").ifPresent(userRepository::delete);
+        userRepository.findByEmail("ctrl_pwr_same_sec@test.com").ifPresent(userRepository::delete);
     }
 
     @Test
@@ -297,7 +303,8 @@ class AuthControllerTest {
                         .content("""
                                 {"token":"%s","newPassword":"newPassword1"}
                                 """.formatted(token)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("JWT_BLACKLISTED"));
     }
 
     @Test
@@ -443,5 +450,128 @@ class AuthControllerTest {
         String newToken = jwtService.generateToken("ctrl_resend_stale@test.com", JwtTokenType.ACTIVATION, null);
         mockMvc.perform(get("/api/v1/auth/activate").param("token", newToken))
                 .andExpect(status().isOk());
+    }
+
+    // ---------- GH-145: epoka resetu hasła — starsze linki przestają działać ----------
+
+    @Test
+    @DisplayName("Dwa żądania resetu -> link sprzed drugiego żądania 401 TOKEN_REVOKED, link po nim 200")
+    void passwordReset_secondRequest_revokesOlderLink() throws Exception {
+        String email = "ctrl_pwr_two@test.com";
+        register("ctrl_pwr_two", email);
+        requestPasswordReset(email);
+        String olderLink = jwtService.generateToken(email, JwtTokenType.PASSWORD_RESET, null);
+
+        // epoka drugiego żądania musi trafić w PÓŹNIEJSZĄ pełną sekundę niż iat starszego linku
+        Thread.sleep(1100);
+        requestPasswordReset(email);
+        String newerLink = jwtService.generateToken(email, JwtTokenType.PASSWORD_RESET, null);
+
+        confirmPasswordReset(olderLink, "olderPassword1")
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("TOKEN_REVOKED"))
+                .andExpect(jsonPath("$.message").value(containsString("Password reset")));
+
+        confirmPasswordReset(newerLink, "newerPassword1")
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Reset linkiem B -> wcześniejszy, nieużyty link A 401 TOKEN_REVOKED, hasło zostaje to z B")
+    void passwordReset_successfulReset_revokesOtherOutstandingLink() throws Exception {
+        String email = "ctrl_pwr_after@test.com";
+        register("ctrl_pwr_after", email);
+        activate(email);   // aktywne konto, żeby na końcu sprawdzić hasło logowaniem
+
+        // dwa linki z tej samej sekundy (np. dwa maile jeden po drugim): epoka żądania ich nie rozdziela,
+        // więc ochronę daje dopiero epoka ustawiana po udanym resecie
+        String linkA = jwtService.generateToken(email, JwtTokenType.PASSWORD_RESET, null);
+        String linkB = jwtService.generateToken(email, JwtTokenType.PASSWORD_RESET, null);
+
+        // udany reset musi wypaść w późniejszej pełnej sekundzie niż iat linku A
+        Thread.sleep(1100);
+        confirmPasswordReset(linkB, "passwordFromB1")
+                .andExpect(status().isOk());
+
+        // właściciel już zresetował hasło — link A z przechwyconego maila nie może go nadpisać
+        confirmPasswordReset(linkA, "attackerPassword1")
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("TOKEN_REVOKED"));
+
+        login(email, "passwordFromB1").andExpect(status().isOk());
+        login(email, "attackerPassword1").andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Ponowne użycie tego samego linku resetu -> 401 JWT_BLACKLISTED z komunikatem o resecie hasła, nie aktywacji")
+    void passwordReset_reusedLink_blacklistedWithResetMessage() throws Exception {
+        String email = "ctrl_pwr_reuse@test.com";
+        register("ctrl_pwr_reuse", email);
+        String link = jwtService.generateToken(email, JwtTokenType.PASSWORD_RESET, null);
+
+        confirmPasswordReset(link, "firstPassword1")
+                .andExpect(status().isOk());
+
+        // blacklista jest sprawdzana PRZED epoką, więc ponowne użycie daje JWT_BLACKLISTED, nie TOKEN_REVOKED
+        confirmPasswordReset(link, "secondPassword1")
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("JWT_BLACKLISTED"))
+                .andExpect(jsonPath("$.message").value(containsString("Password reset")))
+                .andExpect(jsonPath("$.message").value(not(containsString("Activation"))));
+    }
+
+    @Test
+    @DisplayName("Link wystawiony zaraz po epoce (ta sama sekunda) -> 200: epoka ucięta do sekund, porównanie ostre")
+    void passwordReset_linkIssuedRightAfterEpoch_stillValid() throws Exception {
+        String email = "ctrl_pwr_same_sec@test.com";
+        register("ctrl_pwr_same_sec", email);
+
+        // dokładnie to robi listener żądania: epoka, a zaraz po niej świeży token (iat ucięty do sekund).
+        // Epoka w ms zamiast w pełnych sekundach (albo porównanie <=) odrzucałaby ten świeży link.
+        sessionEpochStore.invalidatePasswordResetNow(email);
+        String freshLink = jwtService.generateToken(email, JwtTokenType.PASSWORD_RESET, null);
+
+        confirmPasswordReset(freshLink, "freshPassword1")
+                .andExpect(status().isOk());
+    }
+
+    private void register(String username, String email) throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"%s","email":"%s","password":"password123"}
+                                """.formatted(username, email)))
+                .andExpect(status().isOk());
+    }
+
+    private void activate(String email) throws Exception {
+        String token = jwtService.generateToken(email, JwtTokenType.ACTIVATION, null);
+        mockMvc.perform(get("/api/v1/auth/activate").param("token", token))
+                .andExpect(status().isOk());
+    }
+
+    private void requestPasswordReset(String email) throws Exception {
+        mockMvc.perform(post("/api/v1/auth/password-reset/request")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s"}
+                                """.formatted(email)))
+                .andExpect(status().isOk());
+    }
+
+    private ResultActions confirmPasswordReset(String token, String newPassword) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/password-reset/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"token":"%s","newPassword":"%s"}
+                        """.formatted(token, newPassword)));
+    }
+
+    private ResultActions login(String email, String password) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"email":"%s","password":"%s"}
+                        """.formatted(email, password)));
     }
 }
