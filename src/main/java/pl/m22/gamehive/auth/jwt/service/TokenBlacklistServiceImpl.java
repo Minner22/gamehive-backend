@@ -3,6 +3,7 @@ package pl.m22.gamehive.auth.jwt.service;
 import com.nimbusds.jwt.SignedJWT;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -44,7 +45,7 @@ public class TokenBlacklistServiceImpl implements TokenBlacklistService {
             }
         } catch (ParseException e) {
             log.warn("Failed to parse token for blacklisting: {}", e.getMessage());
-        } catch (RedisConnectionFailureException e) {
+        } catch (RedisConnectionFailureException | QueryTimeoutException e) {
             log.error("Redis unavailable while blacklisting access token", e);
         }
     }
@@ -56,7 +57,7 @@ public class TokenBlacklistServiceImpl implements TokenBlacklistService {
         }
         try {
             return redisTemplate.hasKey(BLACKLIST_PREFIX + jti);
-        } catch (RedisConnectionFailureException e) {
+        } catch (RedisConnectionFailureException | QueryTimeoutException e) {
             log.warn("Redis unavailable for blacklist check, failing open", e);
             return false;
         }

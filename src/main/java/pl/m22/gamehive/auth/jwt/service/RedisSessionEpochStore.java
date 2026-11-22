@@ -2,6 +2,7 @@ package pl.m22.gamehive.auth.jwt.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -82,7 +83,7 @@ public class RedisSessionEpochStore {
                     String.valueOf(epochMillis),
                     Duration.ofSeconds(ttlSeconds)
             );
-        } catch (RedisConnectionFailureException _) {
+        } catch (RedisConnectionFailureException | QueryTimeoutException _) {
             log.error("Redis unavailable while setting epoch [{}] for user: {}", prefix, LoggingUtils.obfuscateEmail(email));
             throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot set epoch - Redis unavailable");
         }
@@ -98,8 +99,8 @@ public class RedisSessionEpochStore {
             String value = redisTemplate.opsForValue().get(prefix + email);
 
             return value == null ? null : Long.valueOf(value);
-        } catch (RedisConnectionFailureException _) {
-            log.error("Redis unavailable while setting epoch [{}] for user: {}", prefix, LoggingUtils.obfuscateEmail(email));
+        } catch (RedisConnectionFailureException | QueryTimeoutException _) {
+            log.error("Redis unavailable while reading epoch [{}] for user: {}", prefix, LoggingUtils.obfuscateEmail(email));
 
             return null;
         }

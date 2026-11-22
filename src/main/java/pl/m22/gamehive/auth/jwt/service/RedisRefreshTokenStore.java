@@ -2,6 +2,7 @@ package pl.m22.gamehive.auth.jwt.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -38,7 +39,7 @@ public class RedisRefreshTokenStore {
             redisTemplate.expire(userTokensKey, Duration.ofSeconds(refreshProps.getValidityInSeconds()));
 
             evictOldestIfExceeded(email);
-        } catch (RedisConnectionFailureException e) {
+        } catch (RedisConnectionFailureException | QueryTimeoutException e) {
             log.error("Redis unavailable while saving refresh token for user: {}", email, e);
             throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot save refresh token - Redis unavailable");
         }
@@ -47,7 +48,7 @@ public class RedisRefreshTokenStore {
     public boolean existsByJti(String jti) {
         try {
             return Boolean.TRUE.equals(redisTemplate.hasKey(REFRESH_TOKEN_PREFIX + jti));
-        } catch (RedisConnectionFailureException e) {
+        } catch (RedisConnectionFailureException | QueryTimeoutException e) {
             log.error("Redis unavailable while checking refresh token JTI: {}", jti, e);
             throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot verify refresh token - Redis unavailable");
         }
@@ -65,7 +66,7 @@ public class RedisRefreshTokenStore {
             }
 
             redisTemplate.delete(userTokensKey);
-        } catch (RedisConnectionFailureException e) {
+        } catch (RedisConnectionFailureException | QueryTimeoutException e) {
             log.error("Redis unavailable while revoking tokens for user: {}", email, e);
             throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot revoke tokens - Redis unavailable");
         }
