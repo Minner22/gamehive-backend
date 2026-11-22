@@ -4,6 +4,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -136,5 +138,17 @@ class SearchReindexServiceTest {
 
         verify(gameSearchService).reindexAll();
         verify(taxonomySuggestService).reindexAll();
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("pl.m22.gamehive.support.RedisUnavailability#failures")
+    @DisplayName("Redis niedostępny (odmowa połączenia LUB timeout, GH-165) -> reindeks rusza bez blokady, zwolnienie nie rzuca")
+    void reindex_whenRedisUnavailable_proceedsWithoutLock(RuntimeException failure) {
+        when(valueOperations.setIfAbsent(eq(LOCK_KEY), anyString(), any(Duration.class))).thenThrow(failure);
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any())).thenThrow(failure);
+        when(gameSearchService.reindexAll()).thenReturn(new ContentReindexCounts(1, 0));
+        when(taxonomySuggestService.reindexAll()).thenReturn(new TaxonomyReindexCounts(2, 3));
+
+        assertThat(service.reindex()).isEqualTo(new ReindexResultDto(1, 0, 2, 3));
     }
 }

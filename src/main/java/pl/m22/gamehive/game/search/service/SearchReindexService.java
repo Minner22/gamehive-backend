@@ -2,6 +2,7 @@ package pl.m22.gamehive.game.search.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -56,7 +57,7 @@ public class SearchReindexService {
         try {
             return Boolean.TRUE.equals(redisTemplate.opsForValue()
                     .setIfAbsent(REINDEX_LOCK_KEY, token, properties.getReindexLockTtl()));
-        } catch (RedisConnectionFailureException _) {
+        } catch (RedisConnectionFailureException | QueryTimeoutException _) {
             log.error("Redis unavailable while acquiring the reindex lock - proceeding without it");
 
             return true;
@@ -67,7 +68,7 @@ public class SearchReindexService {
 
         try {
             redisTemplate.execute(RELEASE_IF_OWNED, List.of(REINDEX_LOCK_KEY), token);
-        } catch (RedisConnectionFailureException _) {
+        } catch (RedisConnectionFailureException | QueryTimeoutException _) {
             log.error("Redis unavailable while releasing the reindex lock - it will expire on its own");
         }
     }

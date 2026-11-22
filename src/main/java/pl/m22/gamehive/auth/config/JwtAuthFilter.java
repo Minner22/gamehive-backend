@@ -18,6 +18,7 @@ import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
 import pl.m22.gamehive.auth.jwt.service.UserAuthState;
 import pl.m22.gamehive.auth.jwt.service.UserAuthStateProvider;
 import pl.m22.gamehive.common.exception.ApiError;
+import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -91,8 +92,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
-        } catch (Exception e) {
+        } catch (ApplicationException e) {
             log.debug("JWT validation failed for request [{}]: {}", request.getRequestURI(), e.getMessage());
+        } catch (RuntimeException e) {
+            log.error("Unexpected error while authenticating request [{}]", request.getRequestURI(), e);
         }
 
         filterChain.doFilter(request, response);
