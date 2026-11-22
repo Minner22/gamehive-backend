@@ -52,7 +52,9 @@ Gdy wymaganiem jest **jak** baza jest odpytywana (projekcja bez JOIN-a, jedno za
 - Mock `TaskInfo` buduj **przed** `when(...)`, inaczej Mockito zgłosi `UnfinishedStubbing`.
 - Logi asertuje się przez Logback `ListAppender` na **właściwym** loggerze (wyniki zadań Meili loguje `MeiliIndexGateway`, a nie serwis) i odpina w `@AfterEach`.
 - Wybór handlera wyjątku przez Springa da się udowodnić tylko end-to-end (MockMvc), nie bezpośrednim wywołaniem metody handlera.
-- MockMvc nie ma kontenera, więc nie wykona ERROR dispatch do `/error` (GH-140 da się potwierdzić tylko na `dev`).
+- MockMvc nie ma kontenera, więc nie wykona ERROR dispatch do `/error` (GH-140 da się potwierdzić tylko na `dev`). Kolejność filtrów MockMvc z `@AutoConfigureMockMvc` za to respektuje (GH-163, `CorrelationIdSecurityOrderTest`).
+- **ERROR dispatch w teście jednostkowym `OncePerRequestFilter`-a**: samo `setDispatcherType(ERROR)` nie wystarcza — `shouldNotFilterErrorDispatch` rozpoznaje ERROR dispatch po atrybucie `jakarta.servlet.error.request_uri` (`WebUtils.ERROR_REQUEST_URI_ATTRIBUTE`), który ustawia kontener. Bez niego mutacja `shouldNotFilterErrorDispatch() = true` przeżyła test (GH-163); wzorzec: `simulateErrorDispatch` w `CorrelationIdFilterTest`.
+- Na `dev` ERROR dispatch wywołasz URL-em odrzucanym przez firewall Security (`/api/v1/games;x=1`, `%252e`): `sendError(400)` → `/error` → 401. Wyjątek z `JwtAuthFilter` (np. timeout Redis) go **nie** wywoła — filtr łapie `Exception`.
 - Sort `id DESC` + domyślny rozmiar strony może wypchnąć stare fixture'y poza pierwszą stronę — przy asercjach na fixture'ach podawaj `size=50`.
 - Adnotacji, której działanie zależy od proxy (`@Async`), nie da się przetestować behawioralnie przy executorze inline — pinuje ją asercja na adnotacji + `AopUtils.isAopProxy` (`SearchIndexExecutorTest`, `SearchFallbackTest`).
 - Zielono lokalnie, czerwono w CI: CI buduje **merge commit z `master`** — najpierw zrób rebase.
