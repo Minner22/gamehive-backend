@@ -1,5 +1,6 @@
 package pl.m22.gamehive.common.logging;
 
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.AfterEach;
@@ -10,6 +11,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.web.util.WebUtils;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -122,6 +124,71 @@ class CorrelationIdFilterTest {
         assertThatThrownBy(() -> filter.doFilter(request, new MockHttpServletResponse(), failing))
                 .isInstanceOf(ServletException.class);
         assertThat(MDC.get(CORRELATION_ID)).isNull();
+    }
+
+    // ---------- GH-163: ERROR dispatch tego samego żądania dostaje TO SAMO id ----------
+
+    @Test
+    @DisplayName("Pierwsze przejście zapisuje id w atrybucie requestu (dla późniejszego ERROR dispatchu)")
+    void firstPass_storesIdInRequestAttribute() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, (_, _) -> { });
+
+        assertThat(request.getAttribute(CorrelationIdFilter.CORRELATION_ID_ATTRIBUTE))
+                .isEqualTo(response.getHeader(CORRELATION_ID_HEADER))
+                .isNotNull();
+    }
+
+    @Test
+    @DisplayName("ERROR dispatch po wyjątku z łańcucha -> filtr działa ponownie z TYM SAMYM id (bez nagłówka klienta)")
+    void errorDispatch_reusesIdFromFirstPass() throws Exception {
+        // Tomcat robi ERROR dispatch do /error dopiero PO wyjściu z pierwotnego łańcucha: MDC jest już
+        // wyczyszczone, a znacznik "already filtered" zdjęty — ten sam obiekt requestu przechodzi filtr drugi raz.
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain failing = (_, _) -> {
+            throw new ServletException("wyjątek z filtra, np. JwtAuthFilter");
+        };
+        assertThatThrownBy(() -> filter.doFilter(request, response, failing)).isInstanceOf(ServletException.class);
+        String firstPassId = response.getHeader(CORRELATION_ID_HEADER);
+        assertThat(MDC.get(CORRELATION_ID)).isNull();
+
+        simulateErrorDispatch(request);
+        AtomicReference<String> mdcOnErrorDispatch = new AtomicReference<>();
+        filter.doFilter(request, response, (_, _) -> mdcOnErrorDispatch.set(MDC.get(CORRELATION_ID)));
+
+        // bez atrybutu wygenerowałby tu drugi, inny UUID — log ścieżki błędu nie dałby się powiązać z odpowiedzią
+        assertThat(mdcOnErrorDispatch.get()).isEqualTo(firstPassId);
+        assertThat(response.getHeader(CORRELATION_ID_HEADER)).isEqualTo(firstPassId);
+        assertThat(MDC.get(CORRELATION_ID)).isNull();
+    }
+
+    @Test
+    @DisplayName("ERROR dispatch: atrybut ma pierwszeństwo przed nagłówkiem (nagłówek był już raz zwalidowany)")
+    void errorDispatch_attributeWinsOverHeader() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        simulateErrorDispatch(request);
+        request.addHeader(CORRELATION_ID_HEADER, "client-id-1");
+        request.setAttribute(CorrelationIdFilter.CORRELATION_ID_ATTRIBUTE, "first-pass-id");
+        AtomicReference<String> mdcInChain = new AtomicReference<>();
+
+        filter.doFilter(request, new MockHttpServletResponse(), (_, _) -> mdcInChain.set(MDC.get(CORRELATION_ID)));
+
+        assertThat(mdcInChain.get()).isEqualTo("first-pass-id");
+    }
+
+    /**
+     * Tak, jak robi to kontener: typ dispatchu ERROR, URI strony błędu i atrybut
+     * {@code jakarta.servlet.error.request_uri}. Ten ostatni jest kluczowy — po nim (a nie po
+     * {@code DispatcherType}) {@code OncePerRequestFilter} rozpoznaje ERROR dispatch w {@code shouldNotFilterErrorDispatch}.
+     */
+    private static void simulateErrorDispatch(MockHttpServletRequest request) {
+        String originalUri = request.getRequestURI();
+        request.setDispatcherType(DispatcherType.ERROR);
+        request.setAttribute(WebUtils.ERROR_REQUEST_URI_ATTRIBUTE, originalUri == null ? "/api/v1/x" : originalUri);
+        request.setRequestURI("/error");
     }
 
     private Result run(String header) throws Exception {
