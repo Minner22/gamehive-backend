@@ -5,5 +5,5 @@ public enum RefreshTokenConsumeResult {
 
     CONSUMED,
     REUSED,
-    UNKNOWN;
+    UNKNOWN
 }

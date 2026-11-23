@@ -65,15 +65,6 @@ class RedisRefreshTokenStoreFailureTest {
 
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("pl.m22.gamehive.support.RedisUnavailability#failures")
-    @DisplayName("existsByJti przy niedostępnym Redis -> REDIS_UNAVAILABLE (refresh nie przejdzie bez weryfikacji)")
-    void exists_redisUnavailable_throwsRedisUnavailable(RuntimeException failure) {
-        when(redisTemplate.hasKey(anyString())).thenThrow(failure);
-
-        assertRedisUnavailable(() -> store.existsByJti("jti-1"));
-    }
-
-    @ParameterizedTest(name = "[{index}] {0}")
-    @MethodSource("pl.m22.gamehive.support.RedisUnavailability#failures")
     @DisplayName("revokeAllByUserEmail przy niedostępnym Redis -> REDIS_UNAVAILABLE")
     void revoke_redisUnavailable_throwsRedisUnavailable(RuntimeException failure) {
         when(zSetOps.range(anyString(), anyLong(), anyLong())).thenThrow(failure);

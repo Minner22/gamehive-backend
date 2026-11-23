@@ -11,8 +11,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.TokenPairDto;
+import pl.m22.gamehive.auth.event.RefreshTokenReuseDetectedEvent;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
@@ -25,13 +28,15 @@ import java.util.Date;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@RecordApplicationEvents
 class JwtServiceImplTest {
 
     @Autowired JwtService jwtService;
+    @Autowired ApplicationEvents events;
     @Autowired UserRepository userRepository;
 
     private static final String ACCESS_SECRET = "test-access-secret-abcdefghijklmnopqrstuvwxyz1234567";
@@ -64,18 +69,82 @@ class JwtServiceImplTest {
     }
 
     @Test
-    @DisplayName("refresh token po revokeUsersTokens(email) -> JWT_INVALID_JTI")
+    @DisplayName("GH-146: refresh po revokeUsersTokens -> consumeRefreshToken daje JWT_INVALID_JTI i ZERO zdarzeń reuse")
     void refresh_token_revoked_fails() {
 
-        TokenPairDto pair = jwtService.generateTokenPair(johnCreds());
-        String refresh = pair.refreshToken();
-        jwtService.revokeUsersTokens("john.doe@example.com");
+        String refresh = jwtService.generateToken(ROTATION_EMAIL, JwtTokenType.REFRESH, null);
+        jwtService.revokeUsersTokens(ROTATION_EMAIL);
 
-        assertThatThrownBy(() -> jwtService.validateToken(refresh, JwtTokenType.REFRESH))
+        assertErrorCode(() -> jwtService.consumeRefreshToken(refresh), ErrorCode.JWT_INVALID_JTI);
+        assertThat(events.stream(RefreshTokenReuseDetectedEvent.class)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("GH-146: validateToken(REFRESH) NIE sprawdza Redisa — zrotowany token przechodzi (dlatego /refresh idzie przez consume)")
+    void validateToken_refresh_doesNotTouchRedis() {
+
+        String refresh = jwtService.generateToken(ROTATION_EMAIL, JwtTokenType.REFRESH, null);
+        jwtService.consumeRefreshToken(refresh);
+
+        assertThatCode(() -> jwtService.validateToken(refresh, JwtTokenType.REFRESH)).doesNotThrowAnyException();
+    }
+
+    // ---------- GH-146: consumeRefreshToken ----------
+
+    // spoza data.sql: zdarzenie reuse wylogowuje użytkownika (refreshe + epoka) — nie może dotknąć seedowanych kont
+    private static final String ROTATION_EMAIL = "rotation.jwt@test.com";
+
+    @Test
+    @DisplayName("GH-146: consumeRefreshToken aktywnego tokena -> email właściciela, bez zdarzeń")
+    void consume_active_returnsEmail() {
+
+        String refresh = jwtService.generateToken(ROTATION_EMAIL, JwtTokenType.REFRESH, null);
+
+        assertThat(jwtService.consumeRefreshToken(refresh)).isEqualTo(ROTATION_EMAIL);
+        assertThat(events.stream(RefreshTokenReuseDetectedEvent.class)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("GH-146: drugi consume -> REFRESH_TOKEN_REUSED i dokładnie jedno zdarzenie z emailem")
+    void consume_twice_reusedWithEvent() {
+
+        String refresh = jwtService.generateToken(ROTATION_EMAIL, JwtTokenType.REFRESH, null);
+        jwtService.consumeRefreshToken(refresh);
+
+        assertErrorCode(() -> jwtService.consumeRefreshToken(refresh), ErrorCode.REFRESH_TOKEN_REUSED);
+        assertThat(events.stream(RefreshTokenReuseDetectedEvent.class))
+                .containsExactly(new RefreshTokenReuseDetectedEvent(ROTATION_EMAIL));
+    }
+
+    @Test
+    @DisplayName("GH-146: zły podpis -> JWT_INVALID_SIGNATURE i token NIE jest konsumowany (walidacja przed consume)")
+    void consume_badSignature_doesNotConsume() throws Exception {
+
+        String real = jwtService.generateToken(ROTATION_EMAIL, JwtTokenType.REFRESH, null);
+        // te same claims (ten sam JTI, zapisany w Redis), ale podpis innym sekretem
+        JWTClaimsSet claims = SignedJWT.parse(real).getJWTClaimsSet();
+        SignedJWT forged = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
+        forged.sign(new MACSigner(ACCESS_SECRET.getBytes(StandardCharsets.UTF_8)));
+
+        assertErrorCode(() -> jwtService.consumeRefreshToken(forged.serialize()), ErrorCode.JWT_INVALID_SIGNATURE);
+        assertThat(jwtService.consumeRefreshToken(real)).isEqualTo(ROTATION_EMAIL);
+        assertThat(events.stream(RefreshTokenReuseDetectedEvent.class)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("GH-146: access token zamiast refresha -> JWT_INVALID_TYPE")
+    void consume_wrongType_rejected() {
+
+        String access = jwtService.generateToken(ROTATION_EMAIL, JwtTokenType.ACCESS, Set.of("ROLE_USER"));
+
+        assertErrorCode(() -> jwtService.consumeRefreshToken(access), ErrorCode.JWT_INVALID_SIGNATURE, ErrorCode.JWT_INVALID_TYPE);
+    }
+
+    private static void assertErrorCode(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, ErrorCode... anyOf) {
+        assertThatThrownBy(call)
                 .isInstanceOf(BaseException.class)
                 .extracting(e -> ((BaseException) e).getErrorCode())
-                .isEqualTo(ErrorCode.JWT_INVALID_JTI);
-
+                .isIn((Object[]) anyOf);
     }
 
     @Test

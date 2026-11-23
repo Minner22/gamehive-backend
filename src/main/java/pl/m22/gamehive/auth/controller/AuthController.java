@@ -122,10 +122,12 @@ public class AuthController {
 
     @Operation(
             summary = "Odświeżenie tokenu dostępowego",
-            description = "Na podstawie ważnego tokenu odświeżającego (ciasteczko refreshToken) wydaje nowy token dostępowy oraz rotuje token odświeżający.")
+            description = "Na podstawie ważnego tokenu odświeżającego (ciasteczko refreshToken) wydaje nowy token dostępowy oraz rotuje token odświeżający poprzedni token odświeżający przestaje być ważny.")
     @ApiResponse(responseCode = "200", description = "Wydano nowy access token; nowy refresh token w ciasteczku")
     @ApiResponse(responseCode = "401",
-            description = "Brak ciasteczka refreshToken (REFRESH_TOKEN_MISSING) albo token odświeżający nieprawidłowy, wygasły lub odwołany",
+            description = "Brak ciasteczka refreshToken (REFRESH_TOKEN_MISSING), token odświeżający nieprawidłowy, wygasły lub odwołany (np. wypchnięty limitem sesji albo po wylogowaniu), albo ponowne użycie już zrotowanego tokenu (REFRESH_TOKEN_REUSED) - wtedy wszystkie sesje użytkownika zostają unieważnione",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "503", description = "Usługa tokenów chwilowo niedostępna (REDIS_UNAVAILABLE)",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
@@ -134,9 +136,7 @@ public class AuthController {
             @Parameter(description = "Token odświeżający przekazywany automatycznie jako ciasteczko HttpOnly", required = true)
             @CookieValue("refreshToken") String refreshToken) {
 
-        jwtService.validateToken(refreshToken, JwtTokenType.REFRESH);
-
-        Email email = new Email(jwtService.extractEmailFromToken(refreshToken));
+        Email email = new Email(jwtService.consumeRefreshToken(refreshToken));
         CredentialsDto userCredentials = userMapper.toCredentialsDto(
                 userService.findUserByEmail(email));
 

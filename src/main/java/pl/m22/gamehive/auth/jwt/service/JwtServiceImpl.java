@@ -6,9 +6,12 @@ import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import pl.m22.gamehive.auth.dto.CredentialsDto;
 import pl.m22.gamehive.auth.dto.TokenPairDto;
+import pl.m22.gamehive.auth.event.RefreshTokenReuseDetectedEvent;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.config.AccessTokenProperties;
 import pl.m22.gamehive.auth.jwt.config.ActivationTokenProperties;
@@ -17,6 +20,7 @@ import pl.m22.gamehive.auth.jwt.config.RefreshTokenProperties;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
+import pl.m22.gamehive.common.logging.LoggingUtils;
 
 import java.text.ParseException;
 import java.time.Instant;
@@ -24,6 +28,7 @@ import java.util.Date;
 import java.util.Set;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class JwtServiceImpl implements JwtService {
@@ -34,6 +39,7 @@ public class JwtServiceImpl implements JwtService {
     private final RefreshTokenProperties refreshProps;
     private final PasswordResetTokenProperties passwordResetProps;
     private final RedisRefreshTokenStore redisRefreshTokenStore;
+    private final ApplicationEventPublisher eventPublisher;
     private static final String CLAIM_TYPE = "type";
     private static final String CLAIM_ROLES = "roles";
 
@@ -65,9 +71,6 @@ public class JwtServiceImpl implements JwtService {
             if (tokenType == JwtTokenType.REFRESH) {
                 String jti = claims.getJWTID();
                 if (jti == null || jti.isEmpty()) {
-                    throw new ApplicationException(ErrorCode.JWT_INVALID_JTI);
-                }
-                if (!redisRefreshTokenStore.existsByJti(jti)) {
                     throw new ApplicationException(ErrorCode.JWT_INVALID_JTI);
                 }
             }
@@ -107,32 +110,19 @@ public class JwtServiceImpl implements JwtService {
 
     @Override
     public String extractEmailFromToken(String token) {
-        try {
-            SignedJWT signedJWT = SignedJWT.parse(token);
-            JWTClaimsSet jwtClaimsSet = signedJWT.getJWTClaimsSet();
-            if (jwtClaimsSet.getSubject() == null || jwtClaimsSet.getSubject().isEmpty()) {
-                throw new ApplicationException(ErrorCode.JWT_INVALID_SUBJECT);
-            }
-            return jwtClaimsSet.getSubject();
-        } catch (ParseException e) {
-            throw new ApplicationException(
-                    ErrorCode.JWT_PARSE_ERROR,
-                    "Failed to parse JWT: " + e.getMessage()
-            );
+
+        JWTClaimsSet jwtClaimsSet = parseClaims(token);
+        if (jwtClaimsSet.getSubject() == null || jwtClaimsSet.getSubject().isEmpty()) {
+            throw new ApplicationException(ErrorCode.JWT_INVALID_SUBJECT);
         }
+
+        return jwtClaimsSet.getSubject();
     }
 
     @Override
     public String extractJtiFromToken(String token) {
-        try {
-            SignedJWT signedJWT = SignedJWT.parse(token);
-            return signedJWT.getJWTClaimsSet().getJWTID();
-        } catch (ParseException e) {
-            throw new ApplicationException(
-                    ErrorCode.JWT_PARSE_ERROR,
-                    "Failed to parse JWT: " + e.getMessage()
-            );
-        }
+
+        return parseClaims(token).getJWTID();
     }
 
     @Override
@@ -152,6 +142,44 @@ public class JwtServiceImpl implements JwtService {
 
             return issuedAt == null ? null : issuedAt.toInstant();
 
+        } catch (ParseException e) {
+            throw new ApplicationException(
+                    ErrorCode.JWT_PARSE_ERROR,
+                    "Failed to parse JWT: " + e.getMessage()
+            );
+        }
+    }
+
+    @Override
+    public String consumeRefreshToken(String refreshToken) {
+
+        validateToken(refreshToken, JwtTokenType.REFRESH);
+
+        JWTClaimsSet claimsSet = parseClaims(refreshToken);
+        String jti = claimsSet.getJWTID();
+        String email = claimsSet.getSubject();
+        if (email == null || email.isEmpty()) {
+            throw new ApplicationException(ErrorCode.JWT_INVALID_SUBJECT);
+        }
+
+        return switch (redisRefreshTokenStore.consume(jti, email, claimsSet.getExpirationTime().toInstant())) {
+            case CONSUMED -> email;
+            case UNKNOWN -> throw new ApplicationException(ErrorCode.JWT_INVALID_JTI);
+            case REUSED -> {
+                log.warn("Refresh token reuse detected for {} (jti={}) - revoking all sessions",
+                        LoggingUtils.obfuscateEmail(email), jti);
+                eventPublisher.publishEvent(new RefreshTokenReuseDetectedEvent(email));
+                throw new ApplicationException(ErrorCode.REFRESH_TOKEN_REUSED);
+            }
+        };
+    }
+
+    private JWTClaimsSet parseClaims(String token) {
+
+        try {
+            SignedJWT signedJWT = SignedJWT.parse(token);
+
+            return signedJWT.getJWTClaimsSet();
         } catch (ParseException e) {
             throw new ApplicationException(
                     ErrorCode.JWT_PARSE_ERROR,

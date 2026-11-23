@@ -64,15 +64,6 @@ public class RedisRefreshTokenStore {
         }
     }
 
-    public boolean existsByJti(String jti) {
-        try {
-            return Boolean.TRUE.equals(redisTemplate.hasKey(REFRESH_TOKEN_PREFIX + jti));
-        } catch (RedisConnectionFailureException | QueryTimeoutException e) {
-            log.error("Redis unavailable while checking refresh token JTI: {}", jti, e);
-            throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot verify refresh token - Redis unavailable");
-        }
-    }
-
     public void revokeAllByUserEmail(String email) {
         try {
             String userTokensKey = USER_TOKENS_PREFIX + email;

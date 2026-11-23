@@ -39,17 +39,11 @@ class RedisRefreshTokenStoreTest {
     }
 
     @Test
-    @DisplayName("saveRefreshToken + existsByJti -> true")
+    @DisplayName("saveRefreshToken -> klucz refresh_token:{jti} istnieje")
     void save_and_exists() {
         String jti = UUID.randomUUID().toString();
         store.saveRefreshToken(jti, "user@test.com", Instant.now().plusSeconds(3600));
-        assertTrue(store.existsByJti(jti));
-    }
-
-    @Test
-    @DisplayName("existsByJti for unknown JTI -> false")
-    void unknown_jti_not_found() {
-        assertFalse(store.existsByJti("non-existent-jti"));
+        assertTrue(exists(jti));
     }
 
     @Test
@@ -64,8 +58,8 @@ class RedisRefreshTokenStoreTest {
 
         store.revokeAllByUserEmail("user@test.com");
 
-        assertFalse(store.existsByJti(jti1));
-        assertFalse(store.existsByJti(jti2));
+        assertFalse(exists(jti1));
+        assertFalse(exists(jti2));
     }
 
     @Test
@@ -81,7 +75,7 @@ class RedisRefreshTokenStoreTest {
         }
 
         // max to 5 — po 6. zapisie dokładnie jeden token musi zostać eksmitowany
-        long surviving = Arrays.stream(jtis).filter(store::existsByJti).count();
+        long surviving = Arrays.stream(jtis).filter(this::exists).count();
         assertEquals(5, surviving, "Cap powinien zostawić dokładnie 5 tokenów");
     }
 
@@ -90,6 +84,11 @@ class RedisRefreshTokenStoreTest {
     @DisplayName("revokeAllByUserEmail for non-existent user does not throw")
     void revoke_nonexistent_user_no_error() {
         assertDoesNotThrow(() -> store.revokeAllByUserEmail("nobody@test.com"));
+    }
+
+    // GH-146: existsByJti usunięte z produkcji (zaproszenie do TOCTOU "sprawdź, potem użyj") — testy czytają klucz wprost
+    private boolean exists(String jti) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey("refresh_token:" + jti));
     }
 
     // ---------- GH-146: consume = atomowa rotacja (Lua) ----------
