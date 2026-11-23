@@ -72,7 +72,7 @@ public class RedisSessionEpochStore {
 
     public Long getPasswordResetInvalidAfter(String email) {
 
-        return getEpoch(PASSWORD_RESET_PREFIX, email);
+        return getEpochStrict(PASSWORD_RESET_PREFIX, email);
     }
 
     private void setEpoch(String prefix, String email, long epochMillis, long ttlSeconds) {
@@ -103,6 +103,23 @@ public class RedisSessionEpochStore {
             log.error("Redis unavailable while reading epoch [{}] for user: {}", prefix, LoggingUtils.obfuscateEmail(email));
 
             return null;
+        }
+    }
+
+    /**
+     * Fail-closed odpowiednik {@link #getEpoch}: przy niedostępnym Redisie rzuca REDIS_UNAVAILABLE zamiast zwracać null.
+     */
+    private Long getEpochStrict(String prefix, String email) {
+
+        try {
+            String value = redisTemplate.opsForValue().get(prefix + email);
+
+            return value == null
+                    ? null
+                    : Long.valueOf(value);
+        } catch (RedisConnectionFailureException | QueryTimeoutException _) {
+            log.error("Redis unavailable while reading epoch [{}] for user: {} - refusing operation", prefix, LoggingUtils.obfuscateEmail(email));
+            throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot read epoch - Redis unavailable");
         }
     }
 

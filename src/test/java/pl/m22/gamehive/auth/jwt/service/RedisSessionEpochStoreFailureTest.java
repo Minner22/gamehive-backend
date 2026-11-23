@@ -67,13 +67,30 @@ class RedisSessionEpochStoreFailureTest {
 
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("pl.m22.gamehive.support.RedisUnavailability#failures")
-    @DisplayName("Odczyt każdej epoki przy niedostępnym Redis -> null (fail-open), bez wyjątku")
+    @DisplayName("Odczyt epoki sesji i aktywacji przy niedostępnym Redis -> null (fail-open), bez wyjątku")
     void getEpoch_redisUnavailable_failsOpen(RuntimeException failure) {
         when(valueOps.get(anyString())).thenThrow(failure);
 
-        assertThat(store.getInvalidAfter(EMAIL)).isNull();
-        assertThat(store.getActivationInvalidAfter(EMAIL)).isNull();
+        assertThat(store.getInvalidAfter(EMAIL)).isNull();            // JwtAuthFilter
+        assertThat(store.getActivationInvalidAfter(EMAIL)).isNull();  // /activate — świadomie fail-open (GH-168)
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("pl.m22.gamehive.support.RedisUnavailability#failures")
+    @DisplayName("Odczyt epoki resetu hasła przy niedostępnym Redis -> REDIS_UNAVAILABLE (fail-closed, GH-168)")
+    void getPasswordResetEpoch_redisUnavailable_failsClosed(RuntimeException failure) {
+        when(valueOps.get(anyString())).thenThrow(failure);
+
+        assertRedisUnavailable(() -> store.getPasswordResetInvalidAfter(EMAIL));
+    }
+
+    @Test
+    @DisplayName("Odczyt epoki resetu przy działającym Redis: brak klucza -> null, wartość -> liczba")
+    void getPasswordResetEpoch_redisUp_readsValue() {
+        when(valueOps.get("password_reset_invalid_after:" + EMAIL)).thenReturn(null, "1795301499000");
+
         assertThat(store.getPasswordResetInvalidAfter(EMAIL)).isNull();
+        assertThat(store.getPasswordResetInvalidAfter(EMAIL)).isEqualTo(1795301499000L);
     }
 
     @Test
