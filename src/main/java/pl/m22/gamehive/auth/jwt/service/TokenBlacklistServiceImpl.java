@@ -24,41 +24,33 @@ public class TokenBlacklistServiceImpl implements TokenBlacklistService {
 
     private final RedisTemplate<String, String> redisTemplate;
 
+    // Wersje zwykłe i *Strict różnią się WYŁĄCZNIE reakcją na niedostępny Redis (GH-148/GH-168):
+    // zwykłe połykają awarię (zapis) / przepuszczają (odczyt), strict rzucają REDIS_UNAVAILABLE.
+    // Sama operacja na Redisie żyje w writeEntry / hasEntry.
+
     @Override
     public void blacklistToken(String token) {
         try {
-            SignedJWT signedJWT = SignedJWT.parse(token);
-            String jti = signedJWT.getJWTClaimsSet().getJWTID();
-            if (jti == null) {
-                log.warn("Token has no JTI, cannot blacklist");
-                return;
-            }
-
-            Date expirationDate = signedJWT.getJWTClaimsSet().getExpirationTime();
-            if (expirationDate == null) {
-                return;
-            }
-
-            Instant expiration = expirationDate.toInstant();
-
-            Duration remainingTtl = Duration.between(Instant.now(), expiration);
-            if (remainingTtl.isPositive()) {
-                redisTemplate.opsForValue().set(BLACKLIST_PREFIX + jti, "1", remainingTtl);
-            }
-        } catch (ParseException e) {
-            log.warn("Failed to parse token for blacklisting: {}", e.getMessage());
+            writeEntry(token);
         } catch (RedisConnectionFailureException | QueryTimeoutException e) {
             log.error("Redis unavailable while blacklisting access token", e);
         }
     }
 
     @Override
-    public boolean isBlacklisted(String jti) {
-        if (jti == null) {
-            return false;
-        }
+    public void blacklistTokenStrict(String token) {
         try {
-            return redisTemplate.hasKey(BLACKLIST_PREFIX + jti);
+            writeEntry(token);
+        } catch (RedisConnectionFailureException | QueryTimeoutException e) {
+            log.error("Redis unavailable while blacklisting access token", e);
+            throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot blacklist token - Redis unavailable");
+        }
+    }
+
+    @Override
+    public boolean isBlacklisted(String jti) {
+        try {
+            return hasEntry(jti);
         } catch (RedisConnectionFailureException | QueryTimeoutException e) {
             log.warn("Redis unavailable for blacklist check, failing open", e);
             return false;
@@ -67,16 +59,44 @@ public class TokenBlacklistServiceImpl implements TokenBlacklistService {
 
     @Override
     public boolean isBlacklistedStrict(String jti) {
-
-        if (jti == null) {
-            return false;
-        }
-
         try {
-            return Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_PREFIX + jti));
+            return hasEntry(jti);
         } catch (RedisConnectionFailureException | QueryTimeoutException e) {
             log.error("Redis unavailable for strict blacklist check, refusing the operation", e);
             throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot verify token blacklist - Redis unavailable");
         }
+    }
+
+    private void writeEntry(String token) {
+
+        SignedJWT signedJWT;
+        String jti;
+        Date expirationDate;
+        try {
+            signedJWT = SignedJWT.parse(token);
+            jti = signedJWT.getJWTClaimsSet().getJWTID();
+            expirationDate = signedJWT.getJWTClaimsSet().getExpirationTime();
+        } catch (ParseException e) {
+            log.warn("Failed to parse token for blacklisting: {}", e.getMessage());
+            return;
+        }
+
+        if (jti == null) {
+            log.warn("Token has no JTI, cannot blacklist");
+            return;
+        }
+        if (expirationDate == null) {
+            return;
+        }
+
+        Duration remainingTtl = Duration.between(Instant.now(), expirationDate.toInstant());
+        if (remainingTtl.isPositive()) {
+            redisTemplate.opsForValue().set(BLACKLIST_PREFIX + jti, "1", remainingTtl);
+        }
+    }
+
+    private boolean hasEntry(String jti) {
+
+        return jti != null && Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_PREFIX + jti));
     }
 }

@@ -169,4 +169,12 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath("$.paths['/api/v1/auth/password-reset/confirm'].post.responses['503']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/auth/password-reset/confirm'].post.responses['401']").exists());
     }
+
+    @Test
+    @DisplayName("POST /auth/logout dokumentuje 503 REDIS_UNAVAILABLE (GH-148)")
+    void apiDocs_logout_documents503() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.responses['503']").exists());
+    }
 }
