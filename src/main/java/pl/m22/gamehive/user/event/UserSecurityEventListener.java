@@ -9,6 +9,8 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import pl.m22.gamehive.auth.jwt.service.RedisRefreshTokenStore;
 import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
+import pl.m22.gamehive.common.exception.InfrastructureException;
+import pl.m22.gamehive.common.logging.LoggingUtils;
 import pl.m22.gamehive.config.CacheConfig;
 
 /**
@@ -54,7 +56,7 @@ public class UserSecurityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void onUserCredentialsChanged(UserCredentialsChangedEvent event) {
 
-        sessionEpochStore.invalidatePasswordResetNow(event.email());
+        bestEffort("password reset epoch", event.email(), () -> sessionEpochStore.invalidatePasswordResetNow(event.email()));
         revoke(event.email());
     }
 
@@ -66,9 +68,10 @@ public class UserSecurityEventListener {
 
     private void revoke(String email) {
 
-        refreshTokenStore.revokeAllByUserEmail(email);
-        sessionEpochStore.invalidateNow(email);
         evictAuthState(email);
+
+        bestEffort("revoke refresh tokens", email, () -> refreshTokenStore.revokeAllByUserEmail(email));
+        bestEffort("session epoch", email, () -> sessionEpochStore.invalidateNow(email));
     }
 
     // Eviction programowa (nie @CacheEvict): metody listenera są package-private i wołane przez
@@ -79,6 +82,16 @@ public class UserSecurityEventListener {
 
         if (cache != null) {
             cache.evict(email);
+        }
+    }
+
+    private void bestEffort(String step, String email, Runnable action) {
+
+        try {
+            action.run();
+        } catch (InfrastructureException e) {
+            log.error("Security side effect [{}] failed for user {} - continuing with the remaining steps",
+                    step, LoggingUtils.obfuscateEmail(email), e);
         }
     }
 }
