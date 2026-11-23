@@ -67,6 +67,17 @@ class TokenBlacklistServiceImplTest {
     }
 
     @Test
+    @DisplayName("blacklistTokenStrict przy działającym Redis -> token na blackliście (GH-148)")
+    void blacklistTokenStrict_blacklists_whenRedisUp() {
+        String token = jwtService.generateToken("test@test.com", JwtTokenType.ACCESS, Set.of("ROLE_USER"));
+        String jti = jwtService.extractJtiFromToken(token);
+
+        tokenBlacklistService.blacklistTokenStrict(token);
+
+        assertTrue(tokenBlacklistService.isBlacklisted(jti));
+    }
+
+    @Test
     @DisplayName("isBlacklisted with null JTI -> false")
     void null_jti_returns_false() {
         assertFalse(tokenBlacklistService.isBlacklisted(null));

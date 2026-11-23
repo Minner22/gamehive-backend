@@ -121,4 +121,31 @@ class TokenBlacklistServiceImplFailureTest {
 
         assertThat(service.isBlacklistedStrict("some-jti")).isFalse();
     }
+
+    // ---------- GH-148: zapis fail-closed dla logoutu ----------
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("pl.m22.gamehive.support.RedisUnavailability#failures")
+    @DisplayName("blacklistTokenStrict przy niedostępnym Redis -> REDIS_UNAVAILABLE (logout nie może cicho się nie udać)")
+    void blacklistTokenStrict_redisUnavailable_throws(RuntimeException failure) throws Exception {
+        String jti = UUID.randomUUID().toString();
+        doThrow(failure).when(valueOps).set(eq("blacklist:" + jti), eq("1"), any(Duration.class));
+        String token = signedToken(jti);
+
+        assertThatThrownBy(() -> service.blacklistTokenStrict(token))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.REDIS_UNAVAILABLE);
+    }
+
+    @Test
+    @DisplayName("blacklistTokenStrict: inny błąd Redis (WRONGTYPE) -> leci dalej bez tłumaczenia")
+    void blacklistTokenStrict_otherRedisError_isNotTranslated() throws Exception {
+        String jti = UUID.randomUUID().toString();
+        doThrow(new RedisSystemException("WRONGTYPE", new RuntimeException()))
+                .when(valueOps).set(eq("blacklist:" + jti), eq("1"), any(Duration.class));
+        String token = signedToken(jti);
+
+        assertThatThrownBy(() -> service.blacklistTokenStrict(token)).isInstanceOf(RedisSystemException.class);
+    }
 }

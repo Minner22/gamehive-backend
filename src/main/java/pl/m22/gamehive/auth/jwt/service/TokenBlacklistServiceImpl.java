@@ -53,6 +53,36 @@ public class TokenBlacklistServiceImpl implements TokenBlacklistService {
     }
 
     @Override
+    public void blacklistTokenStrict(String token) {
+
+        try {
+            SignedJWT signedJWT = SignedJWT.parse(token);
+            String jti = signedJWT.getJWTClaimsSet().getJWTID();
+            if (jti == null) {
+                log.warn("Token has no JTI, cannot blacklist");
+                return;
+            }
+
+            Date expirationDate = signedJWT.getJWTClaimsSet().getExpirationTime();
+            if (expirationDate == null) {
+                return;
+            }
+
+            Instant expiration = expirationDate.toInstant();
+
+            Duration remainingTtl = Duration.between(Instant.now(), expiration);
+            if (remainingTtl.isPositive()) {
+                redisTemplate.opsForValue().set(BLACKLIST_PREFIX + jti, "1", remainingTtl);
+            }
+        } catch (ParseException e) {
+            log.warn("Failed to parse token for blacklisting: {}", e.getMessage());
+        } catch (RedisConnectionFailureException | QueryTimeoutException e) {
+            log.error("Redis unavailable while blacklisting access token", e);
+            throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot blacklist token - Redis unavailable");
+        }
+    }
+
+    @Override
     public boolean isBlacklisted(String jti) {
         if (jti == null) {
             return false;

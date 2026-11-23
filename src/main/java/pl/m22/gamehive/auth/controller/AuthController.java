@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,10 +21,7 @@ import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
 import pl.m22.gamehive.auth.service.AuthService;
 import pl.m22.gamehive.common.domain.Email;
-import pl.m22.gamehive.common.exception.ApiError;
-import pl.m22.gamehive.common.exception.ApiValidationError;
-import pl.m22.gamehive.common.exception.ApplicationException;
-import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.exception.*;
 import pl.m22.gamehive.common.logging.LoggingUtils;
 import pl.m22.gamehive.user.mapper.UserMapper;
 import pl.m22.gamehive.user.service.UserService;
@@ -153,32 +151,56 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "Wylogowano; tokeny unieważnione, ciasteczko wyczyszczone")
     @ApiResponse(responseCode = "401", description = "Brak lub nieprawidłowy token dostępowy",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "503", description = "Usługa tokenów chwilowo niedostępna (REDIS_UNAVAILABLE) — ciasteczko refreshToken mimo to wyczyszczone, ale tokeny mogły nie zostać unieważnione",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             @Parameter(description = "Nagłówek z tokenem dostępowym w formacie `Bearer <token>`", required = true)
-            @RequestHeader("Authorization") String accessTokenHeader) {
+            @RequestHeader("Authorization") String accessTokenHeader,
+            HttpServletResponse response) {
 
         String accessToken = Objects.nonNull(accessTokenHeader) && accessTokenHeader.startsWith(BEARER_PREFIX) ? accessTokenHeader.substring(BEARER_PREFIX.length()) : accessTokenHeader;
 
         jwtService.validateToken(accessToken, JwtTokenType.ACCESS);
-        tokenBlacklistService.blacklistToken(accessToken);
+
+        response.addHeader(HttpHeaders.SET_COOKIE, clearedRefreshCookie().toString());
+
+        InfrastructureException failure = null;
+        try {
+            tokenBlacklistService.blacklistTokenStrict(accessToken);
+        }catch (InfrastructureException e) {
+            failure = e;
+        }
 
         String subjectEmail = jwtService.extractEmailFromToken(accessToken);
-        jwtService.revokeUsersTokens(subjectEmail);
+        try {
+            jwtService.revokeUsersTokens(subjectEmail);
+        } catch (InfrastructureException e) {
+            if (failure == null) {
+                failure = e;
+            } else {
+                failure.addSuppressed(e);
+            }
+        }
+        if (failure != null) {
+            log.warn("Logout only partialy applied for {} - Redis unavailable; refresh cookie cleared", LoggingUtils.obfuscateEmail(subjectEmail));
+            throw failure;
+        }
 
-        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", "")
+        log.info("User logged out: {}", LoggingUtils.obfuscateEmail(subjectEmail));
+        return ResponseEntity.ok().build();
+    }
+
+    private ResponseCookie clearedRefreshCookie() {
+
+        return ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
                 .secure(true)
                 .path("/api/v1/auth/refresh")
                 .maxAge(0)
                 .sameSite("Strict")
-                .build();
-
-        log.info("User logged out: {}", LoggingUtils.obfuscateEmail(subjectEmail));
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                 .build();
     }
 
