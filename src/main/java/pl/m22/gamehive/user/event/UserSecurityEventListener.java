@@ -70,8 +70,12 @@ public class UserSecurityEventListener {
 
         evictAuthState(email);
 
-        bestEffort("revoke refresh tokens", email, () -> refreshTokenStore.revokeAllByUserEmail(email));
-        bestEffort("session epoch", email, () -> sessionEpochStore.invalidateNow(email));
+        try {
+            bestEffort("revoke refresh tokens", email, () -> refreshTokenStore.revokeAllByUserEmail(email));
+            bestEffort("session epoch", email, () -> sessionEpochStore.invalidateNow(email));
+        } finally {
+            evictAuthState(email);
+        }
     }
 
     // Eviction programowa (nie @CacheEvict): metody listenera są package-private i wołane przez

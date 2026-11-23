@@ -14,12 +14,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.concurrent.ConcurrentMapCache;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import pl.m22.gamehive.auth.jwt.service.RedisRefreshTokenStore;
 import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
+import pl.m22.gamehive.auth.jwt.service.UserAuthState;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
 import pl.m22.gamehive.config.CacheConfig;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
@@ -46,7 +50,7 @@ class UserSecurityEventListenerTest {
 
         verify(refreshTokenStore).revokeAllByUserEmail(email);
         verify(sessionEpochStore).invalidateNow(email);
-        verify(cache).evict(email);
+        verify(cache, times(2)).evict(email);   // przed krokami Redis i po zapisie epoki
     }
 
     // Inwariant: reaktywacja i zmiana ról to evict-only — NIE wolno im rewokować refresh ani zerować epoch
@@ -91,7 +95,7 @@ class UserSecurityEventListenerTest {
         inOrder.verify(sessionEpochStore).invalidatePasswordResetNow(email);
         inOrder.verify(refreshTokenStore).revokeAllByUserEmail(email);
         verify(sessionEpochStore).invalidateNow(email);
-        verify(cache).evict(email);
+        verify(cache, times(2)).evict(email);   // przed krokami Redis i po zapisie epoki
     }
 
     @Test
@@ -106,7 +110,7 @@ class UserSecurityEventListenerTest {
 
         verify(sessionEpochStore).invalidatePasswordResetNow(email);
         verify(sessionEpochStore).invalidateNow(email);
-        verify(cache).evict(email);
+        verify(cache, times(2)).evict(email);   // przed krokami Redis i po zapisie epoki
     }
 
     @Test
@@ -119,7 +123,7 @@ class UserSecurityEventListenerTest {
         assertThatCode(() -> listener.onUserCredentialsChanged(new UserCredentialsChangedEvent(email)))
                 .doesNotThrowAnyException();
 
-        verify(cache).evict(email);
+        verify(cache, times(2)).evict(email);   // przed krokami Redis i po zapisie epoki
         verify(refreshTokenStore).revokeAllByUserEmail(email);
         verify(sessionEpochStore).invalidateNow(email);
     }
@@ -134,10 +138,12 @@ class UserSecurityEventListenerTest {
 
         assertThatCode(() -> listener.onUserDeactivated(new UserDeactivatedEvent(email))).doesNotThrowAnyException();
 
+        // czyszczenie PRZED (deaktywacja działa od razu przy padniętym Redis) i PO zapisie epoki (security review GH-168)
         InOrder inOrder = inOrder(cache, refreshTokenStore, sessionEpochStore);
         inOrder.verify(cache).evict(email);
         inOrder.verify(refreshTokenStore).revokeAllByUserEmail(email);
         inOrder.verify(sessionEpochStore).invalidateNow(email);
+        inOrder.verify(cache).evict(email);
     }
 
     @Test
@@ -149,7 +155,7 @@ class UserSecurityEventListenerTest {
 
         assertThatThrownBy(() -> listener.onUserForceLoggedOut(new UserForceLoggedOutEvent(email)))
                 .isInstanceOf(IllegalStateException.class);
-        verify(cache).evict(email);   // cache i tak już wyczyszczony — idzie pierwszy
+        verify(cache, times(2)).evict(email);   // przed krokami i w finally — także przy błędzie w naszym kodzie
     }
 
     @Test
@@ -190,5 +196,44 @@ class UserSecurityEventListenerTest {
         listener.onUserForceLoggedOut(new UserForceLoggedOutEvent(email));
 
         verify(sessionEpochStore, never()).invalidatePasswordResetNow(anyString());
+    }
+
+    // ---------- security review GH-168: cache trzyma epokę sesji ----------
+
+    @Test
+    @DisplayName("Żądanie przeładowujące cache MIĘDZY czyszczeniem a zapisem epoki nie zostawia starej epoki na 60 s (force-logout)")
+    void staleAuthStateLoadedDuringRevoke_isEvictedAfterEpochWrite() {
+        String email = "jane.smith@example.com";
+        Cache realCache = new ConcurrentMapCache(CacheConfig.USER_AUTH_STATE);
+        when(cacheManager.getCache(CacheConfig.USER_AUTH_STATE)).thenReturn(realCache);
+        UserAuthState staleState = new UserAuthState(true, List.of(new SimpleGrantedAuthority("ROLE_USER")), null);
+        // symulacja: równoległe żądanie atakującego trafia w okno po pierwszym czyszczeniu i — zanim
+        // invalidateNow zapisze epokę — ładuje do cache stan BEZ epoki (UserAuthStateProvider czyta ją z Redisa)
+        doAnswer(_ -> {
+            realCache.put(email, staleState);
+            return null;
+        }).when(refreshTokenStore).revokeAllByUserEmail(email);
+
+        listener.onUserForceLoggedOut(new UserForceLoggedOutEvent(email));
+
+        // bez drugiego czyszczenia stary stan przetrwałby do TTL (60 s) i skradziony token nadal by działał
+        assertThat(realCache.get(email)).isNull();
+        verify(sessionEpochStore).invalidateNow(email);
+    }
+
+    @Test
+    @DisplayName("To samo przy zmianie hasła: stary stan załadowany w trakcie rewokacji nie przetrwa listenera")
+    void staleAuthStateLoadedDuringPasswordChange_isEvicted() {
+        String email = "jane.smith@example.com";
+        Cache realCache = new ConcurrentMapCache(CacheConfig.USER_AUTH_STATE);
+        when(cacheManager.getCache(CacheConfig.USER_AUTH_STATE)).thenReturn(realCache);
+        doAnswer(_ -> {
+            realCache.put(email, new UserAuthState(true, List.of(), null));
+            return null;
+        }).when(refreshTokenStore).revokeAllByUserEmail(email);
+
+        listener.onUserCredentialsChanged(new UserCredentialsChangedEvent(email));
+
+        assertThat(realCache.get(email)).isNull();
     }
 }
