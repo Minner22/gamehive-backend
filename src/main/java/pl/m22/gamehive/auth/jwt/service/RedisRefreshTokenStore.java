@@ -33,6 +33,9 @@ public class RedisRefreshTokenStore {
                     if redis.call('DEL', KEYS[1]) == 1 then
                         redis.call('ZREM', KEYS[2], ARGV[1])
                         redis.call('SET', KEYS[3], ARGV[3], 'PX', ARGV[2])
+                        redis.call('SET', KEYS[4], ARGV[3], 'PX', ARGV[5])
+                        redis.call('ZADD', KEYS[2], ARGV[6], ARGV[4])
+                        redis.call('EXPIRE', KEYS[2], ARGV[7])
                         return 1
                     end
                     if redis.call('EXISTS', KEYS[3]) == 1 then

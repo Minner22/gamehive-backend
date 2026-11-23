@@ -170,11 +170,15 @@ class RefreshTokenRotationTest {
     @Test
     @DisplayName("AC3: refresh wypchnięty limitem 5 -> 401 JWT_INVALID_JTI, BEZ globalnego wylogowania")
     void evictedByLimit_plainUnauthorized() throws Exception {
-        String evicted = jwtService.generateToken(JANE, JwtTokenType.REFRESH, Set.of("ROLE_USER"));
-        List<String> newer = new ArrayList<>();
-        for (int i = 0; i < 5; i++) {
-            newer.add(jwtService.generateToken(JANE, JwtTokenType.REFRESH, Set.of("ROLE_USER")));
+        List<String> issued = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            issued.add(jwtService.generateToken(JANE, JwtTokenType.REFRESH, Set.of("ROLE_USER")));
         }
+        // NIE zakładamy, że wypadł pierwszy: tokeny z tej samej milisekundy mają w ZSET równy score,
+        // a wtedy Redis porządkuje po wartości (JTI = losowy UUID) — wypchnięty jest dowolny z nich
+        String evicted = issued.stream().filter(t -> !jtiExists(t)).findFirst().orElseThrow();
+        List<String> newer = issued.stream().filter(t -> !t.equals(evicted)).toList();
+        assertThat(newer).hasSize(5);
         String access = jwtService.generateToken(JANE, JwtTokenType.ACCESS, Set.of("ROLE_USER"));
 
         refresh(evicted)
