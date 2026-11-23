@@ -185,7 +185,7 @@ public class AuthController {
             }
         }
         if (failure != null) {
-            log.warn("Logout only partialy applied for {} - Redis unavailable; refresh cookie cleared", LoggingUtils.obfuscateEmail(subjectEmail));
+            log.warn("Logout only partially applied for {} - Redis unavailable; refresh cookie cleared", LoggingUtils.obfuscateEmail(subjectEmail));
             throw failure;
         }
 
