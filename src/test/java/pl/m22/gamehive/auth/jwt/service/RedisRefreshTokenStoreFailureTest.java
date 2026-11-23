@@ -67,37 +67,39 @@ class RedisRefreshTokenStoreFailureTest {
     @MethodSource("pl.m22.gamehive.support.RedisUnavailability#failures")
     @DisplayName("revokeAllByUserEmail przy niedostępnym Redis -> REDIS_UNAVAILABLE")
     void revoke_redisUnavailable_throwsRedisUnavailable(RuntimeException failure) {
-        when(zSetOps.range(anyString(), anyLong(), anyLong())).thenThrow(failure);
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenThrow(failure);
 
         assertRedisUnavailable(() -> store.revokeAllByUserEmail(EMAIL));
     }
 
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("pl.m22.gamehive.support.RedisUnavailability#failures")
-    @DisplayName("GH-146: consume przy niedostępnym Redis -> REDIS_UNAVAILABLE (bez rotacji nie ma nowego tokena)")
-    void consume_redisUnavailable_throwsRedisUnavailable(RuntimeException failure) {
-        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(), any(), any())).thenThrow(failure);
+    @DisplayName("GH-146: rotate przy niedostępnym Redis -> REDIS_UNAVAILABLE (bez rotacji nie ma nowego tokena)")
+    void rotate_redisUnavailable_throwsRedisUnavailable(RuntimeException failure) {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenThrow(failure);
 
-        assertRedisUnavailable(() -> store.consume("jti-1", EMAIL, Instant.now().plusSeconds(600)));
+        assertRedisUnavailable(this::rotate);
     }
 
     @Test
     @DisplayName("GH-146: błąd skryptu (RedisSystemException) NIE jest maskowany jako REDIS_UNAVAILABLE")
-    void consume_scriptError_propagates() {
+    void rotate_scriptError_propagates() {
         RedisSystemException scriptError = new RedisSystemException("ERR Error running script", null);
-        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(), any(), any())).thenThrow(scriptError);
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenThrow(scriptError);
 
-        assertThatThrownBy(() -> store.consume("jti-1", EMAIL, Instant.now().plusSeconds(600)))
-                .isSameAs(scriptError);
+        assertThatThrownBy(this::rotate).isSameAs(scriptError);
     }
 
     @Test
     @DisplayName("GH-146: skrypt zwrócił null (np. w pipeline/MULTI) -> UNKNOWN, nie NPE")
-    void consume_nullResult_unknown() {
-        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(), any(), any())).thenReturn(null);
+    void rotate_nullResult_unknown() {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenReturn(null);
 
-        assertThat(store.consume("jti-1", EMAIL, Instant.now().plusSeconds(600)))
-                .isEqualTo(RefreshTokenConsumeResult.UNKNOWN);
+        assertThat(rotate()).isEqualTo(RefreshTokenConsumeResult.UNKNOWN);
+    }
+
+    private RefreshTokenConsumeResult rotate() {
+        return store.rotate("jti-1", "jti-2", EMAIL, Instant.now().plusSeconds(600), Instant.now().plusSeconds(600));
     }
 
     private static void assertRedisUnavailable(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {

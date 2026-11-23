@@ -206,7 +206,7 @@ class RefreshTokenRotationTest {
     @DisplayName("Redis niedostępny przy rotacji -> 503 REDIS_UNAVAILABLE (nie 401, nie 500), token nieskonsumowany")
     void redisDown_503(RuntimeException failure) throws Exception {
         String refreshToken = jwtService.generateToken(JANE, JwtTokenType.REFRESH, Set.of("ROLE_USER"));
-        doThrow(failure).when(redisTemplate).execute(any(RedisScript.class), anyList(), any(), any(), any());
+        doThrow(failure).when(redisTemplate).execute(any(RedisScript.class), anyList(), any(Object[].class));
 
         refresh(refreshToken)
                 .andExpect(status().isServiceUnavailable())

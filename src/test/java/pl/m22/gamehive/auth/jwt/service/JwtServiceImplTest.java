@@ -69,13 +69,13 @@ class JwtServiceImplTest {
     }
 
     @Test
-    @DisplayName("GH-146: refresh po revokeUsersTokens -> consumeRefreshToken daje JWT_INVALID_JTI i ZERO zdarzeń reuse")
+    @DisplayName("GH-146: refresh po revokeUsersTokens -> rotateRefreshToken daje JWT_INVALID_JTI i ZERO zdarzeń reuse")
     void refresh_token_revoked_fails() {
 
         String refresh = jwtService.generateToken(ROTATION_EMAIL, JwtTokenType.REFRESH, null);
         jwtService.revokeUsersTokens(ROTATION_EMAIL);
 
-        assertErrorCode(() -> jwtService.consumeRefreshToken(refresh), ErrorCode.JWT_INVALID_JTI);
+        assertErrorCode(() -> rotate(refresh), ErrorCode.JWT_INVALID_JTI);
         assertThat(events.stream(RefreshTokenReuseDetectedEvent.class)).isEmpty();
     }
 
@@ -84,23 +84,26 @@ class JwtServiceImplTest {
     void validateToken_refresh_doesNotTouchRedis() {
 
         String refresh = jwtService.generateToken(ROTATION_EMAIL, JwtTokenType.REFRESH, null);
-        jwtService.consumeRefreshToken(refresh);
+        rotate(refresh);
 
         assertThatCode(() -> jwtService.validateToken(refresh, JwtTokenType.REFRESH)).doesNotThrowAnyException();
     }
 
-    // ---------- GH-146: consumeRefreshToken ----------
+    // ---------- GH-146: rotateRefreshToken ----------
 
     // spoza data.sql: zdarzenie reuse wylogowuje użytkownika (refreshe + epoka) — nie może dotknąć seedowanych kont
     private static final String ROTATION_EMAIL = "rotation.jwt@test.com";
 
     @Test
-    @DisplayName("GH-146: consumeRefreshToken aktywnego tokena -> email właściciela, bez zdarzeń")
+    @DisplayName("GH-146: rotateRefreshToken aktywnego tokena -> email właściciela, bez zdarzeń")
     void consume_active_returnsEmail() {
 
         String refresh = jwtService.generateToken(ROTATION_EMAIL, JwtTokenType.REFRESH, null);
 
-        assertThat(jwtService.consumeRefreshToken(refresh)).isEqualTo(ROTATION_EMAIL);
+        TokenPairDto pair = rotate(refresh);
+        assertThat(jwtService.extractEmailFromToken(pair.refreshToken())).isEqualTo(ROTATION_EMAIL);
+        assertThat(jwtService.extractEmailFromToken(pair.accessToken())).isEqualTo(ROTATION_EMAIL);
+        assertThat(pair.refreshToken()).isNotEqualTo(refresh);
         assertThat(events.stream(RefreshTokenReuseDetectedEvent.class)).isEmpty();
     }
 
@@ -109,9 +112,9 @@ class JwtServiceImplTest {
     void consume_twice_reusedWithEvent() {
 
         String refresh = jwtService.generateToken(ROTATION_EMAIL, JwtTokenType.REFRESH, null);
-        jwtService.consumeRefreshToken(refresh);
+        rotate(refresh);
 
-        assertErrorCode(() -> jwtService.consumeRefreshToken(refresh), ErrorCode.REFRESH_TOKEN_REUSED);
+        assertErrorCode(() -> rotate(refresh), ErrorCode.REFRESH_TOKEN_REUSED);
         assertThat(events.stream(RefreshTokenReuseDetectedEvent.class))
                 .containsExactly(new RefreshTokenReuseDetectedEvent(ROTATION_EMAIL));
     }
@@ -126,8 +129,8 @@ class JwtServiceImplTest {
         SignedJWT forged = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
         forged.sign(new MACSigner(ACCESS_SECRET.getBytes(StandardCharsets.UTF_8)));
 
-        assertErrorCode(() -> jwtService.consumeRefreshToken(forged.serialize()), ErrorCode.JWT_INVALID_SIGNATURE);
-        assertThat(jwtService.consumeRefreshToken(real)).isEqualTo(ROTATION_EMAIL);
+        assertErrorCode(() -> rotate(forged.serialize()), ErrorCode.JWT_INVALID_SIGNATURE);
+        assertThat(jwtService.extractEmailFromToken(rotate(real).refreshToken())).isEqualTo(ROTATION_EMAIL);
         assertThat(events.stream(RefreshTokenReuseDetectedEvent.class)).isEmpty();
     }
 
@@ -137,7 +140,11 @@ class JwtServiceImplTest {
 
         String access = jwtService.generateToken(ROTATION_EMAIL, JwtTokenType.ACCESS, Set.of("ROLE_USER"));
 
-        assertErrorCode(() -> jwtService.consumeRefreshToken(access), ErrorCode.JWT_INVALID_SIGNATURE, ErrorCode.JWT_INVALID_TYPE);
+        assertErrorCode(() -> rotate(access), ErrorCode.JWT_INVALID_SIGNATURE, ErrorCode.JWT_INVALID_TYPE);
+    }
+
+    private TokenPairDto rotate(String refreshToken) {
+        return jwtService.rotateRefreshToken(refreshToken, email -> new CredentialsDto(email, Set.of("ROLE_USER")));
     }
 
     private static void assertErrorCode(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, ErrorCode... anyOf) {

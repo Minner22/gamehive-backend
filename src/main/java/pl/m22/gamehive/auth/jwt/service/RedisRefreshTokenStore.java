@@ -27,9 +27,9 @@ public class RedisRefreshTokenStore {
     private static final String USER_TOKENS_PREFIX = "user_refresh_tokens:";
     private static final String ROTATED_PREFIX = "refresh_rotated:";
 
-    // KEYS: refresh_token:{jti}, user_refresh_tokens:{email}, refresh_rotated:{jti}
-    // ARGV: jti, ttlMs, email
-    private static final RedisScript<Long> CONSUME = RedisScript.of("""
+    // KEYS: refresh_token:{oldJti}, user_refresh_tokens:{email}, refresh_rotated:{oldJti}, refresh_token:{newJti}
+    // ARGV: oldJti, markerTtlMs, email, newJti, newTtlMs, scoreMs, userTokensTtlSec
+    private static final RedisScript<Long> ROTATE = RedisScript.of("""
                     if redis.call('DEL', KEYS[1]) == 1 then
                         redis.call('ZREM', KEYS[2], ARGV[1])
                         redis.call('SET', KEYS[3], ARGV[3], 'PX', ARGV[2])
@@ -39,6 +39,16 @@ public class RedisRefreshTokenStore {
                         return 2
                     end
                     return 0
+                    """, Long.class);
+
+    // KEYS: user_refresh_tokens:{email}; ARGV: prefiks kluczy tokenów
+    private static final RedisScript<Long> REVOKE_ALL = RedisScript.of("""
+                    local jtis = redis.call('ZRANGE', KEYS[1], 0, -1)
+                    for _, jti in ipairs(jtis) do
+                        redis.call('DEL', ARGV[1] .. jti)
+                    end
+                    redis.call('DEL', KEYS[1])
+                    return #jtis
                     """, Long.class);
 
     private final RedisTemplate<String, String> redisTemplate;
@@ -66,35 +76,34 @@ public class RedisRefreshTokenStore {
 
     public void revokeAllByUserEmail(String email) {
         try {
-            String userTokensKey = USER_TOKENS_PREFIX + email;
-            Set<String> jtis = redisTemplate.opsForZSet().range(userTokensKey, 0, -1);
-
-            if (jtis != null && !jtis.isEmpty()) {
-                for (String jti : jtis) {
-                    redisTemplate.delete(REFRESH_TOKEN_PREFIX + jti);
-                }
-            }
-
-            redisTemplate.delete(userTokensKey);
+            redisTemplate.execute(REVOKE_ALL, List.of(USER_TOKENS_PREFIX + email), REFRESH_TOKEN_PREFIX);
         } catch (RedisConnectionFailureException | QueryTimeoutException e) {
             log.error("Redis unavailable while revoking tokens for user: {}", email, e);
             throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot revoke tokens - Redis unavailable");
         }
     }
 
-    public RefreshTokenConsumeResult consume(String jti, String email, Instant expiresAt) {
+    public RefreshTokenConsumeResult rotate(String oldJti, String newJti, String email,
+                                            Instant oldExpiresAt, Instant newExpiresAt) {
 
-        Duration ttl = Duration.between(Instant.now(), expiresAt);
-        if (!ttl.isPositive()) {
+        Instant now = Instant.now();
+        Duration markerTtl = Duration.between(now, oldExpiresAt);
+        Duration newTtl = Duration.between(now, newExpiresAt);
+        if (!markerTtl.isPositive() || !newTtl.isPositive()) {
             return RefreshTokenConsumeResult.UNKNOWN;
         }
 
         try {
-            Long code = redisTemplate.execute(CONSUME,
-                    List.of(REFRESH_TOKEN_PREFIX + jti, USER_TOKENS_PREFIX + email, ROTATED_PREFIX + jti),
-                    jti,
-                    String.valueOf(ttl.toMillis()),
-                    email);
+            Long code = redisTemplate.execute(ROTATE,
+                    List.of(REFRESH_TOKEN_PREFIX + oldJti, USER_TOKENS_PREFIX + email,
+                            ROTATED_PREFIX + oldJti, REFRESH_TOKEN_PREFIX + newJti),
+                    oldJti,
+                    String.valueOf(markerTtl.toMillis()),
+                    email,
+                    newJti,
+                    String.valueOf(newTtl.toMillis()),
+                    String.valueOf(now.toEpochMilli()),
+                    String.valueOf(refreshProps.getValidityInSeconds()));
             if (code == null) {
                 return RefreshTokenConsumeResult.UNKNOWN;
             }

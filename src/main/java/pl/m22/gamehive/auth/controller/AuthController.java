@@ -136,13 +136,13 @@ public class AuthController {
             @Parameter(description = "Token odświeżający przekazywany automatycznie jako ciasteczko HttpOnly", required = true)
             @CookieValue("refreshToken") String refreshToken) {
 
-        Email email = new Email(jwtService.consumeRefreshToken(refreshToken));
-        CredentialsDto userCredentials = userMapper.toCredentialsDto(
-                userService.findUserByEmail(email));
+        TokenPairDto tokens = jwtService.rotateRefreshToken(refreshToken,
+                email -> userMapper.toCredentialsDto(userService.findUserByEmail(new Email(email))));
 
-        log.info("User refreshed access token: {}", email.obfuscated());
+        log.info("User refreshed access token: {}",
+                LoggingUtils.obfuscateEmail(jwtService.extractEmailFromToken(tokens.refreshToken())));
 
-        return generateTokens(userCredentials);
+        return tokenResponse(tokens);
     }
 
     @Operation(
@@ -275,7 +275,10 @@ public class AuthController {
 
     private ResponseEntity<AccessTokenResponseDto> generateTokens(CredentialsDto userCredentials) {
 
-        TokenPairDto loginResponse = jwtService.generateTokenPair(userCredentials);
+        return tokenResponse(jwtService.generateTokenPair(userCredentials));
+    }
+
+    private ResponseEntity<AccessTokenResponseDto> tokenResponse(TokenPairDto loginResponse) {
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", loginResponse.refreshToken())
                 .httpOnly(true)

@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 @Slf4j
 @Service
@@ -98,14 +99,13 @@ public class JwtServiceImpl implements JwtService {
 
     @Override
     public String generateToken(String subjectEmail, JwtTokenType tokenType, Set<String> roles) {
-        JWTClaimsSet claimsSet = createPayload(subjectEmail, tokenType, roles);
-        SignedJWT signedJwt = generateSignedJwt(claimsSet, tokenType);
+        IssuedToken issued = issue(subjectEmail, tokenType, roles);
 
         if (tokenType == JwtTokenType.REFRESH) {
-            saveRefreshToken(claimsSet);
+            saveRefreshToken(issued.claims());
         }
 
-        return signedJwt.serialize();
+        return issued.serialized();
     }
 
     @Override
@@ -151,7 +151,7 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
-    public String consumeRefreshToken(String refreshToken) {
+    public TokenPairDto rotateRefreshToken(String refreshToken, Function<String, CredentialsDto> credentialsLoader) {
 
         validateToken(refreshToken, JwtTokenType.REFRESH);
 
@@ -162,8 +162,13 @@ public class JwtServiceImpl implements JwtService {
             throw new ApplicationException(ErrorCode.JWT_INVALID_SUBJECT);
         }
 
-        return switch (redisRefreshTokenStore.consume(jti, email, claimsSet.getExpirationTime().toInstant())) {
-            case CONSUMED -> email;
+        CredentialsDto credentials = credentialsLoader.apply(email);
+        IssuedToken access = issue(email, JwtTokenType.ACCESS, credentials.roles());
+        IssuedToken refresh = issue(email, JwtTokenType.REFRESH, null);
+
+        return switch (redisRefreshTokenStore.rotate(jti, refresh.claims().getJWTID(), email,
+                claimsSet.getExpirationTime().toInstant(), refresh.claims().getExpirationTime().toInstant())) {
+            case CONSUMED -> new TokenPairDto(access.serialized(), refresh.serialized());
             case UNKNOWN -> throw new ApplicationException(ErrorCode.JWT_INVALID_JTI);
             case REUSED -> {
                 log.warn("Refresh token reuse detected for {} (jti={}) - revoking all sessions",
@@ -172,6 +177,15 @@ public class JwtServiceImpl implements JwtService {
                 throw new ApplicationException(ErrorCode.REFRESH_TOKEN_REUSED);
             }
         };
+    }
+
+    private record IssuedToken(String serialized, JWTClaimsSet claims) {
+    }
+
+    private IssuedToken issue(String subjectEmail, JwtTokenType tokenType, Set<String> roles) {
+        JWTClaimsSet claimsSet = createPayload(subjectEmail, tokenType, roles);
+
+        return new IssuedToken(generateSignedJwt(claimsSet, tokenType).serialize(), claimsSet);
     }
 
     private JWTClaimsSet parseClaims(String token) {
