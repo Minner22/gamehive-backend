@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 @Slf4j
 @RestController
@@ -83,7 +84,11 @@ public class AuthController {
             @Parameter(description = "Token aktywacyjny (JWT) z linku w wiadomości e-mail", required = true)
             @RequestParam("token") String token) {
 
-        Email email = validateOneTimeToken(token, JwtTokenType.ACTIVATION, sessionEpochStore::getActivationInvalidAfter, ACTIVATION_LABEL);
+        Email email = validateOneTimeToken(token,
+                JwtTokenType.ACTIVATION,
+                tokenBlacklistService::isBlacklisted,
+                sessionEpochStore::getActivationInvalidAfter,
+                ACTIVATION_LABEL);
 
         authService.activateUser(email);
 
@@ -204,13 +209,20 @@ public class AuthController {
             content = @Content(schema = @Schema(implementation = ApiValidationError.class)))
     @ApiResponse(responseCode = "401", description = "Token nieprawidłowy, wygasły, już użyty (JWT_BLACKLISTED) lub unieważniony nowszym linkiem albo udanym resetem (TOKEN_REVOKED)",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "503",
+            description = "Usługa tokenów chwilowo niedostępna (REDIS_UNAVAILABLE) — hasło NIE zostało zmienione, spróbuj ponownie za chwilę",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "500", description = "Błąd wewnętrzny serwera",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/password-reset/confirm")
     public ResponseEntity<Void> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmDto confirmDto) {
 
         String token = confirmDto.token();
-        Email email = validateOneTimeToken(token, JwtTokenType.PASSWORD_RESET, sessionEpochStore::getPasswordResetInvalidAfter, PASSWORD_RESET_LABEL);
+        Email email = validateOneTimeToken(token,
+                JwtTokenType.PASSWORD_RESET,
+                tokenBlacklistService::isBlacklistedStrict,
+                sessionEpochStore::getPasswordResetInvalidAfter,
+                PASSWORD_RESET_LABEL);
 
         authService.confirmPasswordReset(email, confirmDto.newPassword());
 
@@ -255,11 +267,15 @@ public class AuthController {
                 .body(new AccessTokenResponseDto(loginResponse.accessToken()));
     }
 
-    private Email validateOneTimeToken(String token, JwtTokenType type, Function<String, Long> epochLookup, String tokenLabel) {
+    private Email validateOneTimeToken(String token,
+                                       JwtTokenType type,
+                                       Predicate<String> blackListCheck,
+                                       Function<String, Long> epochLookup,
+                                       String tokenLabel) {
 
         jwtService.validateToken(token, type);
 
-        if (tokenBlacklistService.isBlacklisted(jwtService.extractJtiFromToken(token))) {
+        if (blackListCheck.test(jwtService.extractJtiFromToken(token))) {
             throw new ApplicationException(ErrorCode.JWT_BLACKLISTED,
                     tokenLabel + " token has already been used or is invalid.");
         }

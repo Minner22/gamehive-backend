@@ -7,6 +7,8 @@ import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.exception.InfrastructureException;
 
 import java.text.ParseException;
 import java.time.Duration;
@@ -60,6 +62,21 @@ public class TokenBlacklistServiceImpl implements TokenBlacklistService {
         } catch (RedisConnectionFailureException | QueryTimeoutException e) {
             log.warn("Redis unavailable for blacklist check, failing open", e);
             return false;
+        }
+    }
+
+    @Override
+    public boolean isBlacklistedStrict(String jti) {
+
+        if (jti == null) {
+            return false;
+        }
+
+        try {
+            return Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_PREFIX + jti));
+        } catch (RedisConnectionFailureException | QueryTimeoutException e) {
+            log.error("Redis unavailable for strict blacklist check, refusing the operation", e);
+            throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot verify token blacklist - Redis unavailable");
         }
     }
 }

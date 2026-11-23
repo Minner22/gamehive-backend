@@ -18,6 +18,8 @@ import org.mockito.quality.Strictness;
 import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import pl.m22.gamehive.common.exception.BaseException;
+import pl.m22.gamehive.common.exception.ErrorCode;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -88,5 +90,35 @@ class TokenBlacklistServiceImplFailureTest {
         SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
         jwt.sign(new MACSigner("test-secret-0123456789abcdefghijklmnop"));
         return jwt.serialize();
+    }
+
+    // ---------- GH-168: wariant fail-closed dla tokenów jednorazowych ----------
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("pl.m22.gamehive.support.RedisUnavailability#failures")
+    @DisplayName("isBlacklistedStrict przy niedostępnym Redis -> REDIS_UNAVAILABLE (fail-closed), nie false")
+    void isBlacklistedStrict_redisUnavailable_failsClosed(RuntimeException failure) {
+        when(redisTemplate.hasKey(anyString())).thenThrow(failure);
+
+        assertThatThrownBy(() -> service.isBlacklistedStrict("some-jti"))
+                .isInstanceOf(BaseException.class)
+                .extracting(e -> ((BaseException) e).getErrorCode())
+                .isEqualTo(ErrorCode.REDIS_UNAVAILABLE);
+    }
+
+    @Test
+    @DisplayName("isBlacklistedStrict: inny błąd Redis (WRONGTYPE) -> leci dalej bez tłumaczenia na REDIS_UNAVAILABLE")
+    void isBlacklistedStrict_otherRedisError_isNotTranslated() {
+        when(redisTemplate.hasKey(anyString())).thenThrow(new RedisSystemException("WRONGTYPE", new RuntimeException()));
+
+        assertThatThrownBy(() -> service.isBlacklistedStrict("some-jti")).isInstanceOf(RedisSystemException.class);
+    }
+
+    @Test
+    @DisplayName("isBlacklistedStrict: hasKey zwraca null -> false (bez NPE)")
+    void isBlacklistedStrict_nullFromRedis_isFalse() {
+        when(redisTemplate.hasKey(anyString())).thenReturn(null);
+
+        assertThat(service.isBlacklistedStrict("some-jti")).isFalse();
     }
 }
