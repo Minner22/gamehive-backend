@@ -90,5 +90,5 @@ jobs:
 
       - name: Analyze
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: deliberately-invalid-token-gh153
         run: ./mvnw -B sonar:sonar
