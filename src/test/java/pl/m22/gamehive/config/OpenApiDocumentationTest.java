@@ -171,13 +171,16 @@ class OpenApiDocumentationTest {
     }
 
     @Test
-    @DisplayName("GET /auth/refresh dokumentuje 401 (w tym REFRESH_TOKEN_REUSED) i 503 REDIS_UNAVAILABLE (GH-146)")
+    @DisplayName("GET /auth/refresh dokumentuje 401 (w tym REFRESH_TOKEN_REUSED, ACCOUNT_DISABLED) i 503 REDIS_UNAVAILABLE (GH-146, GH-172)")
     void apiDocs_refresh_documents401And503() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['/api/v1/auth/refresh'].get.responses['503']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/auth/refresh'].get.responses['401'].description",
-                        org.hamcrest.Matchers.containsString("REFRESH_TOKEN_REUSED")));
+                        org.hamcrest.Matchers.containsString("REFRESH_TOKEN_REUSED")))
+                // GH-172
+                .andExpect(jsonPath("$.paths['/api/v1/auth/refresh'].get.responses['401'].description",
+                        org.hamcrest.Matchers.containsString("ACCOUNT_DISABLED")));
     }
 
     @Test

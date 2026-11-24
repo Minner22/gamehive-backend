@@ -11,6 +11,8 @@ public interface AuthService {
 
     CredentialsDto login(LoginDto loginDto);
 
+    CredentialsDto loadRefreshCredentials(Email email);
+
     void activateUser(Email email);
 
     void requestPasswordReset(Email email);
