@@ -20,7 +20,10 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class GameCollectionItem extends LongEntity {
 
-    @Column(name = "owner_id", nullable = false, updatable = false)
+    @Column(name = "ci_verification_note")
+    private String ciVerificationNote;
+
+    @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

@@ -94,7 +94,7 @@ jobs:
       - name: Block changes to existing Flyway migrations
         shell: bash
         env:
-          BASE_REF: ${{ github.base_ref }}
+          BASE_REF: no-such-branch-gh154
         run: |
           git diff --name-status "origin/${BASE_REF}...HEAD" -- src/main/resources/db/migration \
             | awk '$1 != "A" { bad=1; print "::error file=" $NF "::Zmieniona istniejąca migracja (" $1 "): " $NF " - dodaj nowy plik V* zamiast edytować zastosowany" } END { exit bad }'
