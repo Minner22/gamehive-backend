@@ -8,7 +8,7 @@ description: Reguły i lista kontrolna dla nowej migracji Flyway w GameHive (src
 ## Twarde reguły
 1. **Nigdy nie edytuj pliku `V*`, który mógł być już zastosowany** (czyli każdego, który jest na `master` albo był uruchomiony na dev). Flyway trzyma checksumy i wtedy nie wstaje (`Migration checksum mismatch`). Precedens: `d7a981d` dopisał `CREATE INDEX` do zastosowanego `V8` → dev stał na V8 przez 5 tygodni bez V9–V11. Napraw to nowym plikiem `V<n+1>`. Wyjątek: plik dodany na bieżącej gałęzi i jeszcze nigdzie nieuruchomiony.
 2. **`flyway repair` nie jest naprawą** — przepisuje tylko checksum, a dopisane instrukcje zostają na zawsze niewykonane. Na dev ratunkiem jest `docker compose down -v` (kasuje wolumen; **zawsze pytaj użytkownika**).
-3. **Zielony `mvn test` nie dowodzi niczego o migracji** — profil `test` ma Flyway wyłączony, a schemat H2 generuje Hibernate z encji. Każda nowa migracja = jeden start `dev` (skill `verify-dev`).
+3. **Zielony lokalny `./mvnw test` nie dowodzi niczego o migracji** — profil `test` ma Flyway wyłączony, a schemat H2 generuje Hibernate z encji. **Dowodzi tego CI (GH-154)**: job `integration` stosuje wszystkie `V*` na pustym PostgreSQL 16 i robi `ddl-auto=validate`, a job `migrations-guard` blokuje edycję, usunięcie i zmianę nazwy istniejącego `V*` na PR. Lokalnie to samo: `./mvnw -Pintegration test` (Docker Desktop).
 4. Boot 4: Flyway działa tylko z `spring-boot-starter-flyway`; samo `flyway-core` po cichu nic nie robi.
 
 ## Lista kontrolna nowego pliku
@@ -31,7 +31,13 @@ description: Reguły i lista kontrolna dla nowej migracji Flyway w GameHive (src
 - [ ] DEFAULT-y z SQL **nie istnieją w H2** → fixture'y w `data.sql` muszą podawać te kolumny jawnie (skill `fixture-guard`).
 - [ ] Indeksy i `ON DELETE` (poza `@OnDelete`) nie istnieją w H2 — testy repozytorium weryfikują zachowanie JPA, nie SQL.
 
-## Weryfikacja na dev (skill `verify-dev`)
+## Co sprawdza CI (GH-154), a co nadal `dev`
+- `migration/FlywayPostgresMigrationTest` (`@Tag("postgres")`, profil `test` + `it-postgres`, Testcontainers): kontekst wstaje = migracje od zera + `validate`; asercje FK `ON DELETE` i indeksów. **Nowe FK z wybraną regułą albo nowy indeks → dopisz wiersz do `@CsvSource`** (`foreignKeyDeleteRules` / `indexesExist`), inaczej regułę pilnuje tylko ręczna weryfikacja.
+- **Obraz w teście = obraz w `docker-compose.yml`** (`postgres:16-alpine`) — przy podbiciu PostgreSQL zmień oba.
+- `validate` sprawdza istnienie tabel/kolumn i zgodność typów, ale **nie** `nullable`, `length` ani DEFAULT-y — te punkty listy kontrolnej zostają ręczne.
+- Pole w encji bez migracji: H2 utworzy kolumnę sam (lokalne testy zielone), job `integration` czerwony z `Schema validation: missing column` — to dokładnie przypadek, który CI ma łapać.
+
+## Weryfikacja na dev (skill `verify-dev`) — dane seedera, cały stos
 - log: `Successfully applied 1 migration … v<n>`;
 - `docker exec gamehive-postgres psql -U gamehive -d gamehive -c '\d+ <tabela>'` — kolumny, FK z `ON DELETE`, indeksy;
 - `select version, description, success from flyway_schema_history order by installed_rank;`;
