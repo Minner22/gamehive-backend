@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver   # profil "test" ustawia H2 — nie polegamy na kolejności nadpisań
+  flyway:
+    enabled: true                              # schemat WYŁĄCZNIE z migracji V*, od pustej bazy
+  jpa:
+    hibernate:
+      ddl-auto: validate                       # Hibernate porównuje każdą encję ze schematem z migracji
+    defer-datasource-initialization: false     # z Flyway "true" daje cykl zależności (i niczego tu nie potrzebujemy)
+  sql:
+    init:
+      mode: never                              # bez data.sql — sprawdzamy schemat, nie fixture'y

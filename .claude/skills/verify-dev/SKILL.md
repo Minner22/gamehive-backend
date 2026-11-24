@@ -6,7 +6,7 @@ description: Uruchamia GameHive na profilu dev (PostgreSQL + Redis + Meilisearch
 # Weryfikacja na profilu `dev`
 
 ## Dlaczego ten skill istnieje
-Profil `test` używa H2 bez Flyway, `gamehive.search.enabled=false` (fallback zamiast Meili), `SyncTaskExecutor` zamiast puli `@Async` i MockMvc bez kontenera. **Zielony `mvn test` nie dowodzi więc niczego** o: migracjach `V*` (checksumy, DDL, `ON DELETE`, indeksy, DEFAULT-y), Meilisearch (beany `Meili*` nie powstają), wątku `search-index-*` i propagacji MDC, ERROR dispatch do `/error`. To już dwa razy kosztowało: zmodyfikowany zastosowany `V8` (dev zablokowany na 5 tygodni) i brakujący `okhttp-jvm` (670 zielonych testów, crash na starcie).
+Profil `test` używa H2 bez Flyway, `gamehive.search.enabled=false` (fallback zamiast Meili), `SyncTaskExecutor` zamiast puli `@Async` i MockMvc bez kontenera. **Zielony `mvn test` nie dowodzi więc niczego** o: migracjach `V*` (checksumy, DDL, `ON DELETE`, indeksy, DEFAULT-y — **od GH-154 stosowanie od zera, `validate`, `ON DELETE` i indeksy sprawdza job `integration` w CI**, a edycję zastosowanego `V*` blokuje `migrations-guard`; `dev` zostaje dla DEFAULT-ów, danych seedera i migracji na bazie z istniejącymi danymi), Meilisearch (beany `Meili*` nie powstają), wątku `search-index-*` i propagacji MDC, ERROR dispatch do `/error`. To już dwa razy kosztowało: zmodyfikowany zastosowany `V8` (dev zablokowany na 5 tygodni) i brakujący `okhttp-jvm` (670 zielonych testów, crash na starcie).
 
 ## Procedura
 
