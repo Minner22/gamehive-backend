@@ -1,0 +1,4 @@
+# core.autocrlf=true zamieniłby LF w mvnw na CRLF i runner Linux zgłosiłby "/usr/bin/env: 'sh\r'".
+mvnw     text eol=lf
+*.sh     text eol=lf
+*.cmd    text eol=crlf

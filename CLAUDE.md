@@ -4,18 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Build, test, run (Maven; **JDK 25** required):
+Build, test, run (Maven via the **Maven Wrapper**; **JDK 25** required):
 
 ```bash
-mvn clean install              # full build + tests
-mvn test                       # all tests
-mvn -Dtest=ClassName test                          # one test class
-mvn -Dtest=ClassName#methodName test               # one test method
-mvn spring-boot:run                                # run app (dev profile, default)
-mvn spring-boot:run -Dspring-boot.run.profiles=prod
-mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-    -Dsonar.projectKey=Minner22_gamehive-backend   # CI equivalent (SonarCloud)
+./mvnw clean install              # full build + tests
+./mvnw test                       # all tests
+./mvnw -Dtest=ClassName test                       # one test class
+./mvnw -Dtest=ClassName#methodName test            # one test method
+./mvnw spring-boot:run                             # run app (dev profile, default)
+./mvnw spring-boot:run -Dspring-boot.run.profiles=prod
+./mvnw -B verify                                   # what the CI `test` job runs
+./mvnw -B sonar:sonar                              # what the CI `sonar` job runs (needs SONAR_TOKEN + target/ from verify)
 ```
+
+**Maven Wrapper (GH-153)** pins **Maven 3.9.16** in `.mvn/wrapper/maven-wrapper.properties` (only-script mode — no `maven-wrapper.jar`, which `.gitignore` excludes anyway) together with `distributionSha256Sum`: a tampered or corrupted download fails instead of running. **Bumping Maven = new `distributionUrl` *and* a new SHA-256** (Maven Central publishes only `.sha512` — verify the zip with it, then compute the SHA-256 yourself). On Windows use `mvnw.cmd` from PowerShell/cmd and `./mvnw` from Git Bash. `.gitattributes` forces `mvnw`/`*.sh` to LF and `*.cmd` to CRLF — the repo runs with `core.autocrlf=true`, and a CRLF `mvnw` dies on the Linux runner with `/usr/bin/env: 'sh\r'`; `mvnw` also needs the executable bit in the index (`git update-index --chmod=+x mvnw` — Windows does not set it). **PowerShell splits unquoted `-Dkey=value` arguments at `.` and `,`** (`-Dmaven=3.9.16` arrives as `-Dmaven=3` + `.9.16`, `-Dtest=A,B` likewise) — quote them there (`"-Dtest=A,B"`); the commands above are Bash syntax. `sonar-maven-plugin` is pinned in `pluginManagement` and `sonar.projectKey` lives in `pom.xml`, so the short `sonar:sonar` prefix resolves to the pinned version and never runs inside `verify`.
 
 The `dev` profile uses `spring-boot-docker-compose` which **auto-starts/stops `docker-compose.yml`** (PostgreSQL + Redis + Meilisearch) on app boot. Requires `secret.properties` (gitignored, holds the JWT secrets, the mail credentials and `gamehive.search.api-key`) and `.env` with `REDIS_PASSWORD`/`POSTGRES_PASSWORD`/`MEILI_MASTER_KEY` next to `pom.xml` — **`MEILI_MASTER_KEY` and `gamehive.search.api-key` must hold the same value**, one feeds the container, the other the client. The `test` profile needs neither — it uses H2 + embedded Redis (port 16379), disables search (`gamehive.search.enabled: false`) and overrides every JWT secret inline in `application-test.yml`.
 
@@ -143,4 +145,11 @@ Module details were moved out of this file into skills (loaded on demand, not ev
 
 ## CI
 
-GitHub Actions (`.github/workflows/build.yml`) runs `mvn -B verify ... sonar:sonar` on every PR. **PRs are built against a merge commit (branch + master)**, so if master moved ahead, local-only `mvn test` may pass while CI fails — pull/rebase master before debugging green-local/red-CI failures. SonarCloud coverage excludes `dto`, `model`, `config`, `mapper`, `exception`, `logging` packages and `GameHiveApplication`.
+GitHub Actions workflow **`CI`** (`.github/workflows/ci.yml`, GH-153; replaced the single-job `build.yml`) runs on every PR, on pushes to `master` and on demand, with **two jobs**:
+
+- **`test`** — `./mvnw -B verify` (the future required check for the `master` ruleset, #157). Always uploads `target/surefire-reports/` as artifact **`surefire-reports`** (7 days) — after a red run, download it (`gh run download <run-id> -n surefire-reports`) instead of scrolling the log. On success it also uploads **`sonar-input`** (1 day): `target/classes`, `target/test-classes`, `target/site/jacoco/jacoco.xml`, `target/surefire-reports` of *that* commit.
+- **`sonar`** — `needs: test`; the only job with `fetch-depth: 0`; restores `sonar-input` into `target/` (default paths, so no `sonar.java.binaries`/`xmlReportPaths` settings) and runs `./mvnw -B sonar:sonar` without rebuilding or re-testing. **Skipped for Dependabot and fork PRs** (they get no `secrets.*`; the `secrets` context is not allowed in a job-level `if:`, hence the condition on actor and head repo) — skipped, not red. An expired or broken `SONAR_TOKEN` now reddens only `sonar` (`HTTP 403 … check … SONAR_TOKEN`), while `test` stays green (#152 used to redden everything).
+
+`permissions: contents: read`, `persist-credentials: false` on checkout (nothing pushes), `timeout-minutes` per job. `concurrency` cancels the previous run of the same PR on a new push, but **never cancels `master` runs** (every merge gets a full analysis). Maven deps cached by `setup-java` (`cache: maven`); the Sonar cache key depends on `pom.xml` (it used to be a constant that never refreshed). Actions are pinned by major (`checkout@v7`, `setup-java@v6`, `upload-artifact@v7`, `download-artifact@v8` — which fails on an artifact digest mismatch by default, `cache@v6`); SHA pinning is deferred to #155/#156. Verified 2026-11-24 on a throwaway draft PR: both jobs green (`test` 1:41 vs ~2:42 for the old single job), the old run cancelled by a second push, a deliberately red test → `test` failure + `sonar` skipped + `surefire-reports` with the failure, a bad token → `test` green + `sonar` red; coverage import unchanged versus `master`. The Dependabot/fork skip is still unverified live (no such PR yet — #155 will show it).
+
+ **PRs are built against a merge commit (branch + master)**, so if master moved ahead, local-only `mvn test` may pass while CI fails — pull/rebase master before debugging green-local/red-CI failures. SonarCloud coverage excludes `dto`, `model`, `config`, `mapper`, `exception`, `logging` packages and `GameHiveApplication`.

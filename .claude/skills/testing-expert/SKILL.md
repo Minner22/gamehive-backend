@@ -71,4 +71,4 @@ Gdy wymaganiem jest **jak** baza jest odpytywana (projekcja bez JOIN-a, jedno za
 Migracji Flyway i wszystkiego, co jest tylko w SQL (DEFAULT-y, indeksy, `ON DELETE` bez `@OnDelete`), Meilisearch, prawdziwej puli `@Async` i propagacji MDC, ERROR dispatch, zachowania specyficznego dla PostgreSQL (tryb zgodności H2 nie jest pełny: collation, `LIKE`, typy, plany zapytań).
 
 ## Uruchamianie
-`mvn -Dtest=Klasa test`, `mvn -Dtest=Klasa#metoda test`. Po każdej zmianie `data.sql` albo współdzielonej infrastruktury puść **pełny** `mvn test` — zależności są międzyklasowe.
+`./mvnw -Dtest=Klasa test`, `./mvnw -Dtest=Klasa#metoda test` (Maven Wrapper, GH-153; z PowerShella `mvnw.cmd` i argumenty `-D…` w cudzysłowach, bo PowerShell tnie je na `.` i `,`). Po każdej zmianie `data.sql` albo współdzielonej infrastruktury puść **pełny** `./mvnw test` — zależności są międzyklasowe. **Czerwony run CI**: raporty są w artefakcie `surefire-reports` joba `test` (`gh run download <run-id> -n surefire-reports`), nie trzeba przewijać logu.

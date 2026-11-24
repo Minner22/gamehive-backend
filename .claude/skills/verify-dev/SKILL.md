@@ -11,7 +11,7 @@ Profil `test` używa H2 bez Flyway, `gamehive.search.enabled=false` (fallback za
 ## Procedura
 
 1. **Preflight** (nie wypisuje sekretów): `bash .claude/skills/verify-dev/scripts/preflight.sh`. Sprawdza `.env`, `secret.properties`, równość `MEILI_MASTER_KEY` ↔ `gamehive.search.api-key`, Docker i port 8080. Niczego nie naprawiaj w tych plikach sam — zgłoś użytkownikowi, co brakuje.
-2. **Start**: `mvn spring-boot:run` z `run_in_background: true` (profil `dev` jest domyślny; `spring-boot-docker-compose` sam podnosi i zatrzymuje kontenery). Czekaj na linię `Started GameHiveApplication` w wyjściu albo w `logs/app.log` (Monitor z pętlą until, nie sleep).
+2. **Start**: `./mvnw spring-boot:run` z `run_in_background: true` (profil `dev` jest domyślny; `spring-boot-docker-compose` sam podnosi i zatrzymuje kontenery). Czekaj na linię `Started GameHiveApplication` w wyjściu albo w `logs/app.log` (Monitor z pętlą until, nie sleep).
 3. **Sprawdź log startu** pod kątem:
    - Flyway: `Successfully applied N migrations` / `Schema ... is up to date`; `FlywayValidateException: Migration checksum mismatch` = ktoś edytował zastosowany `V*` → **nie** proponuj `flyway repair`; jedyna naprawa na dev to `docker compose down -v` (kasuje wolumen — **zapytaj użytkownika przed wykonaniem**), a w kodzie: przywrócić stary plik i dodać nowy `V*`;
    - Meili: brak ERROR od `MeiliIndexInitializer` (ustawienia indeksów zastosowane);
