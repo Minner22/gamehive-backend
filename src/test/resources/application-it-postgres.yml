@@ -1,6 +1,3 @@
-# GH-154: nakładka na profil "test" dla testów na prawdziwym PostgreSQL (Testcontainers, tag "postgres").
-# Z "test" zostaje wszystko poza bazą: embedded Redis, SyncTaskExecutor, sekrety JWT, wyłączona wyszukiwarka.
-# Połączenie (url/user/hasło) daje @ServiceConnection kontenera — nie wpisuj go tutaj.
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver   # profil "test" ustawia H2 — nie polegamy na kolejności nadpisań
