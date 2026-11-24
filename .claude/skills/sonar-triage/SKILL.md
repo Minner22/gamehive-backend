@@ -5,7 +5,7 @@ description: Pobiera otwarte issues i stan quality gate projektu GameHive z Sona
 
 # Triage SonarCloud
 
-Projekt: `Minner22_gamehive-backend` (analiza w `.github/workflows/build.yml` na każdym PR i pushu do `master`). Precedens: GH-136 (sprzątanie długu).
+Projekt: `Minner22_gamehive-backend` (analiza w jobie `sonar` workflow `CI`, `.github/workflows/ci.yml` — na każdym PR i pushu do `master`, na artefakcie z joba `test`; pomijana dla Dependabota i forków, GH-153). Wygasły `SONAR_TOKEN` czerwieni tylko job `sonar` (`HTTP 403`), nie `test`. Precedens: GH-136 (sprzątanie długu).
 
 ## Pobranie danych
 API SonarCloud. **Projekt jest prywatny** — anonimowe zapytanie zwraca `{"errors":[{"msg":"Project doesn't exist"}]}` (sprawdzone 2026-11-21). Potrzebny token: poproś użytkownika o wygenerowanie go w SonarCloud (My Account → Security) i ustawienie zmiennej `SONAR_TOKEN` w środowisku, z którego startuje Claude Code. Do każdego `curl` dodaj `-u "$SONAR_TOKEN:"`. Jeśli zmiennej brak, zatrzymaj się i poproś o nią. **Nigdy nie proś o wklejenie tokena do czatu.**

@@ -435,8 +435,11 @@ Szczegółowa roadmapa fazy „Gry”: [`docs/roadmap-games.md`](docs/roadmap-ga
 
 ## CI
 
-GitHub Actions (`.github/workflows/build.yml`) uruchamia `mvn -B verify sonar:sonar`
-na każdym PR. **PR budowany jest na commicie scalającym (branch + master)** — jeśli
+GitHub Actions (`.github/workflows/ci.yml`, workflow `CI`) ma dwa joby: **`test`**
+(`./mvnw -B verify`, raporty testów jako artefakt `surefire-reports`) i **`sonar`**
+(analiza SonarCloud na artefakcie z `test`, pomijana dla PR-ów Dependabota i forków).
+Uruchamia się na każdym PR i pushu do `master`. Build lokalnie: `./mvnw -B verify`
+(Maven Wrapper przypina Mavena 3.9.16; na Windows `mvnw.cmd`). **PR budowany jest na commicie scalającym (branch + master)** — jeśli
 master się przesunął, lokalny `mvn test` może przejść mimo czerwonego CI; przed
 debugowaniem warto zrobić rebase/pull mastera. Pokrycie SonarCloud wyklucza pakiety
 `dto`, `model`, `config`, `mapper`, `exception`, `logging` oraz `GameHiveApplication`.
