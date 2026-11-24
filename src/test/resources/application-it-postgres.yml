@@ -1,0 +1,15 @@
+# GH-154: nakładka na profil "test" dla testów na prawdziwym PostgreSQL (Testcontainers, tag "postgres").
+# Z "test" zostaje wszystko poza bazą: embedded Redis, SyncTaskExecutor, sekrety JWT, wyłączona wyszukiwarka.
+# Połączenie (url/user/hasło) daje @ServiceConnection kontenera — nie wpisuj go tutaj.
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver   # profil "test" ustawia H2 — nie polegamy na kolejności nadpisań
+  flyway:
+    enabled: true                              # schemat WYŁĄCZNIE z migracji V*, od pustej bazy
+  jpa:
+    hibernate:
+      ddl-auto: validate                       # Hibernate porównuje każdą encję ze schematem z migracji
+    defer-datasource-initialization: false     # z Flyway "true" daje cykl zależności (i niczego tu nie potrzebujemy)
+  sql:
+    init:
+      mode: never                              # bez data.sql — sprawdzamy schemat, nie fixture'y
