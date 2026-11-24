@@ -2,6 +2,7 @@ package pl.m22.gamehive.auth.service;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -13,12 +14,14 @@ import pl.m22.gamehive.auth.dto.RegistrationDto;
 import pl.m22.gamehive.auth.event.ActivationEmailResendRequestedEvent;
 import pl.m22.gamehive.auth.event.PasswordResetRequestedEvent;
 import pl.m22.gamehive.auth.event.UserRegisteredEvent;
+import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.common.domain.Email;
 import pl.m22.gamehive.common.domain.HashedPassword;
 import pl.m22.gamehive.common.domain.Username;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.DomainException;
 import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.exception.InfrastructureException;
 import pl.m22.gamehive.common.logging.CorrelationIdFilter;
 import pl.m22.gamehive.user.event.UserAuditEvent;
 import pl.m22.gamehive.user.event.UserCredentialsChangedEvent;
@@ -31,6 +34,7 @@ import pl.m22.gamehive.user.repository.UserRoleRepository;
 
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService{
@@ -43,6 +47,7 @@ public class AuthServiceImpl implements AuthService{
     private final UserRoleRepository userRoleRepository;
     private final UserMapper userMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final JwtService jwtService;
 
     // Atrapa hasha do wyrównania czasu odpowiedzi dla nieistniejących kont (anty-timing).
     // Generowana tym samym encoderem => ten sam algorytm i koszt (bcrypt/10) co realne hasła.
@@ -89,6 +94,25 @@ public class AuthServiceImpl implements AuthService{
         if (!appUser.isEnabled()) {
             throw new ApplicationException(ErrorCode.USER_NOT_ACTIVATED,
                     "User not activated: " + appUser.getEmail().obfuscated());
+        }
+
+        return userMapper.toCredentialsDto(appUser);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public CredentialsDto loadRefreshCredentials(Email email) {
+
+        AppUser appUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.USER_NOT_FOUND));
+
+        if (!appUser.isEnabled()) {
+            try {
+                jwtService.revokeUsersTokens(email.value());
+            } catch (InfrastructureException e) {
+                log.error("Could not revoke refresh tokens of disabled account {}", email.obfuscated(), e);
+            }
+            throw new ApplicationException(ErrorCode.ACCOUNT_DISABLED);
         }
 
         return userMapper.toCredentialsDto(appUser);

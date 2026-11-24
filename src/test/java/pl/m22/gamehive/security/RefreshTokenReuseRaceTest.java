@@ -21,8 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.auth.jwt.service.RedisRefreshTokenStore;
+import pl.m22.gamehive.auth.service.AuthService;
 import pl.m22.gamehive.common.domain.Email;
-import pl.m22.gamehive.user.service.UserService;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -46,7 +46,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  *   <li><b>zaraz po {@code RedisRefreshTokenStore.rotate}</b> — okno, w którym siedział błąd: gdy następcę
  *       zapisywał osobny krok po konsumpcji, drugie żądanie (REUSED → revokeAll) nie widziało go w ZSET
  *       i złodziej zachowywał sesję. Ten wariant czerwienieje po rozdzieleniu konsumpcji i zapisu;</li>
- *   <li><b>w {@code UserService.findUserByEmail}</b>, przed rotacją — atakujący przegrywa wyścig i to jego
+ *   <li><b>w {@code AuthService.loadRefreshCredentials}</b> (loader danych właściciela), przed rotacją — atakujący przegrywa wyścig i to jego
  *       żądanie wykrywa reuse; sesja zwycięzcy też musi paść.</li>
  * </ul>
  * Niezmiennik: po obu żądaniach ŻADEN token wydany w tym wyścigu nie działa.
@@ -62,7 +62,7 @@ class RefreshTokenReuseRaceTest {
     @Autowired JwtService jwtService;
     @Autowired CacheManager cacheManager;
     @Autowired RedisTemplate<String, String> redisTemplate;
-    @MockitoSpyBean UserService userService;
+    @MockitoSpyBean AuthService authService;
     @MockitoSpyBean RedisRefreshTokenStore refreshTokenStore;
     @MockitoBean JavaMailSender mailSender;
 
@@ -98,7 +98,7 @@ class RefreshTokenReuseRaceTest {
         doAnswer(inv -> {
             park(attackerParked, release);
             return inv.callRealMethod();
-        }).when(userService).findUserByEmail(any(Email.class));
+        }).when(authService).loadRefreshCredentials(any(Email.class));
 
         assertNoSessionSurvives(attackerParked, release);
     }
