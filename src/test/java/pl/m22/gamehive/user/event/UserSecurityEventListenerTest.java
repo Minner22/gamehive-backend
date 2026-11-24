@@ -16,6 +16,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.concurrent.ConcurrentMapCache;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import pl.m22.gamehive.auth.event.RefreshTokenReuseDetectedEvent;
 import pl.m22.gamehive.auth.jwt.service.RedisRefreshTokenStore;
 import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.auth.jwt.service.UserAuthState;
@@ -196,6 +197,49 @@ class UserSecurityEventListenerTest {
         listener.onUserForceLoggedOut(new UserForceLoggedOutEvent(email));
 
         verify(sessionEpochStore, never()).invalidatePasswordResetNow(anyString());
+    }
+
+    // ---------- GH-146: ponowne użycie zrotowanego refresh tokena ----------
+
+    @Test
+    @DisplayName("GH-146: RefreshTokenReuseDetectedEvent -> pełna rewokacja jak force-logout (refreshe + epoka + podwójna eviction)")
+    void onRefreshTokenReuseDetected_revokesEverything() {
+        String email = "jane.smith@example.com";
+        when(cacheManager.getCache(CacheConfig.USER_AUTH_STATE)).thenReturn(cache);
+
+        listener.onRefreshTokenReuseDetected(new RefreshTokenReuseDetectedEvent(email));
+
+        verify(refreshTokenStore).revokeAllByUserEmail(email);
+        verify(sessionEpochStore).invalidateNow(email);
+        verify(sessionEpochStore, never()).invalidatePasswordResetNow(email);
+        verify(cache, times(2)).evict(email);
+    }
+
+    @Test
+    @DisplayName("GH-146: reuse -> stan z cache załadowany w trakcie rewokacji (bez epoki) nie przetrwa")
+    void staleAuthStateLoadedDuringReuseRevoke_isEvicted() {
+        String email = "jane.smith@example.com";
+        Cache realCache = new ConcurrentMapCache(CacheConfig.USER_AUTH_STATE);
+        when(cacheManager.getCache(CacheConfig.USER_AUTH_STATE)).thenReturn(realCache);
+        UserAuthState staleState = new UserAuthState(true, List.of(new SimpleGrantedAuthority("ROLE_USER")), null);
+        doAnswer(_ -> {
+            realCache.put(email, staleState);
+            return null;
+        }).when(refreshTokenStore).revokeAllByUserEmail(email);
+
+        listener.onRefreshTokenReuseDetected(new RefreshTokenReuseDetectedEvent(email));
+
+        assertThat(realCache.get(email)).isNull();
+    }
+
+    @Test
+    @DisplayName("GH-146: listener reuse to synchroniczny @EventListener — @TransactionalEventListener nie odpaliłby bez transakcji")
+    void onRefreshTokenReuseDetected_isPlainEventListener() throws Exception {
+        java.lang.reflect.Method m = UserSecurityEventListener.class
+                .getDeclaredMethod("onRefreshTokenReuseDetected", RefreshTokenReuseDetectedEvent.class);
+
+        assertThat(m.isAnnotationPresent(org.springframework.context.event.EventListener.class)).isTrue();
+        assertThat(m.isAnnotationPresent(org.springframework.transaction.event.TransactionalEventListener.class)).isFalse();
     }
 
     // ---------- security review GH-168: cache trzyma epokę sesji ----------

@@ -2,6 +2,7 @@ package pl.m22.gamehive.auth.jwt.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -9,9 +10,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.core.script.RedisScript;
+import pl.m22.gamehive.auth.jwt.RefreshTokenConsumeResult;
 import pl.m22.gamehive.auth.jwt.config.RefreshTokenProperties;
 import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
@@ -19,6 +23,7 @@ import pl.m22.gamehive.common.exception.ErrorCode;
 import java.time.Duration;
 import java.time.Instant;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doThrow;
@@ -60,20 +65,41 @@ class RedisRefreshTokenStoreFailureTest {
 
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("pl.m22.gamehive.support.RedisUnavailability#failures")
-    @DisplayName("existsByJti przy niedostępnym Redis -> REDIS_UNAVAILABLE (refresh nie przejdzie bez weryfikacji)")
-    void exists_redisUnavailable_throwsRedisUnavailable(RuntimeException failure) {
-        when(redisTemplate.hasKey(anyString())).thenThrow(failure);
+    @DisplayName("revokeAllByUserEmail przy niedostępnym Redis -> REDIS_UNAVAILABLE")
+    void revoke_redisUnavailable_throwsRedisUnavailable(RuntimeException failure) {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenThrow(failure);
 
-        assertRedisUnavailable(() -> store.existsByJti("jti-1"));
+        assertRedisUnavailable(() -> store.revokeAllByUserEmail(EMAIL));
     }
 
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("pl.m22.gamehive.support.RedisUnavailability#failures")
-    @DisplayName("revokeAllByUserEmail przy niedostępnym Redis -> REDIS_UNAVAILABLE")
-    void revoke_redisUnavailable_throwsRedisUnavailable(RuntimeException failure) {
-        when(zSetOps.range(anyString(), anyLong(), anyLong())).thenThrow(failure);
+    @DisplayName("GH-146: rotate przy niedostępnym Redis -> REDIS_UNAVAILABLE (bez rotacji nie ma nowego tokena)")
+    void rotate_redisUnavailable_throwsRedisUnavailable(RuntimeException failure) {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenThrow(failure);
 
-        assertRedisUnavailable(() -> store.revokeAllByUserEmail(EMAIL));
+        assertRedisUnavailable(this::rotate);
+    }
+
+    @Test
+    @DisplayName("GH-146: błąd skryptu (RedisSystemException) NIE jest maskowany jako REDIS_UNAVAILABLE")
+    void rotate_scriptError_propagates() {
+        RedisSystemException scriptError = new RedisSystemException("ERR Error running script", null);
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenThrow(scriptError);
+
+        assertThatThrownBy(this::rotate).isSameAs(scriptError);
+    }
+
+    @Test
+    @DisplayName("GH-146: skrypt zwrócił null (np. w pipeline/MULTI) -> UNKNOWN, nie NPE")
+    void rotate_nullResult_unknown() {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenReturn(null);
+
+        assertThat(rotate()).isEqualTo(RefreshTokenConsumeResult.UNKNOWN);
+    }
+
+    private RefreshTokenConsumeResult rotate() {
+        return store.rotate("jti-1", "jti-2", EMAIL, Instant.now().plusSeconds(600), Instant.now().plusSeconds(600));
     }
 
     private static void assertRedisUnavailable(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {

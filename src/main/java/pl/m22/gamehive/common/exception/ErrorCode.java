@@ -68,6 +68,7 @@ public enum ErrorCode {
     MECHANIC_NOT_FOUND(HttpStatus.NOT_FOUND, "Mechanic not found"),
     PUBLISHER_NOT_FOUND(HttpStatus.NOT_FOUND, "Publisher not found"),
     REFRESH_TOKEN_MISSING(HttpStatus.UNAUTHORIZED, "Refresh token is missing"),
+    REFRESH_TOKEN_REUSED(HttpStatus.UNAUTHORIZED, "Refresh token reuse detected - all sessions revoked"),
     REINDEX_ALREADY_RUNNING(HttpStatus.CONFLICT, "Search reindex is already running"),
     ROLE_NOT_FOUND(HttpStatus.NOT_FOUND, "Role not found"),
     TOKEN_REVOKED(HttpStatus.UNAUTHORIZED, "Token has been revoked"),

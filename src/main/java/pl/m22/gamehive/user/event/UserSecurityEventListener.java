@@ -4,9 +4,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import pl.m22.gamehive.auth.event.RefreshTokenReuseDetectedEvent;
 import pl.m22.gamehive.auth.jwt.service.RedisRefreshTokenStore;
 import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.common.exception.InfrastructureException;
@@ -62,6 +64,12 @@ public class UserSecurityEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void onUserForceLoggedOut(UserForceLoggedOutEvent event) {
+
+        revoke(event.email());
+    }
+
+    @EventListener
+    void onRefreshTokenReuseDetected(RefreshTokenReuseDetectedEvent event) {
 
         revoke(event.email());
     }

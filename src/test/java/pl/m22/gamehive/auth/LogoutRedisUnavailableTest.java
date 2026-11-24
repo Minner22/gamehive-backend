@@ -13,7 +13,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -31,7 +31,10 @@ import java.util.Objects;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -45,8 +48,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * a {@code DispatcherServlet.processHandlerException} robi {@code resetBuffer()}, nie {@code reset()} — nagłówki
  * przeżywają obsługę wyjątku. Ten test to pinuje (MockMvc przechodzi przez prawdziwy DispatcherServlet).
  *
- * <p>Awaria symulowana na szpiegu {@code RedisTemplate}: {@code opsForValue()} (blacklista) i {@code opsForZSet()}
- * (rewokacja) zwracają mocki rzucające {@link QueryTimeoutException}.
+ * <p>Awaria symulowana na szpiegu {@code RedisTemplate}: {@code opsForValue()} (blacklista) zwraca mock rzucający
+ * {@link QueryTimeoutException}, a rewokację (od GH-146 skrypt Lua) wyłącza rzucający {@code execute(script, ...)}.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -97,7 +100,7 @@ class LogoutRedisUnavailableTest {
     @DisplayName("Redis niedostępny -> 503 REDIS_UNAVAILABLE, ale Set-Cookie refreshToken=; Max-Age=0 jest w odpowiedzi błędu")
     void logout_redisDown_503WithClearedCookie() throws Exception {
         valueOpsDown();
-        zSetOpsDown();
+        revokeDown();
 
         MockHttpServletResponse response = logout()
                 .andExpect(status().isServiceUnavailable())
@@ -123,7 +126,7 @@ class LogoutRedisUnavailableTest {
     @Test
     @DisplayName("Pada tylko rewokacja -> 503, ale access token i tak na blackliście")
     void logout_revokeDown_blacklistStillApplied() throws Exception {
-        zSetOpsDown();
+        revokeDown();
 
         assertClearedCookie(logout()
                 .andExpect(status().isServiceUnavailable())
@@ -174,12 +177,10 @@ class LogoutRedisUnavailableTest {
         doReturn(failing).when(redisTemplate).opsForValue();
     }
 
-    @SuppressWarnings("unchecked")
-    private void zSetOpsDown() {
-        ZSetOperations<String, String> failing = Mockito.mock(ZSetOperations.class, _ -> {
-            throw new QueryTimeoutException("Redis command timed out");
-        });
-        doReturn(failing).when(redisTemplate).opsForZSet();
+    // rewokacja refreshy to od GH-146 jeden skrypt Lua (REVOKE_ALL) — awaria = rzucający execute(script, ...)
+    private void revokeDown() {
+        doThrow(new QueryTimeoutException("Redis command timed out"))
+                .when(redisTemplate).execute(any(RedisScript.class), anyList(), any(Object[].class));
     }
 
     private void resetSecurityState() {
