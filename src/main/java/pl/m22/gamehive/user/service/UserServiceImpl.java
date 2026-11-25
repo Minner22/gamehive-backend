@@ -209,8 +209,8 @@ public class UserServiceImpl implements UserService {
 
     private void guardLastAdmin(AppUser targetUser) {
 
-        if (hasAdminRole(targetUser) && userRepository.countByRoles_Name(ROLE_ADMIN) <= 1) {
-            throw new DomainException(ErrorCode.CANNOT_REMOVE_LAST_ADMIN);
+        if (isActiveAdmin(targetUser)) {
+            ensureAnotherActiveAdminRemains();
         }
     }
 
@@ -218,8 +218,8 @@ public class UserServiceImpl implements UserService {
 
         boolean wasAdmin = hasAdminRole(targetUser);
         boolean willBeAdmin = newRoleNames.contains(ROLE_ADMIN);
-        if (wasAdmin && !willBeAdmin && userRepository.countByRoles_Name(ROLE_ADMIN) <= 1) {
-            throw new DomainException(ErrorCode.CANNOT_REMOVE_LAST_ADMIN);
+        if (wasAdmin && !willBeAdmin && targetUser.isEnabled()) {
+            ensureAnotherActiveAdminRemains();
         }
     }
 
@@ -227,6 +227,11 @@ public class UserServiceImpl implements UserService {
 
         return user.getRoles().stream()
                 .anyMatch(role -> ROLE_ADMIN.equals(role.getName()));
+    }
+
+    private boolean isActiveAdmin(AppUser user) {
+
+        return hasAdminRole(user) && user.isEnabled();
     }
 
     private void publishAudit(AuditAction action, UUID targetId, String targetEmail, Email requester, String details) {
@@ -237,6 +242,15 @@ public class UserServiceImpl implements UserService {
     private String currentCorrelationId() {
 
         return MDC.get(CorrelationIdFilter.CORRELATION_ID);
+    }
+
+    private void ensureAnotherActiveAdminRemains() {
+
+        userRoleRepository.findByNameForUpdate(ROLE_ADMIN)
+                .orElseThrow(() -> new ApplicationException(ErrorCode.ROLE_NOT_FOUND));
+        if (userRepository.countByRoles_NameAndEnabledTrue(ROLE_ADMIN) <= 1) {
+            throw new DomainException(ErrorCode.CANNOT_REMOVE_LAST_ADMIN);
+        }
     }
 
     // Role to kontrolowany słownik (ROLE_*), bez znaków wymagających escapowania -> bezpieczny ręczny JSON.
