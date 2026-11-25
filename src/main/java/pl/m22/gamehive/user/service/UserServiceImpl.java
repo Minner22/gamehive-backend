@@ -71,6 +71,7 @@ public class UserServiceImpl implements UserService {
         return userRepository.findAll(pageable);
     }
 
+    @Transactional
     @Override
     public UserProfile updateCurrentUserProfile(Email email, UserProfileUpdateDto userProfileUpdateDto) {
 
