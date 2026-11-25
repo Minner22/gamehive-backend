@@ -33,5 +33,5 @@ public interface UserRepository extends JpaRepository<AppUser, UUID> {
 
     boolean existsByUsername(Username username);
 
-    long countByRoles_Name(String roleName);
+    long countByRoles_NameAndEnabledTrue(String roleName);
 }
