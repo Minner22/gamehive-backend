@@ -21,12 +21,12 @@ import pl.m22.gamehive.auth.jwt.JwtTokenType;
 import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.auth.jwt.service.RedisSessionEpochStore;
 import pl.m22.gamehive.auth.jwt.service.TokenBlacklistService;
+import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.user.repository.UserRepository;
 
 import java.util.Set;
 
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -470,7 +470,8 @@ class AuthControllerTest {
         confirmPasswordReset(olderLink, "olderPassword1")
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value("TOKEN_REVOKED"))
-                .andExpect(jsonPath("$.message").value(containsString("Password reset")));
+                // GH-149: w odpowiedzi tylko defaultMessage; "Password reset" w logu pilnuje ApiErrorStaticMessageTest
+                .andExpect(jsonPath("$.message").value(ErrorCode.TOKEN_REVOKED.getDefaultMessage()));
 
         confirmPasswordReset(newerLink, "newerPassword1")
                 .andExpect(status().isOk());
@@ -503,7 +504,7 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("Ponowne użycie tego samego linku resetu -> 401 JWT_BLACKLISTED z komunikatem o resecie hasła, nie aktywacji")
+    @DisplayName("Ponowne użycie tego samego linku resetu -> 401 JWT_BLACKLISTED (nie TOKEN_REVOKED)")
     void passwordReset_reusedLink_blacklistedWithResetMessage() throws Exception {
         String email = "ctrl_pwr_reuse@test.com";
         register("ctrl_pwr_reuse", email);
@@ -516,8 +517,8 @@ class AuthControllerTest {
         confirmPasswordReset(link, "secondPassword1")
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value("JWT_BLACKLISTED"))
-                .andExpect(jsonPath("$.message").value(containsString("Password reset")))
-                .andExpect(jsonPath("$.message").value(not(containsString("Activation"))));
+                // GH-149: w odpowiedzi tylko defaultMessage; "Password reset" w logu pilnuje ApiErrorStaticMessageTest
+                .andExpect(jsonPath("$.message").value(ErrorCode.JWT_BLACKLISTED.getDefaultMessage()));
     }
 
     @Test

@@ -1,15 +1,22 @@
 package pl.m22.gamehive.common.exception;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.MethodParameter;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.data.core.TypeInformation;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
+import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -24,6 +31,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,6 +40,69 @@ class GlobalExceptionHandlerTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
     private final MockHttpServletRequest request = new MockHttpServletRequest("PUT", "/api/v1/admin/taxonomy/publishers/1");
+
+    private final Logger handlerLogger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
+
+    @BeforeEach
+    void attachAppender() {
+        appender.start();
+        handlerLogger.addAppender(appender);
+    }
+
+    @AfterEach
+    void detachAppender() {
+        handlerLogger.detachAppender(appender);
+    }
+
+    // ---------- GH-149: ApiError.message zawsze = ErrorCode.defaultMessage, szczegół tylko w logu ----------
+
+    private static final String DETAIL = "Invalid credentials for: jo******@example.com (token type REFRESH)";
+
+    static Stream<Arguments> baseExceptions() {
+        Function<GlobalExceptionHandler, Function<BaseException, ResponseEntity<ApiError>>> domain =
+                h -> ex -> h.handleDomainException((DomainException) ex);
+        Function<GlobalExceptionHandler, Function<BaseException, ResponseEntity<ApiError>>> application =
+                h -> ex -> h.handleApplicationException((ApplicationException) ex);
+        Function<GlobalExceptionHandler, Function<BaseException, ResponseEntity<ApiError>>> infrastructure =
+                h -> ex -> h.handleInfrastructureException((InfrastructureException) ex);
+        return Stream.of(
+                Arguments.of(new DomainException(ErrorCode.USERNAME_ALREADY_EXISTS, DETAIL), domain, Level.INFO),
+                Arguments.of(new ApplicationException(ErrorCode.INVALID_CREDENTIALS, DETAIL), application, Level.WARN),
+                Arguments.of(new InfrastructureException(ErrorCode.JWT_SIGNING_ERROR, DETAIL), infrastructure, Level.ERROR));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("baseExceptions")
+    @DisplayName("GH-149: wyjątek ze szczegółem -> odpowiedź ma tylko defaultMessage, szczegół ląduje w logu na poziomie podtypu")
+    void baseException_respondsWithDefaultMessage_logsDetail(
+            BaseException ex,
+            Function<GlobalExceptionHandler, Function<BaseException, ResponseEntity<ApiError>>> invoke,
+            Level expectedLevel) {
+
+        ResponseEntity<ApiError> response = invoke.apply(handler).apply(ex);
+
+        ErrorCode code = ex.getErrorCode();
+        assertThat(response.getStatusCode()).isEqualTo(code.getHttpStatus());
+        assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
+        assertThat(response.getBody()).isEqualTo(new ApiError(code.name(), code.getDefaultMessage()));
+
+        assertThat(appender.list)
+                .singleElement()
+                .satisfies(e -> {
+                    assertThat(e.getLevel()).isEqualTo(expectedLevel);
+                    assertThat(e.getFormattedMessage()).contains(DETAIL).contains(code.name());
+                });
+    }
+
+    @Test
+    @DisplayName("GH-149: wyjątek bez szczegółu -> ta sama odpowiedź (defaultMessage)")
+    void baseExceptionWithoutDetail_respondsWithDefaultMessage() {
+        var response = handler.handleApplicationException(new ApplicationException(ErrorCode.JWT_EXPIRED));
+
+        assertThat(response.getBody())
+                .isEqualTo(new ApiError("JWT_EXPIRED", ErrorCode.JWT_EXPIRED.getDefaultMessage()));
+    }
 
     @Test
     @DisplayName("DataIntegrityViolationException -> 409 DATA_CONFLICT (wyścig find-or-create / FK RESTRICT)")

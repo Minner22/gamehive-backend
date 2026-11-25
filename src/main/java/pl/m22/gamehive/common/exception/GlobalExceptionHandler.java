@@ -80,7 +80,7 @@ public class GlobalExceptionHandler {
 
         log.info("Domain rule violation: {} ({})", ex.getMessage(), ex.getErrorCode());
 
-        return buildResponse(ex);
+        return error(ex.getErrorCode());
     }
 
     @ExceptionHandler(ApplicationException.class)
@@ -88,7 +88,7 @@ public class GlobalExceptionHandler {
 
         log.warn("Application flow error: {} ({})", ex.getMessage(), ex.getErrorCode());
 
-        return buildResponse(ex);
+        return error(ex.getErrorCode());
     }
 
     @ExceptionHandler(InfrastructureException.class)
@@ -96,7 +96,7 @@ public class GlobalExceptionHandler {
 
         log.error("Infrastructure failure: {} ({})", ex.getMessage(), ex.getErrorCode(), ex);
 
-        return buildResponse(ex);
+        return error(ex.getErrorCode());
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -193,11 +193,6 @@ public class GlobalExceptionHandler {
         log.warn("Required cookie missing: {}", ex.getCookieName());
 
         return error(ErrorCode.REFRESH_TOKEN_MISSING);
-    }
-
-    private ResponseEntity<ApiError> buildResponse(BaseException ex) {
-
-        return errorBuilder(ex.getErrorCode()).body(new ApiError(ex.getErrorCode().name(), ex.getMessage()));
     }
 
     private static ResponseEntity<ApiError> error(ErrorCode errorCode) {
