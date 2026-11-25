@@ -1,0 +1,40 @@
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 5
+    labels: ["type:chore", "area:ci"]
+    commit-message:
+      prefix: "deps"
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      spring-boot:
+        patterns: ["org.springframework.boot*"]
+      meilisearch:
+        patterns: ["com.meilisearch.sdk*", "com.squareup.okhttp3*"]
+      maven-plugins:
+        patterns: ["org.apache.maven.plugins*", "org.jacoco*", "org.sonarsource.scanner.maven*"]
+      test:
+        dependency-type: development
+      libraries:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 5
+    labels: ["type:chore", "area:ci"]
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
