@@ -4,8 +4,8 @@ import lombok.Getter;
 
 /**
  * Bazowy wyjątek aplikacji niosący {@link ErrorCode}. {@link GlobalExceptionHandler}
- * mapuje go na odpowiedź HTTP (status z {@code errorCode.getHttpStatus()}, ciało jako
- * {@code ApiError}).
+ * mapuje go na odpowiedź HTTP: status z {@code errorCode.getHttpStatus()}, ciało
+ * {@link ApiError} z {@code errorCode.name()} i <b>zawsze</b> {@code errorCode.getDefaultMessage()}.
  *
  * <p>Wybierz konkretny podtyp zgodnie z naturą błędu:
  * <ul>
@@ -14,7 +14,6 @@ import lombok.Getter;
  *   <li>{@link InfrastructureException} — awaria systemu zewnętrznego (loguje ERROR + stack)</li>
  * </ul>
  */
-
 @Getter
 public class BaseException extends RuntimeException {
     private  final ErrorCode errorCode;
