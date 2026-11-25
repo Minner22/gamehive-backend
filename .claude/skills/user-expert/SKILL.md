@@ -37,6 +37,7 @@ Jak pracować: odpowiadaj z kodu (`plik:linia`). Szczegóły audytu i GH-63 są 
 **Nowy moduł z danymi per-user** (jak `collection/`): UUID bez FK + listener na `UserDeletedEvent` (AFTER_COMMIT → osobny bean `REQUIRES_NEW`, bulk `@Modifying` delete). `UserDeletedEvent` niesie `userId`, bo po commicie wiersza już nie ma.
 
 ## Niezmienniki
+- **Każda mutacja w `UserServiceImpl` jest `@Transactional`** — od GH-150 także `updateCurrentUserProfile` (pinuje `user/service/UserProfileUpdateTransactionTest`: odczyt użytkownika biegnie w zapisowej transakcji serwisu). Nowe zdarzenie AFTER_COMMIT z tych metod dotrze bez dodatkowych zmian.
 - `force-logout` ma `@Transactional(readOnly = true)` **celowo**: bez transakcji AFTER_COMMIT by nie odpalił (pamięć `project_force_logout_design`).
 - Audyt: brak FK, wartości kopiowane; dokładnie jeden wpis na zatwierdzoną akcję; błąd zapisu audytu nie cofa akcji.
 - Wiersze `application_users` z `data.sql` mają stałe UUID (`support/SeededUsers`). Testy non-`@Transactional` nie kasują seedowanych użytkowników — tworzą własnych.
@@ -48,4 +49,4 @@ Jak pracować: odpowiadaj z kodu (`plik:linia`). Szczegóły audytu i GH-63 są 
 ## Obserwacje z analizy kodu (2026-11-21) — zgłoszone jako issues, nie naprawiaj samodzielnie
 1. **[#147] Wyścig na guardzie "ostatni admin"** — `guardLastAdmin` liczy adminów (`countByRoles_Name`) bez blokady. Dwóch ostatnich adminów usuwających/deaktywujących się **nawzajem** w tym samym momencie: obaj widzą licznik 2, obie operacje przechodzą, system zostaje bez admina. Guard własnego konta tego nie łapie, bo każdy działa na *innym* koncie. Mało prawdopodobne, ale nieodwracalne bez SQL.
 2. ~~[#144] Długi `X-Correlation-Id` gubi wpis audytu~~ — **rozwiązane w GH-144**: filtr podmienia niepoprawny nagłówek na UUID, więc insert do `correlation_id VARCHAR(64)` już nie pada. Lekcja zostaje aktualna: **każda** wartość kontrolowana przez klienta, która trafia do kolumny audytu, musi zmieścić się w kolumnie, zanim zostanie opublikowana. Błąd insertu w `REQUIRES_NEW` po AFTER_COMMIT jest tylko logowany, a wpis znika po cichu. Regresję pilnuje `common/logging/CorrelationIdAuditRegressionTest`.
-3. [#150] `updateCurrentUserProfile` nie ma `@Transactional` (opiera się na `save`). Dziś działa poprawnie, ale nie pasuje do reszty serwisu.
+3. ~~[#150] `updateCurrentUserProfile` nie ma `@Transactional`~~ — **rozwiązane w GH-150** (zob. niezmienniki).
