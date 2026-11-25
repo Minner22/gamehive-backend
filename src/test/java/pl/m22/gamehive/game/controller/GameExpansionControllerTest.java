@@ -1,6 +1,5 @@
 package pl.m22.gamehive.game.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +20,7 @@ import pl.m22.gamehive.common.persistence.ModerationStatus;
 import pl.m22.gamehive.game.model.GameExpansion;
 import pl.m22.gamehive.game.repository.GameExpansionRepository;
 import pl.m22.gamehive.support.SeededUsers;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.*;
 
@@ -41,7 +41,7 @@ class GameExpansionControllerTest {
     @Autowired RedisTemplate<String, String> redisTemplate;
     @MockitoBean JavaMailSender mailSender;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
     // Jane: dodatki 1 (APPROVED), 2 (PENDING), 3 (DRAFT), 4 (REJECTED count=1), 5 (REJECTED count=2 = limit testowy);
     // dodatek 6 należy do Johna. Gra bazowa wszystkich: 7 (Carcassonne, APPROVED, 2..2 graczy, 45 min, wiek 8)
@@ -72,7 +72,7 @@ class GameExpansionControllerTest {
     }
 
     private String json(Map<String, Object> body) throws Exception {
-        return objectMapper.writeValueAsString(body);
+        return jsonMapper.writeValueAsString(body);
     }
 
     // ---------- POST /api/v1/expansions: happy path ----------
