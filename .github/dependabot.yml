@@ -13,15 +13,14 @@ updates:
     ignore:
       - dependency-name: "org.springframework.boot:*"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "com.squareup.okhttp3:*"
     groups:
       spring-boot:
         patterns: ["org.springframework.boot*"]
       meilisearch:
-        patterns: ["com.meilisearch.sdk*", "com.squareup.okhttp3*"]
+        patterns: ["com.meilisearch.sdk*"]
       maven-plugins:
         patterns: ["org.apache.maven.plugins*", "org.jacoco*", "org.sonarsource.scanner.maven*"]
-      test:
-        dependency-type: development
       libraries:
         patterns: ["*"]
 
