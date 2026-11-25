@@ -137,4 +137,4 @@ jobs:
       - name: Analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: echo "GH-157 TEST: celowo czerwony sonar" && exit 1
+        run: 'echo "GH-157 TEST - celowo czerwony sonar"; exit 1'
