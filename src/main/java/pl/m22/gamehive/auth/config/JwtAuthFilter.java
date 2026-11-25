@@ -20,6 +20,7 @@ import pl.m22.gamehive.auth.jwt.service.UserAuthStateProvider;
 import pl.m22.gamehive.common.exception.ApiError;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.logging.LoggingUtils;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -64,7 +65,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 UserAuthState authState = userAuthStateProvider.getAuthState(email);
 
                 if (!authState.enabled()) {
-                    log.debug("User [{}] is disabled, rejecting access token for request [{}]", email, request.getRequestURI());
+                    log.debug("User [{}] is disabled, rejecting access token for request [{}]", LoggingUtils.obfuscateEmail(email), request.getRequestURI());
 
                     writeUnauthorized(response, ErrorCode.ACCOUNT_DISABLED);
 
@@ -77,7 +78,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 // iat jest w sekundach (ucięte), invalidAfter w ms — token wydany przed unieważnieniem ma
                 // zawsze mniejszy iat. Porównanie ostre (<): token z tej samej sekundy też odrzucamy.
                 if (invalidAfter != null && issuedAt != null && issuedAt.toEpochMilli() < invalidAfter) {
-                    log.debug("User [{}] token has been revoked, rejecting access for request [{}]", email, request.getRequestURI());
+                    log.debug("User [{}] token has been revoked, rejecting access for request [{}]", LoggingUtils.obfuscateEmail(email), request.getRequestURI());
 
                     writeUnauthorized(response, ErrorCode.TOKEN_REVOKED);
 
