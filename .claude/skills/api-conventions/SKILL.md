@@ -32,7 +32,8 @@ Uzasadnienia: sekcje "Error handling" i "API documentation (OpenAPI/Swagger)" w 
   - **Application** → `ApplicationException` (WARN): lookup miss, ważność tokena, precondition use-case'u (`*_NOT_FOUND`, `REINDEX_ALREADY_RUNNING`);
   - **Infrastructure** → `InfrastructureException` (ERROR + stack): zawsze opakowuje złapany wyjątek zewnętrzny;
   - **Handler-only** → nigdy nie rzucane, tylko `GlobalExceptionHandler`.
-- [ ] Wpis alfabetycznie w swojej sekcji, z `HttpStatus` i **statycznym** komunikatem po angielsku — bez interpolacji (komunikat trafia do `ApiError`; zmienne idą do `log`).
+- [ ] Wpis alfabetycznie w swojej sekcji, z `HttpStatus` i sensownym `defaultMessage` po angielsku — **to jedyny tekst, jaki zobaczy klient**: od GH-149 `ApiError.message` = `ErrorCode.defaultMessage` zawsze, niezależnie od komunikatu wyjątku.
+- [ ] Komunikat w `throw new …Exception(CODE, "…")` to **szczegół do logu** (nigdy nie trafia do odpowiedzi) — wolno w nim podać kontekst (id, typ tokena, komunikat biblioteki), ale e-maile tylko zamaskowane (`Email.obfuscated()` / `LoggingUtils.obfuscateEmail`). Tekst dla użytkownika robi front, mapując `errorCode` (gamehive-frontend#81). Nie buduj `ApiError` z `ex.getMessage()` w nowym handlerze — tylko `error(ErrorCode)`.
 - [ ] Najpierw sprawdź, czy istniejący kod pasuje (reuse `GAME_NOT_APPROVED` w #121), ale **nie** pożyczaj kodu, który kłamie o typie zasobu (dodatki mają własne `EXPANSION_*`).
 - [ ] Odczyt cudzego niepublicznego zasobu = ten sam `*_NOT_FOUND` co brak (enumeration-safe). Świadomy wyciek istnienia id opisz w dokumentacji jako "known, accepted asymmetry".
 - [ ] Walidacja wejścia przed lookupem (wzór `REJECTION_REASON_REQUIRED`) — o ile nie łamie enumeration-safety po stronie użytkownika.
