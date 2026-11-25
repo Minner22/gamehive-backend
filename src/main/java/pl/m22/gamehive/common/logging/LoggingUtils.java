@@ -7,6 +7,10 @@ public class LoggingUtils {
     }
 
     public static String obfuscateEmail(String email) {
-        return email.replaceAll("(?<=.{2}).(?=.*@)", "*");
+
+
+        return email == null
+                ? "<empty>"
+                : email.replaceAll("(?<=.{2}).(?=.*@)", "*");
     }
 }

@@ -72,7 +72,7 @@ public class RedisRefreshTokenStore {
 
             evictOldestIfExceeded(email);
         } catch (RedisConnectionFailureException | QueryTimeoutException e) {
-            log.error("Redis unavailable while saving refresh token for user: {}", email, e);
+            log.error("Redis unavailable while saving refresh token for user: {}", LoggingUtils.obfuscateEmail(email), e);
             throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot save refresh token - Redis unavailable");
         }
     }
@@ -81,7 +81,7 @@ public class RedisRefreshTokenStore {
         try {
             redisTemplate.execute(REVOKE_ALL, List.of(USER_TOKENS_PREFIX + email), REFRESH_TOKEN_PREFIX);
         } catch (RedisConnectionFailureException | QueryTimeoutException e) {
-            log.error("Redis unavailable while revoking tokens for user: {}", email, e);
+            log.error("Redis unavailable while revoking tokens for user: {}", LoggingUtils.obfuscateEmail(email), e);
             throw new InfrastructureException(ErrorCode.REDIS_UNAVAILABLE, "Cannot revoke tokens - Redis unavailable");
         }
     }

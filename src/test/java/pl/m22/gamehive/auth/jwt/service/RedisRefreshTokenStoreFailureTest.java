@@ -1,5 +1,9 @@
 package pl.m22.gamehive.auth.jwt.service;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,6 +14,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -19,6 +26,7 @@ import pl.m22.gamehive.auth.jwt.RefreshTokenConsumeResult;
 import pl.m22.gamehive.auth.jwt.config.RefreshTokenProperties;
 import pl.m22.gamehive.common.exception.BaseException;
 import pl.m22.gamehive.common.exception.ErrorCode;
+import pl.m22.gamehive.common.logging.LoggingUtils;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -96,6 +104,55 @@ class RedisRefreshTokenStoreFailureTest {
         when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenReturn(null);
 
         assertThat(rotate()).isEqualTo(RefreshTokenConsumeResult.UNKNOWN);
+    }
+
+    // ---------- GH-150: log ERROR przy awarii Redis nie zawiera pełnego e-maila ----------
+
+    @Test
+    @DisplayName("GH-150: saveRefreshToken przy awarii Redis -> log ERROR z ZAMASKOWANYM e-mailem")
+    void save_redisUnavailable_logsObfuscatedEmail() {
+        doThrow(new RedisConnectionFailureException("down")).when(valueOps).set(anyString(), anyString(), any(Duration.class));
+
+        assertLogMasksEmail(() -> store.saveRefreshToken("jti-1", EMAIL, Instant.now().plusSeconds(600)),
+                "saving refresh token");
+    }
+
+    @Test
+    @DisplayName("GH-150: revokeAllByUserEmail przy awarii Redis -> log ERROR z ZAMASKOWANYM e-mailem")
+    void revoke_redisUnavailable_logsObfuscatedEmail() {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class)))
+                .thenThrow(new QueryTimeoutException("timeout"));
+
+        assertLogMasksEmail(() -> store.revokeAllByUserEmail(EMAIL), "revoking tokens");
+    }
+
+    @Test
+    @DisplayName("GH-150: rotate przy awarii Redis -> log ERROR z ZAMASKOWANYM e-mailem")
+    void rotate_redisUnavailable_logsObfuscatedEmail() {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class)))
+                .thenThrow(new RedisConnectionFailureException("down"));
+
+        assertLogMasksEmail(this::rotate, "consuming refresh token");
+    }
+
+    private static void assertLogMasksEmail(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, String messageFragment) {
+        Logger storeLogger = (Logger) LoggerFactory.getLogger(RedisRefreshTokenStore.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        storeLogger.addAppender(appender);
+        try {
+            assertRedisUnavailable(call);
+        } finally {
+            storeLogger.detachAppender(appender);
+        }
+
+        assertThat(appender.list)
+                .filteredOn(e -> e.getLevel() == Level.ERROR)
+                .singleElement()
+                .satisfies(e -> assertThat(e.getFormattedMessage())
+                        .contains(messageFragment)
+                        .contains(LoggingUtils.obfuscateEmail(EMAIL))
+                        .doesNotContain(EMAIL));
     }
 
     private RefreshTokenConsumeResult rotate() {

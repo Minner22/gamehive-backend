@@ -29,6 +29,7 @@ import pl.m22.gamehive.auth.jwt.service.UserAuthStateProvider;
 import pl.m22.gamehive.common.exception.ApplicationException;
 import pl.m22.gamehive.common.exception.ErrorCode;
 import pl.m22.gamehive.common.exception.InfrastructureException;
+import pl.m22.gamehive.common.logging.LoggingUtils;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
@@ -154,11 +155,51 @@ class JwtAuthFilterExceptionLoggingTest {
         assertThat(eventsAt(Level.ERROR)).isEmpty();
     }
 
-    private void runFilter() throws Exception {
+    // ---------- GH-150: żaden log filtra nie zawiera pełnego e-maila ----------
+
+    @Test
+    @DisplayName("GH-150: konto zablokowane -> 401 ACCOUNT_DISABLED, log DEBUG z ZAMASKOWANYM e-mailem")
+    void disabledAccount_logsObfuscatedEmail() throws Exception {
+        when(userAuthStateProvider.getAuthState(EMAIL)).thenReturn(new UserAuthState(false, List.of(), null));
+
+        MockHttpServletResponse response = runFilter();
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(response.getContentAsString()).contains("ACCOUNT_DISABLED");
+        assertDebugLogMasksEmail("is disabled");
+    }
+
+    @Test
+    @DisplayName("GH-150: token sprzed epoki sesji -> 401 TOKEN_REVOKED, log DEBUG z ZAMASKOWANYM e-mailem")
+    void revokedToken_logsObfuscatedEmail() throws Exception {
+        Instant issuedAt = Instant.now().minusSeconds(60);
+        when(jwtService.extractIssuedAtFromToken(TOKEN)).thenReturn(issuedAt);
+        when(userAuthStateProvider.getAuthState(EMAIL)).thenReturn(
+                new UserAuthState(true, List.of(new SimpleGrantedAuthority("ROLE_USER")), Instant.now().toEpochMilli()));
+
+        MockHttpServletResponse response = runFilter();
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(response.getContentAsString()).contains("TOKEN_REVOKED");
+        assertDebugLogMasksEmail("has been revoked");
+    }
+
+    private void assertDebugLogMasksEmail(String messageFragment) {
+        assertThat(eventsAt(Level.DEBUG))
+                .filteredOn(e -> e.getFormattedMessage().contains(messageFragment))
+                .singleElement()
+                .satisfies(e -> assertThat(e.getFormattedMessage())
+                        .contains(LoggingUtils.obfuscateEmail(EMAIL))
+                        .doesNotContain(EMAIL));
+    }
+
+    private MockHttpServletResponse runFilter() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", URI);
         request.setServletPath(URI);
         request.addHeader("Authorization", "Bearer " + TOKEN);
-        filter.doFilter(request, new MockHttpServletResponse(), chain);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(request, response, chain);
+        return response;
     }
 
     private void assertNotAuthenticatedButChainContinued() {
