@@ -1,6 +1,5 @@
 package pl.m22.gamehive.game.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +22,7 @@ import pl.m22.gamehive.common.persistence.ModerationStatus;
 import pl.m22.gamehive.game.model.Game;
 import pl.m22.gamehive.game.repository.GameRepository;
 import pl.m22.gamehive.support.SeededUsers;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.*;
 
@@ -45,7 +45,7 @@ class GameControllerTest {
 
     // lokalna instancja — w Spring Boot 4 bean ObjectMapper wymaga osobnego modułu autokonfiguracji,
     // a do serializacji map w testach w zupełności wystarcza goły mapper
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
     // Jane: gry 1 (APPROVED), 2 (PENDING), 4 (DRAFT), 5 (REJECTED, count=1), 6 (REJECTED, count=2 = limit testowy);
     // gra 3 należy do Johna — „cudze zgłoszenie" z perspektywy Jane
@@ -80,7 +80,7 @@ class GameControllerTest {
     }
 
     private String json(Map<String, Object> body) throws Exception {
-        return objectMapper.writeValueAsString(body);
+        return jsonMapper.writeValueAsString(body);
     }
 
     // ---------- POST /api/v1/games: happy path ----------

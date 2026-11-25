@@ -1,6 +1,5 @@
 package pl.m22.gamehive.game.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +22,7 @@ import pl.m22.gamehive.auth.jwt.service.JwtService;
 import pl.m22.gamehive.game.repository.GameExpansionRepository;
 import pl.m22.gamehive.game.repository.GameRepository;
 import pl.m22.gamehive.support.SeededUsers;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.*;
 
@@ -44,7 +44,7 @@ class GameExpansionModerationControllerTest {
     @Autowired RedisTemplate<String, String> redisTemplate;
     @MockitoBean JavaMailSender mailSender;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
     private String moderatorToken;   // mark.moderator — ROLE_MODERATOR
     private String adminToken;       // john.doe — ROLE_ADMIN
@@ -75,7 +75,7 @@ class GameExpansionModerationControllerTest {
     }
 
     private String json(Map<String, Object> body) throws Exception {
-        return objectMapper.writeValueAsString(body);
+        return jsonMapper.writeValueAsString(body);
     }
 
     // ---------- GET /moderation/expansions : kolejka + autoryzacja ----------
