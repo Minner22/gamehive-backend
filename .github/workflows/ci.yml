@@ -69,7 +69,7 @@ jobs:
           distribution: zulu
           cache: maven
 
-      - name: Flyway migrations on PostgreSQL (Testcontainers)
+      - name: "Integration tests: PostgreSQL + Meilisearch (Testcontainers)"
         run: ./mvnw -B -Pintegration test
 
       - name: Upload test reports
