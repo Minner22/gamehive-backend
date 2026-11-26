@@ -37,6 +37,8 @@ Nowy skill: katalog `.claude/skills/<nazwa>/SKILL.md`, frontmatter `name` + `des
 | Obserwacja z analizy, która została naprawiona | usuń ją z sekcji "Obserwacje" skilla eksperta i opisz rozwiązanie w odpowiednim miejscu |
 | Zmiana niezmienników `data.sql` | tabela w `.claude/skills/fixture-guard/SKILL.md` **oraz** notatka w skillu modułu |
 | Nowa konwencja API/błędów | CLAUDE.md (uzasadnienie) + punkt w `.claude/skills/api-conventions/SKILL.md` |
+| Nowa funkcja widoczna dla użytkownika, zmiana uruchamiania/konfiguracji, nowa wersja | **`README.md` (EN) i `README.pl.md` (PL) razem** — dwa pliki o tej samej treści i kolejności sekcji (GH-200, wzór: AudioFix); README jest dla czytelnika repo, więc pisz z perspektywy użytkownika, bez nazw klas. Wydana wersja → ✅ w „Roadmap”/„Roadmapa” oraz tabela w `RELEASING.md` |
+| Nowy / zmieniony / usunięty endpoint | wiersz w `API.md` (pełna lista, po polsku; w katalogu głównym, bo `docs/` jest w `.gitignore` — to prywatne notatki) — README ma tylko tabelę prefiksów |
 | Nowy moduł top-level | wpis w "Module layout" w CLAUDE.md + nowy skill wiedzy w tym samym formacie (frontmatter `description` z nazwą pakietu i ścieżkami endpointów, żeby skill się ładował) |
 
 Gdy szczegół modułu staje się regułą przekrojową, dopisz jedną linię do streszczenia modułu w CLAUDE.md. **CLAUDE.md ma pozostać mały** (ok. 30 KB po wydzieleniu skilli) — nie wklejaj tam znowu szczegółów modułów.
