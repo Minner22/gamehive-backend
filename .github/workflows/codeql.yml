@@ -24,16 +24,13 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      # wysyłka wyników do Security → Code scanning — jedyne miejsce z tym uprawnieniem
       security-events: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          # manual: kompilacja wrapperem na JDK 25, żeby ekstraktor widział kod z Lomboka i MapStructa
           - language: java-kotlin
             build-mode: manual
-          # workflowy GitHub Actions (wstrzyknięcia w run:, zbyt szerokie permissions)
           - language: actions
             build-mode: none
     steps:

@@ -99,6 +99,21 @@ jobs:
           git diff --name-status "origin/${BASE_REF}...HEAD" -- src/main/resources/db/migration \
             | awk '$1 != "A" { bad=1; print "::error file=" $NF "::Zmieniona istniejąca migracja (" $1 "): " $NF " - dodaj nowy plik V* zamiast edytować zastosowany" } END { exit bad }'
 
+  dependency-review:
+    name: dependency-review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Block dependencies with known high/critical vulnerabilities
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+
   sonar:
     name: sonar
     needs: test
