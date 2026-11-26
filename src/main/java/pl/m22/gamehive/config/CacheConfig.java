@@ -25,7 +25,8 @@ public class CacheConfig {
         // poziomym TTL ogranicza staleness do <=60s albo trzeba cache w Redis / pub-sub eviction.
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofSeconds(60))
-                .maximumSize(10_000));
+                .maximumSize(10_000)
+                .recordStats());
 
         return cacheManager;
     }

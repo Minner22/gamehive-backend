@@ -1,4 +1,6 @@
 spring:
+    main:
+        banner-mode: off
     datasource:
         url: ${DB_URL}
         username: ${DB_USER}

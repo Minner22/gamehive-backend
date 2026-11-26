@@ -281,6 +281,13 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+					<image>
+						<name>ghcr.io/minner22/gamehive-backend:${project.version}</name>
+						<env>
+							<BP_JVM_VERSION>25</BP_JVM_VERSION>
+							<BP_OCI_SOURCE>https://github.com/Minner22/gamehive-backend</BP_OCI_SOURCE>
+						</env>
+					</image>
 				</configuration>
 			</plugin>
 			<plugin>
