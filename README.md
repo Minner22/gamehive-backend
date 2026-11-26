@@ -14,23 +14,24 @@ Modularny monolit oparty o **Spring Boot 4** i **Java 25**.
 | Obszar            | Technologia |
 |-------------------|-------------|
 | Język / runtime   | Java 25 (wątki wirtualne włączone: `spring.threads.virtual.enabled`) |
-| Framework         | Spring Boot 4.0.5 (Web, Security, Data JPA, Cache, Validation, Mail, AOP) |
+| Framework         | Spring Boot 4.2.0 (Web, Security, Data JPA, Cache, Validation, Mail, AOP, Actuator) |
 | Baza danych       | PostgreSQL 16 (prod/dev) · H2 w trybie zgodności PostgreSQL (testy) |
-| Migracje          | Flyway (`spring-boot-starter-flyway`), obecnie `V1`–`V12` |
+| Migracje          | Flyway 12 (`spring-boot-starter-flyway`), obecnie `V1`–`V12` |
 | Cache / sesje     | Redis (refresh tokeny, blacklista, session epoch, blokada reindeksu) + Caffeine (cache in-memory) |
-| Wyszukiwarka      | Meilisearch v1.53 (`meilisearch-java` 0.21.0) — dwa indeksy: treści i podpowiedzi słowników |
+| Wyszukiwarka      | Meilisearch v1.53 (`meilisearch-java` 0.22.1) — dwa indeksy: treści i podpowiedzi słowników |
 | JWT               | Nimbus JOSE + JWT (HS256) |
 | Mapowanie DTO     | MapStruct (+ Lombok) |
 | Dokumentacja API  | springdoc-openapi (Swagger UI) |
 | Logowanie         | Logback + JSON encoder, correlation-id (MDC) |
-| Build / testy     | Maven, JaCoCo, SonarCloud |
+| Build / testy     | Maven Wrapper, JaCoCo, Testcontainers, SonarCloud |
+| Obraz             | Cloud Native Buildpacks (Paketo) → GHCR |
 
 ---
 
 ## Wymagania
 
 - **JDK 25**
-- **Maven**
+- Maven — niepotrzebny osobno, repo ma **Maven Wrapper** (`./mvnw`, na Windows `mvnw.cmd`)
 - **Docker** + Docker Compose (profil `dev` automatycznie startuje PostgreSQL, Redis i Meilisearch)
 
 ---
@@ -44,41 +45,37 @@ aplikacji.
 
 ### 1. Pliki konfiguracyjne (gitignored)
 
-W katalogu obok `pom.xml` utwórz dwa pliki:
-
-**`.env`** — zmienne dla `docker-compose.yml`:
+W katalogu obok `pom.xml` utwórz **jeden** plik `.env` — czyta go zarówno `docker-compose.yml`
+(kontenery usług), jak i aplikacja (`spring.config.import: optional:file:./.env[.properties]`):
 
 ```properties
+# Usługi z docker-compose.yml
 REDIS_PASSWORD=<haslo_redis>
 POSTGRES_PASSWORD=<haslo_postgres>
 POSTGRES_USER=gamehive
 MEILI_MASTER_KEY=<klucz_meili>
-```
 
-**`secret.properties`** — sekrety aplikacji (importowane przez `application.yml`):
-
-```properties
 # Sekrety JWT (HS256) — osobny sekret na każdy typ tokenu
-jwt.activation.secret=<sekret>
-jwt.refresh.secret=<sekret>
-jwt.access.secret=<sekret>
-jwt.passwordreset.secret=<sekret>
+JWT_ACTIVATION_SECRET=<sekret>
+JWT_REFRESH_SECRET=<sekret>
+JWT_ACCESS_SECRET=<sekret>
+JWT_PASSWORDRESET_SECRET=<sekret>
 
 # Konto SMTP (np. Gmail z hasłem aplikacyjnym) do wysyłki maili
-spring.mail.username=<email>
-spring.mail.password=<haslo_aplikacyjne>
-
-# Te same wartości co w .env (używane przez aplikację do połączenia)
-REDIS_PASSWORD=<haslo_redis>
-POSTGRES_PASSWORD=<haslo_postgres>
-gamehive.search.api-key=<klucz_meili>
+MAIL_USERNAME=<email>
+MAIL_PASSWORD=<haslo_aplikacyjne>
 ```
 
-> **`MEILI_MASTER_KEY` (`.env`) i `gamehive.search.api-key` (`secret.properties`) muszą mieć
-> tę samą wartość** — pierwsza konfiguruje kontener, druga klienta. Zmienna jest wymagana:
-> `docker-compose.yml` używa formy `${MEILI_MASTER_KEY:?...}`, więc przy pustej wartości
+> **Wartości bez cudzysłowów.** Compose zdejmuje cudzysłowy, parser properties (Spring) nie —
+> `KEY="abc"` dałby w obu miejscach różne wartości.
+
+> `MEILI_MASTER_KEY` konfiguruje jednocześnie kontener Meili i klienta w aplikacji. Zmienna jest
+> wymagana: `docker-compose.yml` używa formy `${MEILI_MASTER_KEY:?...}`, więc przy pustej wartości
 > kontener **nie wystartuje** — zamiast po cichu wystawić nieuwierzytelnioną wyszukiwarkę
 > (pod `MEILI_ENV=development` Meili klucza nie wymaga).
+
+> Do GH-159 sekrety aplikacji leżały w `secret.properties` — ten plik nie jest już czytany;
+> przenieś jego wartości do `.env` pod nazwami jak wyżej i usuń go.
 
 > Sekrety JWT najlepiej wygenerować jako losowe ciągi hex (sekret tokenu
 > `access` jest dłuższy — patrz przykład w repozytorium).
@@ -86,7 +83,7 @@ gamehive.search.api-key=<klucz_meili>
 ### 2. Uruchomienie
 
 ```bash
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
 
 - API: `http://localhost:8080`
@@ -111,22 +108,23 @@ nadaje ją admin przez `PUT /api/v1/admin/users/{id}/roles`.
 ## Build i testy
 
 ```bash
-mvn clean install                         # pełny build + testy
-mvn test                                  # wszystkie testy
-mvn -Dtest=ClassName test                 # jedna klasa testowa
-mvn -Dtest=ClassName#methodName test      # jedna metoda testowa
-mvn spring-boot:run                       # uruchom (profil dev)
-mvn spring-boot:run -Dspring-boot.run.profiles=prod
+./mvnw clean install                      # pełny build + testy
+./mvnw test                               # wszystkie testy (bez Dockera)
+./mvnw -Dtest=ClassName test              # jedna klasa testowa
+./mvnw -Dtest=ClassName#methodName test   # jedna metoda testowa
+./mvnw -Pintegration test                 # testy na PostgreSQL i Meilisearch w Testcontainers (wymaga Dockera)
+./mvnw spring-boot:run                    # uruchom (profil dev)
+./mvnw spring-boot:build-image -DskipTests   # obraz Docker (patrz niżej)
 ```
 
-Profil `test` nie wymaga `secret.properties` ani `.env` — używa **H2** oraz
+Profil `test` nie wymaga `.env` — używa **H2** oraz
 **wbudowanego Redisa** (port 16379), a wszystkie sekrety JWT są nadpisane
 w `application-test.yml`. Meilisearch nie ma wersji embedded, więc testy biegają
 na `gamehive.search.enabled=false` (fallback bez indeksu).
 
-> **Zielony `mvn test` nie weryfikuje migracji ani Meilisearch.** Na profilu `test` Flyway
+> **Zielony `./mvnw test` nie weryfikuje migracji ani Meilisearch.** Na profilu `test` Flyway
 > jest wyłączony (schemat generuje Hibernate), a implementacje Meili nie są w ogóle tworzone.
-> Sprawdzenie jednego i drugiego wymaga jednokrotnego uruchomienia profilu `dev`.
+> Jedno i drugie sprawdza `./mvnw -Pintegration test` (job `integration` w CI).
 
 ---
 
@@ -140,13 +138,45 @@ na `gamehive.search.enabled=false` (fallback bez indeksu).
 
 W profilu `prod` konfiguracja pochodzi w całości ze zmiennych środowiskowych:
 `DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`,
-`MEILI_HOST`, `MEILI_MASTER_KEY`, `ACTIVATION_ADDRESS`, `PASSWORD_RESET_ADDRESS`
-oraz sekrety JWT i poświadczenia SMTP.
+`MEILI_HOST`, `MEILI_MASTER_KEY`, `ACTIVATION_ADDRESS`, `PASSWORD_RESET_ADDRESS`,
+`JWT_ACTIVATION_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_SECRET`, `JWT_PASSWORDRESET_SECRET`,
+`MAIL_USERNAME`, `MAIL_PASSWORD`. Brak którejkolwiek zatrzymuje start aplikacji z czytelnym
+błędem. Logi idą na stdout jako JSON (jedna linia = jedno zdarzenie).
 
 `ACTIVATION_ADDRESS` i `PASSWORD_RESET_ADDRESS` to **adresy stron frontu** (np.
 `https://gamehive.example/activate`, `https://gamehive.example/password-reset/confirm`),
 na które prowadzą linki w mailach — backend dokleja do nich `?token=<JWT>`. Strona frontu
 odczytuje parametr `token` i sama woła odpowiedni endpoint API.
+
+---
+
+## Obraz Docker
+
+Każdy merge do `master` publikuje obraz w GitHub Container Registry (job `image` w CI):
+`ghcr.io/minner22/gamehive-backend` z tagami `sha-<7 znaków commita>` i `master`. Tag git
+`vX.Y.Z` publikuje dodatkowo `X.Y.Z` i `latest`. Obraz budują buildpacki Paketo
+(`spring-boot:build-image`, Java 25): proces działa jako nie-root, obraz nie ma powłoki
+i nie zawiera żadnych sekretów — konfiguracja przychodzi ze zmiennych środowiskowych (profil `prod`).
+
+**Uruchomienie lokalnie** razem z usługami z `docker-compose.yml` (ten sam `.env`):
+
+```bash
+docker compose --profile app up -d      # PostgreSQL + Redis + Meilisearch + aplikacja (obraz :master)
+curl localhost:8080/actuator/health     # {"status":"UP",...}
+docker compose logs -f app              # logi aplikacji (JSON)
+docker compose --profile app down       # zatrzymanie (wolumeny zostają)
+```
+
+- Inny tag albo obraz zbudowany lokalnie: `GAMEHIVE_IMAGE=ghcr.io/minner22/gamehive-backend:0.1.0 docker compose --profile app up -d`
+  (lokalny build: `./mvnw spring-boot:build-image -DskipTests` → `…:<wersja z pom.xml>`).
+- Aplikacja w kontenerze zajmuje port **8080** — zatrzymaj wcześniej `./mvnw spring-boot:run` albo wybierz inny
+  port hosta: `GAMEHIVE_PORT=18080 docker compose --profile app up -d`.
+- Zwykłe `docker compose up` i profil `dev` aplikacji z obrazu **nie** uruchamiają (usługa `app`
+  jest za profilem compose `app`).
+- Zdrowie: `/actuator/health` oraz sondy `/actuator/health/liveness` i `/actuator/health/readiness`
+  (publiczne, sam status bez szczegółów). Pozostałe endpointy actuatora nie są wystawione.
+- Przy wdrożeniu ustaw kontenerowi **limit pamięci** — kalkulator pamięci Paketo dobiera do niego
+  stertę JVM (bez limitu bierze pamięć całego hosta).
 
 ---
 
@@ -173,8 +203,9 @@ Pakiet bazowy: `pl.m22.gamehive`. DTO jako rekordy Javy, Lombok, MapStruct.
 
 ### Bezpieczeństwo i JWT
 
-- Stateless (`SessionCreationPolicy.STATELESS`), CSRF wyłączone. `permitAll` tylko dla
-  `/api/v1/auth/**`, `/swagger-ui/**`, `/v3/api-docs/**`, `/h2-console/**`.
+- Stateless (`SessionCreationPolicy.STATELESS`), CSRF wyłączone (uwierzytelnianie nagłówkiem
+  Bearer, ciasteczko refresh ma `SameSite=Strict`). `permitAll` tylko dla `/api/v1/auth/**`,
+  `/swagger-ui/**`, `/v3/api-docs/**`, `/h2-console/**` i `/actuator/health/**`.
 - Niezautoryzowane żądania otrzymują **HTTP 401** z ciałem
   `{"errorCode":"ACCESS_DENIED","message":"Authentication required"}`.
 - Cztery typy tokenów (każdy z własnym sekretem HS256): `ACCESS` (15 min),
@@ -435,11 +466,20 @@ Szczegółowa roadmapa fazy „Gry”: [`docs/roadmap-games.md`](docs/roadmap-ga
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`, workflow `CI`) ma dwa joby: **`test`**
-(`./mvnw -B verify`, raporty testów jako artefakt `surefire-reports`) i **`sonar`**
-(analiza SonarCloud na artefakcie z `test`, pomijana dla PR-ów Dependabota i forków).
-Uruchamia się na każdym PR i pushu do `master`. Build lokalnie: `./mvnw -B verify`
-(Maven Wrapper przypina Mavena 3.9.16; na Windows `mvnw.cmd`). **PR budowany jest na commicie scalającym (branch + master)** — jeśli
+GitHub Actions (`.github/workflows/ci.yml`, workflow `CI`), na każdym PR, pushu do `master`
+i tagu `v*`:
+
+- **`test`** — `./mvnw -B verify`, raporty testów jako artefakt `surefire-reports`;
+- **`integration`** — `./mvnw -B -Pintegration test`: migracje Flyway na PostgreSQL oraz
+  wyszukiwanie na prawdziwym Meilisearch (Testcontainers);
+- **`migrations-guard`** (PR) — blokuje edycję zastosowanych migracji;
+- **`dependency-review`** (PR) — blokuje nowe zależności ze znanymi podatnościami (high+);
+- **`sonar`** — analiza SonarCloud (pomijana dla Dependabota, forków i tagów);
+- **`image`** (push na `master` i tagi) — obraz Docker do GHCR, patrz „Obraz Docker”.
+
+Osobny workflow **`CodeQL`** skanuje kod Javy i workflowy. `master` jest chroniony rulesetem
+(zmiany tylko przez PR z zielonymi `test`, `integration`, `migrations-guard`, `dependency-review`).
+Build lokalnie: `./mvnw -B verify` (Maven Wrapper przypina Mavena 3.10.2; na Windows `mvnw.cmd`). **PR budowany jest na commicie scalającym (branch + master)** — jeśli
 master się przesunął, lokalny `mvn test` może przejść mimo czerwonego CI; przed
 debugowaniem warto zrobić rebase/pull mastera. Pokrycie SonarCloud wyklucza pakiety
 `dto`, `model`, `config`, `mapper`, `exception`, `logging` oraz `GameHiveApplication`.
