@@ -42,6 +42,7 @@
 			**/GameHiveApplication.java
 		</sonar.coverage.exclusions>
 		<mapstruct.version>1.6.3</mapstruct.version>
+		<spring-boot.build-image.imageName>ghcr.io/minner22/gamehive-backend:${project.version}</spring-boot.build-image.imageName>
 		<okhttp.version>5.3.2</okhttp.version>
 	</properties>
 	<dependencyManagement>
@@ -282,7 +283,6 @@
 						</exclude>
 					</excludes>
 					<image>
-						<name>ghcr.io/minner22/gamehive-backend:${project.version}</name>
 						<env>
 							<BP_JVM_VERSION>25</BP_JVM_VERSION>
 							<BP_OCI_SOURCE>https://github.com/Minner22/gamehive-backend</BP_OCI_SOURCE>
