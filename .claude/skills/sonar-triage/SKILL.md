@@ -7,6 +7,8 @@ description: Pobiera otwarte issues i stan quality gate projektu GameHive z Sona
 
 Projekt: `Minner22_gamehive-backend` (analiza w jobie `sonar` workflow `CI`, `.github/workflows/ci.yml` — na każdym PR i pushu do `master`, na artefakcie z joba `test`; pomijana dla Dependabota i forków, GH-153). Wygasły `SONAR_TOKEN` czerwieni tylko job `sonar` (`HTTP 403`), nie `test`. Precedens: GH-136 (sprzątanie długu).
 
+**Sonar to nie jedyne źródło alertów bezpieczeństwa (GH-156).** CodeQL (workflow `CodeQL`, *Security → Code scanning*: `gh api repos/Minner22/gamehive-backend/code-scanning/alerts?state=open`), dependency review (job `dependency-review` na PR) i alerty Dependabota (`…/dependabot/alerts`) są publiczne dla właściciela repo i nie potrzebują `SONAR_TOKEN`. Zanim zgłosisz hotspot Sonara jako nowy problem, sprawdź, czy CodeQL nie ma go już rozstrzygniętego — np. wyłączony CSRF w `SecurityConfig` jest świadomą decyzją (alert CodeQL #1 dismissed *won't fix*, uzasadnienie w CLAUDE.md, „Security & JWT pipeline”), więc analogiczny hotspot Sonara to *Safe*.
+
 ## Pobranie danych
 API SonarCloud. **Projekt jest prywatny** — anonimowe zapytanie zwraca `{"errors":[{"msg":"Project doesn't exist"}]}` (sprawdzone 2026-11-21). Potrzebny token: poproś użytkownika o wygenerowanie go w SonarCloud (My Account → Security) i ustawienie zmiennej `SONAR_TOKEN` w środowisku, z którego startuje Claude Code. Do każdego `curl` dodaj `-u "$SONAR_TOKEN:"`. Jeśli zmiennej brak, zatrzymaj się i poproś o nią. **Nigdy nie proś o wklejenie tokena do czatu.**
 

@@ -36,7 +36,8 @@
         "required_status_checks": [
           { "context": "test", "integration_id": 15368 },
           { "context": "integration", "integration_id": 15368 },
-          { "context": "migrations-guard", "integration_id": 15368 }
+          { "context": "migrations-guard", "integration_id": 15368 },
+          { "context": "dependency-review", "integration_id": 15368 }
         ]
       }
     }
