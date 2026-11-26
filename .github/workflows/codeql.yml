@@ -1,0 +1,65 @@
+name: CodeQL
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  schedule:
+    # poniedziałek 03:17 UTC — nowe reguły CodeQL trafiają w kod także bez zmian w repo
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # wysyłka wyników do Security → Code scanning — jedyne miejsce z tym uprawnieniem
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # manual: kompilacja wrapperem na JDK 25, żeby ekstraktor widział kod z Lomboka i MapStructa
+          - language: java-kotlin
+            build-mode: manual
+          # workflowy GitHub Actions (wstrzyknięcia w run:, zbyt szerokie permissions)
+          - language: actions
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 25
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v6
+        with:
+          java-version: 25
+          distribution: zulu
+          cache: maven
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Compile
+        if: matrix.build-mode == 'manual'
+        run: ./mvnw -B -DskipTests compile
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
