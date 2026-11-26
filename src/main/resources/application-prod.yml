@@ -1,4 +1,6 @@
 spring:
+    main:
+        banner-mode: off
     datasource:
         url: ${DB_URL}
         username: ${DB_USER}
@@ -17,6 +19,8 @@ spring:
     flyway:
         locations: classpath:db/migration
     mail:
+        username: ${MAIL_USERNAME}
+        password: ${MAIL_PASSWORD}
         activationAddress: ${ACTIVATION_ADDRESS}
         passwordResetAddress: ${PASSWORD_RESET_ADDRESS}
     data:

@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>pl.m22</groupId>
 	<artifactId>gamehive</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.1.0-SNAPSHOT</version>
 	<name>backend</name>
 	<description>backend</description>
 	<url/>
@@ -70,6 +70,10 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
 		<dependency>
@@ -277,6 +281,13 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+					<image>
+						<name>ghcr.io/minner22/gamehive-backend:${project.version}</name>
+						<env>
+							<BP_JVM_VERSION>25</BP_JVM_VERSION>
+							<BP_OCI_SOURCE>https://github.com/Minner22/gamehive-backend</BP_OCI_SOURCE>
+						</env>
+					</image>
 				</configuration>
 			</plugin>
 			<plugin>

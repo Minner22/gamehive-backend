@@ -47,6 +47,30 @@ services:
       timeout: 5s
       retries: 5
 
+  app:
+    image: ${GAMEHIVE_IMAGE:-ghcr.io/minner22/gamehive-backend:master}
+    container_name: gamehive-app
+    profiles: [app]
+    ports:
+      - "${GAMEHIVE_PORT:-8080}:8080"   # port hosta do zmiany, gdy 8080 zajmuje aplikacja z IDE
+    env_file: .env                  # JWT_*, MAIL_*, MEILI_MASTER_KEY, REDIS_PASSWORD — te same nazwy co lokalnie
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/gamehive
+      DB_USER: ${POSTGRES_USER:-gamehive}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      MEILI_HOST: http://meilisearch:7700
+      ACTIVATION_ADDRESS: http://localhost:5173/activate
+      PASSWORD_RESET_ADDRESS: http://localhost:5173/password-reset/confirm
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+
 volumes:
   redis-data:
   postgres-data:

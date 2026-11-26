@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [master]
+    tags: ['v*']
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
@@ -118,6 +119,7 @@ jobs:
     name: sonar
     needs: test
     if: >-
+      github.ref_type != 'tag' &&
       github.actor != 'dependabot[bot]' &&
       (github.event_name != 'pull_request' ||
        github.event.pull_request.head.repo.full_name == github.repository)
@@ -153,3 +155,50 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: ./mvnw -B sonar:sonar
+
+  image:
+    name: image
+    needs: [test, integration]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/minner22/gamehive-backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          java-version: 25
+          distribution: zulu
+          cache: maven
+
+      - name: Build image (Paketo buildpacks)
+        run: ./mvnw -B spring-boot:build-image -DskipTests "-Dspring-boot.build-image.imageName=${IMAGE}:build"
+
+      - name: Push to GHCR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          tags="sha-${GITHUB_SHA::7}"
+          if [ "$REF_TYPE" = tag ]; then
+            tags="$tags ${REF_NAME#v} latest"
+          else
+            tags="$tags master"
+          fi
+          for t in $tags; do
+            docker tag "$IMAGE:build" "$IMAGE:$t"
+            docker push "$IMAGE:$t"
+            echo "pushed $IMAGE:$t" >> "$GITHUB_STEP_SUMMARY"
+          done

@@ -6,6 +6,8 @@ spring:
     flyway:
         locations: classpath:db/migration
     mail:
+        username: ${MAIL_USERNAME}
+        password: ${MAIL_PASSWORD}
         # Link w mailu prowadzi na stronę frontu (Vite dev server :5173), która wyciąga token
         # z URL i sama woła API (GET /api/v1/auth/activate?token=...) przez proxy.
         activationAddress: http://localhost:5173/activate
@@ -28,3 +30,7 @@ spring:
         compose:
             lifecycle-management: start-and-stop
             file: docker-compose.yml
+
+gamehive:
+    search:
+        api-key: ${MEILI_MASTER_KEY}
