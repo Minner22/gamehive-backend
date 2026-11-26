@@ -16,6 +16,7 @@ Uzasadnienia: sekcje "Error handling" i "API documentation (OpenAPI/Swagger)" w 
 - [ ] Odpowiedź stronicowana: `Page<T>` w kodzie, a w `@ApiResponse` dedykowany płaski `Page<Nazwa>Dto` (record w `dto`).
 - [ ] Sukces to record (`MessageResponseDto`, `AccessTokenResponseDto`…), nie `Map`/`String`. DTO = record z `@Schema` na komponentach.
 - [ ] Nowa ścieżka / zmiana kontraktu → asercja w `OpenApiDocumentationTest`.
+- [ ] Nowa / usunięta ścieżka → wiersz w `API.md` (pełna lista endpointów; README trzyma tylko prefiksy). Przy GH-200 lista okazała się nieaktualna o dwa endpointy GH-142 (`/collection/{games,expansions}/ids`).
 - [ ] Deprecacja = trzy rzeczy: `@Deprecated(since = "GH-<nr>")`, `@Operation(deprecated = true, description = co zamiast i co traci wywołujący)`, Javadoc `@deprecated {@link następca}` (S1123). S1133 = Won't fix.
 
 ## Parametry i paginacja
