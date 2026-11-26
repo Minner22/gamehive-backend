@@ -49,6 +49,21 @@ jwt:
         validityInSeconds: 900
     passwordreset:
         validityInSeconds: 900
+
+management:
+    endpoints:
+        web:
+            exposure:
+                include: health
+    endpoint:
+        health:
+            show-details: never
+            probes:
+                enabled: true
+    health:
+        mail:
+            enabled: false
+
 gamehive:
   moderation:
       max-resubmissions: 5

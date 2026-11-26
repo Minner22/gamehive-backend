@@ -32,6 +32,7 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll() // healthcheck kontenera
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
