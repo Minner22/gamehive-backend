@@ -18,7 +18,7 @@ spring:
                     starttls:
                         enable: true
     config:
-        import: optional:file:./secret.properties
+        import: optional:file:./.env[.properties]
     jpa:
         properties:
           hibernate:
@@ -41,13 +41,17 @@ springdoc:
 
 jwt:
     activation:
+        secret: ${JWT_ACTIVATION_SECRET}
         validityInSeconds: 86400
     refresh:
+        secret: ${JWT_REFRESH_SECRET}
         validityInSeconds: 604800
         maxActiveTokensPerUser: 5
     access:
+        secret: ${JWT_ACCESS_SECRET}
         validityInSeconds: 900
     passwordreset:
+        secret: ${JWT_PASSWORDRESET_SECRET}
         validityInSeconds: 900
 
 management:
